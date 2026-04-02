@@ -860,6 +860,61 @@ body {
   margin-bottom: 0.5rem;
 }
 
+/* Continue Reading Section */
+.continue-reading-section {
+  margin: 1rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.continue-reading-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+  border: none;
+  border-radius: 8px;
+  color: white;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.continue-reading-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+}
+
+.continue-icon {
+  font-size: 0.875rem;
+}
+
+.reading-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.overall-progress-bar {
+  height: 6px;
+  background: var(--bg-tertiary);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.overall-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--success), #22c55e);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
 .manga-description {
   margin-top: 1rem;
 }
@@ -905,6 +960,12 @@ body {
   gap: 0.5rem;
 }
 
+.chapter-number {
+  font-weight: 600;
+  min-width: 100px;
+}
+
+/* Chapter List with Progress */
 .chapter-item {
   display: flex;
   align-items: center;
@@ -913,16 +974,112 @@ body {
   background: var(--bg-secondary);
   border-radius: 8px;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: all 0.2s;
+  border-left: 3px solid transparent;
 }
 
 .chapter-item:hover {
   background: var(--bg-tertiary);
+  transform: translateX(4px);
 }
 
-.chapter-number {
+.chapter-item.read {
+  border-left-color: var(--success);
+  background: rgba(34, 197, 94, 0.05);
+}
+
+.chapter-item.current {
+  border-left-color: var(--accent);
+  background: rgba(99, 102, 241, 0.1);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.chapter-status-icon {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.status-read {
+  color: var(--success);
+  font-weight: bold;
+}
+
+.status-current {
+  color: var(--accent);
+}
+
+.status-unread {
+  color: var(--text-secondary);
+  opacity: 0.5;
+}
+
+.chapter-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: 0.25rem;
+}
+
+.chapter-title {
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.chapter-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-left: auto;
+}
+
+.chapter-pages {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.chapter-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 120px;
+}
+
+.chapter-progress-bar {
+  flex: 1;
+  height: 4px;
+  background: var(--bg-tertiary);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.chapter-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.chapter-progress-text {
+  font-size: 0.75rem;
+  color: var(--accent);
   font-weight: 600;
-  min-width: 100px;
+  min-width: 35px;
+  text-align: right;
+}
+
+.chapter-read-badge {
+  font-size: 0.75rem;
+  padding: 0.25rem 0.75rem;
+  background: rgba(34, 197, 94, 0.2);
+  color: var(--success);
+  border-radius: 9999px;
+  font-weight: 600;
 }
 
 .chapter-title {
