@@ -1,0 +1,11 @@
+{
+  "extends": "@mugiwara/tsconfig/node",
+  "compilerOptions": {
+    "outDir": "../../dist/main",
+    "rootDir": ".",
+    "esModuleInterop": true,
+    "skipLibCheck": true
+  },
+  "include": ["**/*.ts"],
+  "exclude": ["node_modules", "dist"]
+}

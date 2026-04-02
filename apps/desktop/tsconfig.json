@@ -1,0 +1,9 @@
+{
+  "extends": "@mugiwara/tsconfig/react",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "."
+  },
+  "include": ["**/*.ts", "**/*.tsx"],
+  "exclude": ["node_modules", "dist"]
+}
