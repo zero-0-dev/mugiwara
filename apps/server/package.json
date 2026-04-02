@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@mugiwara/types": "workspace:*",
+    "axios": "^1.14.0",
     "better-sqlite3": "^9.2.2",
     "chokidar": "^3.5.3",
     "cors": "^2.8.5",

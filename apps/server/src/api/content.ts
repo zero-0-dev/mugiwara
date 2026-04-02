@@ -91,6 +91,32 @@ router.get('/thumbnails/:filename', async (req: Request, res: Response): Promise
   }
 });
 
+// GET /api/content/covers/:filename - Serve cover image
+router.get('/covers/:filename', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const filename = req.params.filename;
+    if (!filename) {
+      res.status(400).json({ error: 'Filename is required' });
+      return;
+    }
+    const coversDir = join(process.cwd(), 'data', 'covers');
+    const filepath = join(coversDir, filename);
+    
+    if (!existsSync(filepath)) {
+      res.status(404).json({ error: 'Cover image not found' });
+      return;
+    }
+    
+    const imageBuffer = await readFile(filepath);
+    res.setHeader('Content-Type', 'image/jpeg');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.send(imageBuffer);
+  } catch (error) {
+    console.error('Error serving cover image:', error);
+    res.status(500).json({ error: 'Failed to serve cover image' });
+  }
+});
+
 function extractFromArchive(archivePath: string, fileName: string): Promise<Buffer | null> {
   return new Promise((resolve, reject) => {
     yauzl.open(archivePath, { lazyEntries: true }, (err, zipfile) => {

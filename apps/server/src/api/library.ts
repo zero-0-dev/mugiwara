@@ -53,12 +53,22 @@ router.post('/scan', async (_req: Request, res: Response): Promise<void> => {
                   // Skip if chapter path already exists or chapter number already exists
                   if (!existingPaths.has(chapter.path) && !existingNumbers.has(chapter.chapterNumber)) {
                     try {
+                      // Count pages in the chapter
+                      let pagesCount = 0;
+                      try {
+                        const source = pluginManager.getSource('local') as LocalFileSource;
+                        const pages = await source.getChapterPages(existing.id, chapter.path);
+                        pagesCount = pages.length;
+                      } catch (err) {
+                        console.warn(`Failed to count pages for ${chapter.title}:`, err);
+                      }
+
                       await chapterRepository.create({
                         id: uuidv4(),
                         mangaId: existing.id,
                         chapterNumber: chapter.chapterNumber,
                         title: chapter.title,
-                        pagesCount: 0,
+                        pagesCount,
                         filePath: chapter.path,
                         archiveType: chapter.archiveType,
                       });
@@ -88,14 +98,24 @@ router.post('/scan', async (_req: Request, res: Response): Promise<void> => {
                   throw new Error('Failed to create manga');
                 }
 
-                // Create chapters
+                // Create chapters with page counts
                 for (const chapter of scannedManga.chapters) {
+                  // Count pages in the chapter
+                  let pagesCount = 0;
+                  try {
+                    const source = pluginManager.getSource('local') as LocalFileSource;
+                    const pages = await source.getChapterPages(newManga.id, chapter.path);
+                    pagesCount = pages.length;
+                  } catch (err) {
+                    console.warn(`Failed to count pages for ${chapter.title}:`, err);
+                  }
+
                   await chapterRepository.create({
                     id: uuidv4(),
                     mangaId: newManga.id,
                     chapterNumber: chapter.chapterNumber,
                     title: chapter.title,
-                    pagesCount: 0,
+                    pagesCount,
                     filePath: chapter.path,
                     archiveType: chapter.archiveType,
                   });

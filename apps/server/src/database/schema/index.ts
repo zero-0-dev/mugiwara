@@ -11,8 +11,13 @@ export const manga = sqliteTable('manga', {
   status: text('status').notNull().default('unknown'),
   mediaType: text('media_type').notNull().default('unknown'),
   coverImage: text('cover_image'),
+  bannerImage: text('banner_image'),
   sourceId: text('source_id').notNull(),
   sourceMangaId: text('source_manga_id'),
+  anilistId: integer('anilist_id'),
+  genres: text('genres', { mode: 'json' }).$type<string[]>(),
+  tags: text('tags', { mode: 'json' }).$type<string[]>(),
+  lastMetadataSync: text('last_metadata_sync'),
   createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
   updatedAt: text('updated_at').notNull().default('CURRENT_TIMESTAMP'),
 });
