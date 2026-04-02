@@ -11,6 +11,7 @@ import chapterRoutes from './api/chapters';
 import libraryRoutes from './api/library';
 import contentRoutes from './api/content';
 import metadataRoutes from './api/metadata';
+import filtersRoutes from './api/filters';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -30,6 +31,7 @@ app.use('/api/manga', mangaRoutes);
 app.use('/api/manga/:mangaId/chapters', chapterRoutes);
 app.use('/api/manga/:mangaId/metadata', metadataRoutes);
 app.use('/api/library', libraryRoutes);
+app.use('/api/library', filtersRoutes);
 app.use('/api/content', contentRoutes);
 
 // Health check
