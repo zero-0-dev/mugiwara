@@ -54,8 +54,19 @@ export function MangaDetail({
   // Cache-busting timestamp for images
   const [imageCacheBuster, setImageCacheBuster] = useState(Date.now());
 
+  // Categories state
+  const [categories, setCategories] = useState<
+    Array<{ id: string; name: string; color: string | null }>
+  >([]);
+  const [mangaCategories, setMangaCategories] = useState<
+    Array<{ id: string; name: string; color: string | null }>
+  >([]);
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+
   useEffect(() => {
     fetchMangaDetail();
+    fetchCategories();
+    fetchMangaCategories();
   }, [mangaId, apiBaseUrl]);
 
   async function fetchMangaDetail() {
@@ -147,6 +158,64 @@ export function MangaDetail({
         progressPercent,
       };
     });
+  }
+
+  async function fetchCategories() {
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/categories`);
+      if (response.ok) {
+        const data = await response.json();
+        setCategories(data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch categories:", err);
+    }
+  }
+
+  async function fetchMangaCategories() {
+    try {
+      const response = await fetch(
+        `${apiBaseUrl}/api/categories/manga/${mangaId}/categories`,
+      );
+      if (response.ok) {
+        const data = await response.json();
+        setMangaCategories(data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch manga categories:", err);
+    }
+  }
+
+  async function addToCategory(categoryId: string) {
+    try {
+      const response = await fetch(
+        `${apiBaseUrl}/api/categories/manga/${mangaId}/categories`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ categoryId }),
+        },
+      );
+      if (response.ok) {
+        await fetchMangaCategories();
+      }
+    } catch (err) {
+      console.error("Failed to add to category:", err);
+    }
+  }
+
+  async function removeFromCategory(categoryId: string) {
+    try {
+      await fetch(
+        `${apiBaseUrl}/api/categories/manga/${mangaId}/categories/${categoryId}`,
+        {
+          method: "DELETE",
+        },
+      );
+      await fetchMangaCategories();
+    } catch (err) {
+      console.error("Failed to remove from category:", err);
+    }
   }
 
   const handleContinueReading = () => {
@@ -429,6 +498,85 @@ export function MangaDetail({
                   </div>
                 </div>
               )}
+
+              {/* Categories */}
+              <div className="meta-item categories-section">
+                <div className="categories-header">
+                  <strong>Categories:</strong>
+                  <div className="category-dropdown-container">
+                    <button
+                      onClick={() =>
+                        setShowCategoryDropdown(!showCategoryDropdown)
+                      }
+                      className="btn btn-small btn-secondary"
+                    >
+                      + Add to Category
+                    </button>
+                    {showCategoryDropdown && (
+                      <div className="category-dropdown">
+                        {categories
+                          .filter(
+                            (cat) =>
+                              !mangaCategories.some((mc) => mc.id === cat.id),
+                          )
+                          .map((category) => (
+                            <button
+                              key={category.id}
+                              onClick={() => {
+                                addToCategory(category.id);
+                                setShowCategoryDropdown(false);
+                              }}
+                              className="category-dropdown-item"
+                            >
+                              <span
+                                className="category-dot-small"
+                                style={{
+                                  backgroundColor: category.color || "#6366f1",
+                                }}
+                              />
+                              {category.name}
+                            </button>
+                          ))}
+                        {categories.filter(
+                          (cat) =>
+                            !mangaCategories.some((mc) => mc.id === cat.id),
+                        ).length === 0 && (
+                          <span className="category-dropdown-empty">
+                            No more categories
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="manga-categories">
+                  {mangaCategories.map((category) => (
+                    <span
+                      key={category.id}
+                      className="category-tag"
+                      style={{
+                        backgroundColor: category.color
+                          ? `${category.color}33`
+                          : "rgba(99, 102, 241, 0.2)",
+                        borderColor: category.color || "#6366f1",
+                        color: category.color || "#818cf8",
+                      }}
+                    >
+                      {category.name}
+                      <button
+                        onClick={() => removeFromCategory(category.id)}
+                        className="category-remove-btn"
+                        title="Remove from category"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                  {mangaCategories.length === 0 && (
+                    <span className="no-categories">Not in any category</span>
+                  )}
+                </div>
+              </div>
               {manga.description && (
                 <div className="manga-description">
                   <strong>Description:</strong>
@@ -494,7 +642,7 @@ export function MangaDetail({
 
         <div className="chapters-section">
           <h2>Chapters</h2>
-          
+
           {/* Continue Reading Section */}
           {chapters.length > 0 && (
             <div className="continue-reading-section">
@@ -522,7 +670,7 @@ export function MangaDetail({
               )}
             </div>
           )}
-          
+
           {chapters.length === 0 ? (
             <p className="no-chapters">No chapters available</p>
           ) : (

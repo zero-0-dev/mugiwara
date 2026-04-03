@@ -73,9 +73,18 @@ export function SettingsPage({ apiBaseUrl, onBack }: SettingsPageProps) {
   const [error, setError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
 
+  // Categories state
+  const [categories, setCategories] = useState<
+    Array<{ id: string; name: string; color: string | null; sortOrder: number }>
+  >([]);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [newCategoryColor, setNewCategoryColor] = useState("#6366f1");
+  const [savingCategory, setSavingCategory] = useState(false);
+
   useEffect(() => {
     loadSettings();
     loadDirectories();
+    loadCategories();
   }, [apiBaseUrl]);
 
   // Clear success message after 2 seconds
@@ -111,6 +120,70 @@ export function SettingsPage({ apiBaseUrl, onBack }: SettingsPageProps) {
       }
     } catch (err) {
       console.error("Failed to load directories:", err);
+    }
+  }
+
+  async function loadCategories() {
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/categories`);
+      if (response.ok) {
+        const data = await response.json();
+        setCategories(data);
+      }
+    } catch (err) {
+      console.error("Failed to load categories:", err);
+    }
+  }
+
+  async function addCategory() {
+    const trimmed = newCategoryName.trim();
+    if (!trimmed) return;
+
+    try {
+      setSavingCategory(true);
+      const response = await fetch(`${apiBaseUrl}/api/categories`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: trimmed, color: newCategoryColor }),
+      });
+
+      if (response.ok) {
+        setNewCategoryName("");
+        setSaveSuccess("Category added");
+        await loadCategories();
+      } else {
+        const error = await response.json();
+        setError(error.error || "Failed to add category");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to add category");
+    } finally {
+      setSavingCategory(false);
+    }
+  }
+
+  async function deleteCategory(categoryId: string) {
+    if (!confirm("Are you sure you want to delete this category?")) return;
+
+    try {
+      const response = await fetch(
+        `${apiBaseUrl}/api/categories/${categoryId}`,
+        {
+          method: "DELETE",
+        },
+      );
+
+      if (response.ok) {
+        setSaveSuccess("Category deleted");
+        await loadCategories();
+      } else {
+        const error = await response.json();
+        setError(error.error || "Failed to delete category");
+      }
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to delete category",
+      );
     }
   }
 
@@ -421,6 +494,69 @@ export function SettingsPage({ apiBaseUrl, onBack }: SettingsPageProps) {
               <p className="hint">
                 Add at least one directory to scan for manga.
               </p>
+            </div>
+          )}
+        </section>
+
+        {/* Categories */}
+        <section className="settings-section">
+          <h2>🏷️ Categories</h2>
+          <p className="section-description">
+            Create categories to organize your manga library (e.g., Reading,
+            Completed, On Hold, Favorites).
+          </p>
+
+          <div className="category-input-row">
+            <input
+              type="text"
+              value={newCategoryName}
+              onChange={(e) => setNewCategoryName(e.target.value)}
+              placeholder="Enter category name"
+              onKeyPress={(e) => e.key === "Enter" && addCategory()}
+              className="category-input"
+            />
+            <input
+              type="color"
+              value={newCategoryColor}
+              onChange={(e) => setNewCategoryColor(e.target.value)}
+              className="category-color-picker"
+              title="Category color"
+            />
+            <button
+              onClick={addCategory}
+              disabled={!newCategoryName.trim() || savingCategory}
+              className="btn btn-primary"
+            >
+              {savingCategory ? "Adding..." : "Add"}
+            </button>
+          </div>
+
+          <div className="categories-list">
+            {categories.map((category) => (
+              <div
+                key={category.id}
+                className="category-item"
+                style={{ borderLeftColor: category.color || "#6366f1" }}
+              >
+                <span
+                  className="category-dot"
+                  style={{ backgroundColor: category.color || "#6366f1" }}
+                />
+                <span className="category-name">{category.name}</span>
+                <button
+                  onClick={() => deleteCategory(category.id)}
+                  className="btn btn-danger btn-small"
+                >
+                  Delete
+                </button>
+              </div>
+            ))}
+          </div>
+
+          {categories.length === 0 && (
+            <div className="empty-categories">
+              <p>No categories created yet.</p>
+              <p className="hint">Create categories to organize your manga.</p>
             </div>
           )}
         </section>

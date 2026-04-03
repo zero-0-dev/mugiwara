@@ -14,6 +14,7 @@ import contentRoutes from "./api/content";
 import metadataRoutes from "./api/metadata";
 import filtersRoutes from "./api/filters";
 import settingsRoutes from "./api/settings";
+import categoriesRoutes from "./api/categories";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -35,6 +36,7 @@ app.use("/api/manga/:mangaId/metadata", metadataRoutes);
 app.use("/api/library", libraryRoutes);
 app.use("/api/library", filtersRoutes);
 app.use("/api/settings", settingsRoutes);
+app.use("/api/categories", categoriesRoutes);
 app.use("/api/content", contentRoutes);
 
 // Health check

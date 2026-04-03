@@ -35,6 +35,7 @@ export function Library({ apiBaseUrl, onMangaSelect }: LibraryProps) {
     mediaType: "",
     genre: "",
     readingStatus: "all",
+    category: "",
   });
   const [sortBy, setSortBy] = useState("lastRead");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
@@ -89,6 +90,7 @@ export function Library({ apiBaseUrl, onMangaSelect }: LibraryProps) {
       if (filters.status) params.append("status", filters.status);
       if (filters.mediaType) params.append("mediaType", filters.mediaType);
       if (filters.genre) params.append("genre", filters.genre);
+      if (filters.category) params.append("category", filters.category);
       if (filters.readingStatus !== "all")
         params.append("readingStatus", filters.readingStatus);
 
@@ -147,6 +149,7 @@ export function Library({ apiBaseUrl, onMangaSelect }: LibraryProps) {
       mediaType: "",
       genre: "",
       readingStatus: "all",
+      category: "",
     });
     setSortBy("lastRead");
     setSortOrder("desc");
@@ -157,6 +160,7 @@ export function Library({ apiBaseUrl, onMangaSelect }: LibraryProps) {
     filters.status ||
     filters.mediaType ||
     filters.genre ||
+    filters.category ||
     filters.readingStatus !== "all";
 
   if (loading) {
@@ -288,6 +292,23 @@ export function Library({ apiBaseUrl, onMangaSelect }: LibraryProps) {
                 <option value="Sports">Sports</option>
                 <option value="Supernatural">Supernatural</option>
                 <option value="Thriller">Thriller</option>
+              </select>
+            </div>
+
+            <div className="filter-group">
+              <label>Category</label>
+              <select
+                value={filters.category}
+                onChange={(e) =>
+                  setFilters({ ...filters, category: e.target.value })
+                }
+              >
+                <option value="">All Categories</option>
+                {filterOptions?.categories?.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.name}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
