@@ -1,5 +1,5 @@
-import { eq, like, or, and, desc, sql, count } from 'drizzle-orm';
-import { db, manga, chapters, readingProgress } from '../index';
+import { eq, like, or, and, desc, sql, count } from "drizzle-orm";
+import { db, manga, chapters, readingProgress, importTasks } from "../index";
 
 export const mangaRepository = {
   async findAll() {
@@ -18,7 +18,7 @@ export const mangaRepository = {
     return await db.query.manga.findFirst({
       where: and(
         eq(manga.sourceId, sourceId),
-        eq(manga.sourceMangaId, sourceMangaId)
+        eq(manga.sourceMangaId, sourceMangaId),
       ),
     });
   },
@@ -38,6 +38,20 @@ export const mangaRepository = {
   },
 
   async delete(id: string) {
+    // Delete related records first (in correct order to avoid FK constraint errors)
+    // Note: Most tables have onDelete: "cascade", but we explicitly delete for safety
+
+    // Delete import tasks
+    await db.delete(importTasks).where(eq(importTasks.mangaId, id));
+
+    // Delete reading progress (has FK to chapters, so delete before chapters)
+    await db.delete(readingProgress).where(eq(readingProgress.mangaId, id));
+
+    // Delete chapters (will cascade delete reading progress if any remain)
+    await db.delete(chapters).where(eq(chapters.mangaId, id));
+
+    // Finally delete the manga
+    // This will cascade delete: mangaCategories, mangaCollections, tracking
     await db.delete(manga).where(eq(manga.id, id));
   },
 
@@ -45,8 +59,8 @@ export const mangaRepository = {
     return await db.query.manga.findMany({
       where: or(
         like(manga.title, `%${query}%`),
-        like(manga.description || '', `%${query}%`),
-        like(manga.author || '', `%${query}%`)
+        like(manga.description || "", `%${query}%`),
+        like(manga.author || "", `%${query}%`),
       ),
       orderBy: desc(manga.title),
     });
@@ -63,9 +77,11 @@ export const mangaRepository = {
       .leftJoin(readingProgress, eq(manga.id, readingProgress.mangaId))
       .leftJoin(chapters, eq(manga.id, chapters.mangaId))
       .groupBy(manga.id)
-      .orderBy(desc(sql`COALESCE(${readingProgress.lastReadAt}, ${manga.createdAt})`));
+      .orderBy(
+        desc(sql`COALESCE(${readingProgress.lastReadAt}, ${manga.createdAt})`),
+      );
 
-    return results.map(r => ({
+    return results.map((r) => ({
       ...r.manga,
       progress: r.progress || undefined,
       chapterCount: r.chapterCount,

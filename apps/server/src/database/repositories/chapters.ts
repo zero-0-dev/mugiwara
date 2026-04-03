@@ -1,11 +1,11 @@
-import { eq, and, gt, lt, asc, desc, sql } from 'drizzle-orm';
-import { db, chapters } from '../index';
+import { eq, and, gt, lt, asc, desc, sql } from "drizzle-orm";
+import { db, chapters } from "../index";
 
 export const chapterRepository = {
   async findByMangaId(mangaId: string) {
     return await db.query.chapters.findMany({
       where: eq(chapters.mangaId, mangaId),
-      orderBy: asc(chapters.chapterNumber),
+      orderBy: asc(chapters.sortOrder),
     });
   },
 
@@ -15,11 +15,11 @@ export const chapterRepository = {
     });
   },
 
-  async findByNumber(mangaId: string, chapterNumber: number) {
+  async findByChapterId(mangaId: string, chapterId: string) {
     return await db.query.chapters.findFirst({
       where: and(
         eq(chapters.mangaId, mangaId),
-        eq(chapters.chapterNumber, chapterNumber)
+        eq(chapters.chapterId, chapterId),
       ),
     });
   },
@@ -46,23 +46,23 @@ export const chapterRepository = {
     await db.delete(chapters).where(eq(chapters.mangaId, mangaId));
   },
 
-  async getNextChapter(mangaId: string, currentChapterNumber: number) {
+  async getNextChapter(mangaId: string, currentSortOrder: number) {
     return await db.query.chapters.findFirst({
       where: and(
         eq(chapters.mangaId, mangaId),
-        gt(chapters.chapterNumber, currentChapterNumber)
+        gt(chapters.sortOrder, currentSortOrder),
       ),
-      orderBy: asc(chapters.chapterNumber),
+      orderBy: asc(chapters.sortOrder),
     });
   },
 
-  async getPreviousChapter(mangaId: string, currentChapterNumber: number) {
+  async getPreviousChapter(mangaId: string, currentSortOrder: number) {
     return await db.query.chapters.findFirst({
       where: and(
         eq(chapters.mangaId, mangaId),
-        lt(chapters.chapterNumber, currentChapterNumber)
+        lt(chapters.sortOrder, currentSortOrder),
       ),
-      orderBy: [desc(chapters.chapterNumber)],
+      orderBy: [desc(chapters.sortOrder)],
     });
   },
 };

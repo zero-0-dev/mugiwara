@@ -96,7 +96,10 @@ export function Reader({
   }, [readingMode, pages, loading, savedPageIndex]);
 
   useEffect(() => {
-    if (pages.length > 0 && !loading && didInitialScroll.current) {
+    console.log(
+      `[Reader] Progress effect triggered: currentPage=${currentPage}, pages.length=${pages.length}, loading=${loading}`,
+    );
+    if (pages.length > 0 && !loading) {
       saveProgress();
     }
   }, [currentPage, pages.length, loading]);
@@ -193,7 +196,7 @@ export function Reader({
       );
       if (mangaSettingResponse.ok) {
         const data = await mangaSettingResponse.json();
-        if (data.value) {
+        if (data && data.value) {
           setReadingMode(data.value as ReadingMode);
           return;
         }
@@ -243,8 +246,12 @@ export function Reader({
         `${apiBaseUrl}/api/manga/${mangaId}/progress`,
       );
       if (response.ok) {
-        const progress: ReadingProgress = await response.json();
-        if (progress.chapterId === chapterId && progress.pageNumber > 1) {
+        const progress: ReadingProgress | null = await response.json();
+        if (
+          progress &&
+          progress.chapterId === chapterId &&
+          progress.pageNumber > 1
+        ) {
           const pageIndex = progress.pageNumber - 1;
           setCurrentPage(pageIndex);
 
@@ -261,18 +268,29 @@ export function Reader({
 
   async function saveProgress() {
     try {
-      await fetch(`${apiBaseUrl}/api/manga/${mangaId}/progress`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chapterId,
-          pageNumber: currentPage + 1,
-          totalPages: pages.length,
-          isCompleted: currentPage === pages.length - 1,
-        }),
-      });
+      console.log(
+        `[Reader] Saving progress: manga=${mangaId}, chapter=${chapterId}, page=${currentPage + 1}/${pages.length}`,
+      );
+      const response = await fetch(
+        `${apiBaseUrl}/api/manga/${mangaId}/progress`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chapterId,
+            pageNumber: currentPage + 1,
+            totalPages: pages.length,
+            isCompleted: currentPage === pages.length - 1,
+          }),
+        },
+      );
+      if (!response.ok) {
+        console.error(`[Reader] Failed to save progress: ${response.status}`);
+      } else {
+        console.log(`[Reader] Progress saved successfully`);
+      }
     } catch (err) {
-      console.error("Failed to save progress:", err);
+      console.error("[Reader] Failed to save progress:", err);
     }
   }
 

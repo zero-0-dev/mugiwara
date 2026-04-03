@@ -1,14 +1,17 @@
-import { contextBridge, ipcRenderer } from 'electron';
+import { contextBridge, ipcRenderer } from "electron";
 
 // Expose API to renderer process
-contextBridge.exposeInMainWorld('electronAPI', {
+contextBridge.exposeInMainWorld("electronAPI", {
   // Server info
-  getServerPort: () => ipcRenderer.invoke('get-server-port'),
-  getApiUrl: (path: string) => ipcRenderer.invoke('get-api-url', path),
-  
+  getServerPort: () => ipcRenderer.invoke("get-server-port"),
+  getApiUrl: (path: string) => ipcRenderer.invoke("get-api-url", path),
+
   // App info
-  getAppVersion: () => ipcRenderer.invoke('get-app-version'),
-  
+  getAppVersion: () => ipcRenderer.invoke("get-app-version"),
+
+  // File dialogs
+  selectFolder: () => ipcRenderer.invoke("select-folder"),
+
   // Platform
   platform: process.platform,
 });
@@ -20,6 +23,7 @@ declare global {
       getServerPort: () => Promise<number>;
       getApiUrl: (path: string) => Promise<string>;
       getAppVersion: () => Promise<string>;
+      selectFolder: () => Promise<string | null>;
       platform: string;
     };
   }

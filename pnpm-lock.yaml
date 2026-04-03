@@ -57,6 +57,15 @@ importers:
 
   apps/server:
     dependencies:
+      '@mugiwara/plugin-api':
+        specifier: workspace:*
+        version: link:../../packages/plugin-api
+      '@mugiwara/source-local':
+        specifier: workspace:*
+        version: link:../../packages/source-local
+      '@mugiwara/storage-local':
+        specifier: workspace:*
+        version: link:../../packages/storage-local
       '@mugiwara/types':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -133,11 +142,58 @@ importers:
 
   packages/config: {}
 
+  packages/plugin-api:
+    devDependencies:
+      '@types/node':
+        specifier: ^20.10.0
+        version: 20.19.37
+      typescript:
+        specifier: ^5.3.3
+        version: 5.9.3
+
   packages/shared:
     devDependencies:
       '@mugiwara/tsconfig':
         specifier: workspace:*
         version: link:../config
+      typescript:
+        specifier: ^5.3.3
+        version: 5.9.3
+
+  packages/source-local:
+    dependencies:
+      '@mugiwara/plugin-api':
+        specifier: workspace:*
+        version: link:../plugin-api
+      yauzl:
+        specifier: ^3.0.0
+        version: 3.3.0
+    devDependencies:
+      '@types/node':
+        specifier: ^20.10.0
+        version: 20.19.37
+      '@types/yauzl':
+        specifier: ^2.10.0
+        version: 2.10.3
+      typescript:
+        specifier: ^5.3.3
+        version: 5.9.3
+
+  packages/storage-local:
+    dependencies:
+      '@mugiwara/plugin-api':
+        specifier: workspace:*
+        version: link:../plugin-api
+      yauzl:
+        specifier: ^3.0.0
+        version: 3.3.0
+    devDependencies:
+      '@types/node':
+        specifier: ^20.10.0
+        version: 20.19.37
+      '@types/yauzl':
+        specifier: ^2.10.0
+        version: 2.10.3
       typescript:
         specifier: ^5.3.3
         version: 5.9.3
@@ -2378,6 +2434,10 @@ packages:
   yauzl@2.10.0:
     resolution: {integrity: sha512-p4a9I6X6nu6IhoGmBqAcbJy1mlC4j27vEPZX9F4L4/vZT3Lyq1VkFHw/V/PUcB9Buo+DG3iHkT0x3Qya58zc3g==}
 
+  yauzl@3.3.0:
+    resolution: {integrity: sha512-PtGEvEP30p7sbIBJKUBjUnqgTVOyMURc4dLo9iNyAJnNIEz9pm88cCXF21w94Kg3k6RXkeZh5DHOGS0qEONvNQ==}
+    engines: {node: '>=12'}
+
 snapshots:
 
   '@babel/code-frame@7.29.0':
@@ -4360,3 +4420,8 @@ snapshots:
     dependencies:
       buffer-crc32: 0.2.13
       fd-slicer: 1.1.0
+
+  yauzl@3.3.0:
+    dependencies:
+      buffer-crc32: 0.2.13
+      pend: 1.2.0

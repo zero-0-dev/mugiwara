@@ -238,7 +238,7 @@ export function MangaDetail({
     }
     const currentChapter = chapters.find((c) => c.id === progress.chapterId);
     if (currentChapter) {
-      return `Continue Chapter ${currentChapter.chapterNumber}`;
+      return `Continue Chapter ${currentChapter.chapterId}`;
     }
     return "Continue Reading";
   };
@@ -692,7 +692,7 @@ export function MangaDetail({
                   </div>
                   <div className="chapter-info">
                     <span className="chapter-title">
-                      {chapter.title || `Chapter ${chapter.chapterNumber}`}
+                      {chapter.title || `Chapter ${chapter.chapterId}`}
                     </span>
                   </div>
                   <div className="chapter-meta">

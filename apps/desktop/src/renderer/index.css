@@ -1768,3 +1768,282 @@ body {
   font-size: 0.875rem;
   font-style: italic;
 }
+
+/* Settings Layout */
+.settings-layout {
+  display: flex;
+  gap: 1.5rem;
+  padding: 1.5rem;
+}
+
+.settings-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 200px;
+  max-width: 250px;
+}
+
+.settings-nav .nav-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: var(--bg-primary);
+  border: none;
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-size: 0.9375rem;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.settings-nav .nav-item:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.settings-nav .nav-item.active {
+  background: var(--accent);
+  color: white;
+}
+
+.settings-content {
+  flex: 1;
+  max-height: calc(100vh - 150px);
+  overflow-y: auto;
+}
+
+/* Storage Section */
+.backend-card {
+  background: var(--bg-primary);
+  border: 1px solid var(--bg-tertiary);
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.backend-card.default {
+  border-color: var(--accent);
+}
+
+.backend-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.backend-header h4 {
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.default-badge {
+  font-size: 0.75rem;
+  padding: 0.25rem 0.5rem;
+  background: var(--accent);
+  color: white;
+  border-radius: 4px;
+}
+
+.backend-info {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  margin-bottom: 1rem;
+}
+
+.backend-info p {
+  margin: 0.25rem 0;
+}
+
+/* Plugins Section */
+.plugin-card {
+  background: var(--bg-primary);
+  border: 1px solid var(--bg-tertiary);
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.plugin-card.enabled {
+  border-color: var(--success);
+}
+
+.plugin-card.disabled {
+  opacity: 0.7;
+}
+
+.plugin-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.plugin-header h5 {
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.builtin-badge {
+  font-size: 0.75rem;
+  padding: 0.25rem 0.5rem;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  border-radius: 4px;
+}
+
+.version {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.plugin-info {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  margin-bottom: 1rem;
+}
+
+.plugin-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.available-plugins .search-input {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 1rem;
+  background: var(--bg-primary);
+  border: 1px solid var(--bg-tertiary);
+  border-radius: 6px;
+  color: var(--text-primary);
+}
+
+/* Queue Section */
+.queue-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.stat-card {
+  background: var(--bg-primary);
+  border: 1px solid var(--bg-tertiary);
+  border-radius: 8px;
+  padding: 1rem;
+  text-align: center;
+}
+
+.stat-card.running {
+  border-color: var(--accent);
+}
+
+.stat-card.complete {
+  border-color: var(--success);
+}
+
+.stat-card.error {
+  border-color: var(--error);
+}
+
+.stat-value {
+  display: block;
+  font-size: 2rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.stat-label {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.queue-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.tasks-list {
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.task-card {
+  background: var(--bg-primary);
+  border: 1px solid var(--bg-tertiary);
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 0.75rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.task-card.running {
+  border-color: var(--accent);
+}
+
+.task-card.error {
+  border-color: var(--error);
+}
+
+.task-card.complete {
+  border-color: var(--success);
+}
+
+.task-info {
+  flex: 1;
+}
+
+.task-header {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.task-manga {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.task-chapter {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
+.task-status {
+  font-size: 0.75rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.task-status.pending {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
+.task-status.running {
+  background: var(--accent);
+  color: white;
+}
+
+.task-status.complete {
+  background: var(--success);
+  color: white;
+}
+
+.task-status.error {
+  background: var(--error);
+  color: white;
+}
+
+.task-actions {
+  display: flex;
+  gap: 0.5rem;
+}

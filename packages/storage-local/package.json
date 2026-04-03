@@ -1,0 +1,33 @@
+{
+  "name": "@mugiwara/storage-local",
+  "version": "1.0.0",
+  "description": "Local filesystem storage backend for Mugiwara manga reader",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "mugiwara",
+    "manga",
+    "storage",
+    "local",
+    "filesystem"
+  ],
+  "author": "Mugiwara Team",
+  "license": "MIT",
+  "dependencies": {
+    "@mugiwara/plugin-api": "workspace:*",
+    "yauzl": "^3.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/yauzl": "^2.10.0",
+    "typescript": "^5.3.3"
+  }
+}

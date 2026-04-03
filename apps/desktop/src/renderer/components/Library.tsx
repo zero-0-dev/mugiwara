@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { Manga } from "@mugiwara/types";
+import { AddMangaModal } from "./AddMangaModal";
 
 interface MangaWithCount extends Manga {
   chapterCount?: number;
@@ -43,6 +44,7 @@ export function Library({ apiBaseUrl, onMangaSelect }: LibraryProps) {
     null,
   );
   const [showFilters, setShowFilters] = useState(false);
+  const [showAddManga, setShowAddManga] = useState(false);
 
   useEffect(() => {
     fetchManga();
@@ -171,6 +173,12 @@ export function Library({ apiBaseUrl, onMangaSelect }: LibraryProps) {
     <div className="library">
       <div className="library-header">
         <h2>Library</h2>
+        <button
+          onClick={() => setShowAddManga(true)}
+          className="btn btn-primary"
+        >
+          + Add Manga
+        </button>
       </div>
 
       {/* Search and Filters */}
@@ -400,6 +408,17 @@ export function Library({ apiBaseUrl, onMangaSelect }: LibraryProps) {
             </div>
           ))}
         </div>
+      )}
+
+      {showAddManga && (
+        <AddMangaModal
+          apiBaseUrl={apiBaseUrl}
+          onClose={() => setShowAddManga(false)}
+          onSuccess={() => {
+            setShowAddManga(false);
+            fetchManga();
+          }}
+        />
       )}
     </div>
   );

@@ -1,22 +1,6 @@
 import { mangaRepository, chapterRepository } from "../database";
-import { pluginManager, LocalFileSource } from "../plugins";
+import { PluginManager } from "../plugins";
 import { v4 as uuidv4 } from "uuid";
-
-interface ScannedChapter {
-  id: string;
-  path: string;
-  chapterNumber: number;
-  title?: string;
-  archiveType: "cbz" | "cbr" | "zip" | "folder";
-}
-
-interface ScannedManga {
-  id: string;
-  path: string;
-  title: string;
-  sourceMangaId: string;
-  chapters: ScannedChapter[];
-}
 
 interface ScanResults {
   added: number;
@@ -24,7 +8,9 @@ interface ScanResults {
   errors: string[];
 }
 
-export async function scanLibrary(): Promise<ScanResults> {
+export async function scanLibrary(
+  pluginManager: PluginManager,
+): Promise<ScanResults> {
   const results: ScanResults = {
     added: 0,
     updated: 0,
@@ -33,17 +19,21 @@ export async function scanLibrary(): Promise<ScanResults> {
 
   for (const source of pluginManager.getAllSources()) {
     try {
-      if (source.id === "local") {
-        const localSource = source as LocalFileSource;
-        const scanned =
-          (await localSource.scanAllDirectories()) as ScannedManga[];
+      if (source.metadata.id === "local") {
+        // Scan local directories
+        const searchResults = await source.search("");
 
-        for (const scannedManga of scanned) {
+        for (const result of searchResults) {
           try {
+            // Get full manga details including chapters
+            const mangaDetails = await source.getMangaDetails(
+              result.sourceMangaId,
+            );
+
             // Check if manga exists
             const existing = await mangaRepository.findBySource(
               "local",
-              scannedManga.sourceMangaId,
+              result.sourceMangaId,
             );
 
             if (existing) {
@@ -51,46 +41,22 @@ export async function scanLibrary(): Promise<ScanResults> {
               const existingChapters = await chapterRepository.findByMangaId(
                 existing.id,
               );
-              const existingPaths = new Set(
-                existingChapters.map((c: any) => c.filePath),
-              );
-              const existingNumbers = new Set(
-                existingChapters.map((c: any) => c.chapterNumber),
+              const existingChapterIds = new Set(
+                existingChapters.map((c: any) => c.chapterId),
               );
 
-              for (const chapter of scannedManga.chapters) {
-                // Skip if chapter path already exists or chapter number already exists
-                if (
-                  !existingPaths.has(chapter.path) &&
-                  !existingNumbers.has(chapter.chapterNumber)
-                ) {
+              for (const chapter of mangaDetails.chapters) {
+                // Skip if chapter id already exists
+                if (!existingChapterIds.has(chapter.chapterId)) {
                   try {
-                    // Count pages in the chapter
-                    let pagesCount = 0;
-                    try {
-                      const source = pluginManager.getSource(
-                        "local",
-                      ) as LocalFileSource;
-                      const pages = await source.getChapterPages(
-                        existing.id,
-                        chapter.path,
-                      );
-                      pagesCount = pages.length;
-                    } catch (err) {
-                      console.warn(
-                        `Failed to count pages for ${chapter.title}:`,
-                        err,
-                      );
-                    }
-
                     await chapterRepository.create({
                       id: uuidv4(),
                       mangaId: existing.id,
-                      chapterNumber: chapter.chapterNumber,
+                      chapterId: chapter.chapterId,
                       title: chapter.title,
-                      pagesCount,
-                      filePath: chapter.path,
-                      archiveType: chapter.archiveType,
+                      pagesCount: 0, // Will be determined when reading
+                      sortOrder: chapter.sortOrder,
+                      importStatus: "complete",
                     });
                     results.updated++;
                   } catch (err) {
@@ -112,9 +78,9 @@ export async function scanLibrary(): Promise<ScanResults> {
               // Create new manga
               const newManga = await mangaRepository.create({
                 id: uuidv4(),
-                title: scannedManga.title,
+                title: mangaDetails.title,
                 sourceId: "local",
-                sourceMangaId: scannedManga.sourceMangaId,
+                sourceMangaId: result.sourceMangaId,
                 status: "ongoing",
                 mediaType: "manga",
               });
@@ -123,34 +89,16 @@ export async function scanLibrary(): Promise<ScanResults> {
                 throw new Error("Failed to create manga");
               }
 
-              // Create chapters with page counts
-              for (const chapter of scannedManga.chapters) {
-                // Count pages in the chapter
-                let pagesCount = 0;
-                try {
-                  const source = pluginManager.getSource(
-                    "local",
-                  ) as LocalFileSource;
-                  const pages = await source.getChapterPages(
-                    newManga.id,
-                    chapter.path,
-                  );
-                  pagesCount = pages.length;
-                } catch (err) {
-                  console.warn(
-                    `Failed to count pages for ${chapter.title}:`,
-                    err,
-                  );
-                }
-
+              // Create chapters
+              for (const chapter of mangaDetails.chapters) {
                 await chapterRepository.create({
                   id: uuidv4(),
                   mangaId: newManga.id,
-                  chapterNumber: chapter.chapterNumber,
+                  chapterId: chapter.chapterId,
                   title: chapter.title,
-                  pagesCount,
-                  filePath: chapter.path,
-                  archiveType: chapter.archiveType,
+                  pagesCount: 0, // Will be determined when reading
+                  sortOrder: chapter.sortOrder,
+                  importStatus: "complete",
                 });
               }
 
@@ -160,18 +108,22 @@ export async function scanLibrary(): Promise<ScanResults> {
             const message =
               err instanceof Error ? err.message : "Unknown error";
             results.errors.push(
-              `Failed to process ${scannedManga.title}: ${message}`,
+              `Failed to process ${result.title}: ${message}`,
             );
           }
         }
       } else {
         // Handle other source types
         const manga = await source.search("");
-        console.log(`Scanned ${manga.length} items from ${source.name}`);
+        console.log(
+          `Scanned ${manga.length} items from ${source.metadata.name}`,
+        );
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unknown error";
-      results.errors.push(`Failed to scan source ${source.name}: ${message}`);
+      results.errors.push(
+        `Failed to scan source ${source.metadata.name}: ${message}`,
+      );
     }
   }
 

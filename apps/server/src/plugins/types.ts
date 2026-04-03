@@ -1,39 +1,40 @@
-import type { Manga, Chapter, PageInfo } from '@mugiwara/types';
+import {
+  MangaSource,
+  StorageBackend,
+  PluginMetadata,
+} from "@mugiwara/plugin-api";
 
-export interface MangaSource {
-  id: string;
+export interface InstalledPluginRecord {
+  id: string; // npm package name
+  type: "source" | "storage";
+  version: string;
+  isBuiltin: boolean;
+  isEnabled: boolean;
+  config: Record<string, any>;
+  installedAt: string;
+  updatedAt: string;
+}
+
+export interface PluginPackageInfo {
   name: string;
   version: string;
-  
-  // Search for manga by query
-  search(query: string, page?: number): Promise<Manga[]>;
-  
-  // Get manga details including chapters
-  getMangaDetails(mangaId: string): Promise<Manga | null>;
-  
-  // Get chapter pages
-  getChapterPages(mangaId: string, chapterId: string): Promise<PageInfo[]>;
-  
-  // Check for new chapters (optional)
-  checkForUpdates?(mangaId: string, lastChapterNumber: number): Promise<Chapter[]>;
+  description?: string;
+  author?: string;
+  keywords?: string[];
+  mugiwara?: {
+    type: "source" | "storage";
+    id: string;
+    compatibleCore: string;
+  };
 }
 
-export interface LocalFileConfig {
-  directories: string[];
-  supportedFormats: string[];
-  scanInterval?: number; // in minutes
+export interface LoadedPlugin {
+  record: InstalledPluginRecord;
+  instance: MangaSource | StorageBackend;
+  metadata: PluginMetadata;
 }
 
-export abstract class BaseMangaSource implements MangaSource {
-  abstract id: string;
-  abstract name: string;
-  abstract version: string;
-  
-  abstract search(query: string, page?: number): Promise<Manga[]>;
-  abstract getMangaDetails(mangaId: string): Promise<Manga | null>;
-  abstract getChapterPages(mangaId: string, chapterId: string): Promise<PageInfo[]>;
-  
-  async checkForUpdates?(mangaId: string, lastChapterNumber: number): Promise<Chapter[]> {
-    return [];
-  }
+export interface PluginManagerOptions {
+  dataDir: string;
+  db: any;
 }
