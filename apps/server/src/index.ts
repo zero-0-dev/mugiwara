@@ -1,17 +1,19 @@
-import express from 'express';
-import cors from 'cors';
-import { join } from 'path';
+import express from "express";
+import cors from "cors";
+import { join } from "path";
 
-import { initDatabase, closeDatabase } from './database';
-import { pluginManager, LocalFileSource } from './plugins';
-import { getLibraryDirectories } from './services/settings';
+import { initDatabase, closeDatabase } from "./database";
+import { pluginManager, LocalFileSource } from "./plugins";
+import { getLibraryDirectories, getBooleanSetting } from "./services/settings";
+import { scanLibrary } from "./services/library-scan";
 
-import mangaRoutes from './api/manga';
-import chapterRoutes from './api/chapters';
-import libraryRoutes from './api/library';
-import contentRoutes from './api/content';
-import metadataRoutes from './api/metadata';
-import filtersRoutes from './api/filters';
+import mangaRoutes from "./api/manga";
+import chapterRoutes from "./api/chapters";
+import libraryRoutes from "./api/library";
+import contentRoutes from "./api/content";
+import metadataRoutes from "./api/metadata";
+import filtersRoutes from "./api/filters";
+import settingsRoutes from "./api/settings";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -27,23 +29,31 @@ app.use((req, res, next) => {
 });
 
 // API Routes
-app.use('/api/manga', mangaRoutes);
-app.use('/api/manga/:mangaId/chapters', chapterRoutes);
-app.use('/api/manga/:mangaId/metadata', metadataRoutes);
-app.use('/api/library', libraryRoutes);
-app.use('/api/library', filtersRoutes);
-app.use('/api/content', contentRoutes);
+app.use("/api/manga", mangaRoutes);
+app.use("/api/manga/:mangaId/chapters", chapterRoutes);
+app.use("/api/manga/:mangaId/metadata", metadataRoutes);
+app.use("/api/library", libraryRoutes);
+app.use("/api/library", filtersRoutes);
+app.use("/api/settings", settingsRoutes);
+app.use("/api/content", contentRoutes);
 
 // Health check
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+app.get("/api/health", (req, res) => {
+  res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
 // Error handling
-app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error('Error:', err);
-  res.status(500).json({ error: 'Internal server error' });
-});
+app.use(
+  (
+    err: Error,
+    req: express.Request,
+    res: express.Response,
+    next: express.NextFunction,
+  ) => {
+    console.error("Error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  },
+);
 
 // Initialize server
 let server: ReturnType<typeof app.listen> | null = null;
@@ -52,7 +62,7 @@ async function startServer() {
   try {
     // Initialize database
     initDatabase();
-    
+
     // Register local file source
     const localSource = new LocalFileSource();
     pluginManager.registerSource(localSource);
@@ -61,27 +71,48 @@ async function startServer() {
     const savedDirectories = await getLibraryDirectories();
     if (savedDirectories.length > 0) {
       localSource.setDirectories(savedDirectories);
-      console.log(`📚 Loaded ${savedDirectories.length} library directories from settings`);
+      console.log(
+        `📚 Loaded ${savedDirectories.length} library directories from settings`,
+      );
     }
-    
+
     // Start server
-    server = app.listen(PORT, () => {
+    server = app.listen(PORT, async () => {
       console.log(`🚀 Mugiwara server running on http://localhost:${PORT}`);
-      console.log(`📁 Data directory: ${process.env.DATA_DIR || join(process.cwd(), 'data')}`);
-      
+      console.log(
+        `📁 Data directory: ${process.env.DATA_DIR || join(process.cwd(), "data")}`,
+      );
+
+      // Check auto-scan setting and scan if enabled
+      const autoScan = await getBooleanSetting("library.autoScan");
+      if (autoScan && savedDirectories.length > 0) {
+        console.log("🔍 Auto-scan enabled, scanning library...");
+        try {
+          const results = await scanLibrary();
+          console.log(
+            `✅ Auto-scan complete: ${results.added} added, ${results.updated} updated`,
+          );
+          if (results.errors.length > 0) {
+            console.warn(`⚠️ Auto-scan had ${results.errors.length} errors`);
+          }
+        } catch (err) {
+          console.error("❌ Auto-scan failed:", err);
+        }
+      }
+
       // Notify parent process (Electron) that we're ready
       if (process.send) {
-        process.send('ready');
+        process.send("ready");
       }
     });
 
     // Handle graceful shutdown
     const shutdown = () => {
-      console.log('\n👋 Shutting down gracefully...');
+      console.log("\n👋 Shutting down gracefully...");
       closeDatabase();
       if (server) {
         server.close(() => {
-          console.log('Server closed');
+          console.log("Server closed");
           process.exit(0);
         });
       } else {
@@ -89,18 +120,17 @@ async function startServer() {
       }
     };
 
-    process.on('SIGINT', shutdown);
-    process.on('SIGTERM', shutdown);
-    
+    process.on("SIGINT", shutdown);
+    process.on("SIGTERM", shutdown);
+
     // Handle messages from parent process (Electron)
-    process.on('message', (msg) => {
-      if (msg === 'shutdown') {
+    process.on("message", (msg) => {
+      if (msg === "shutdown") {
         shutdown();
       }
     });
-
   } catch (error) {
-    console.error('Failed to start server:', error);
+    console.error("Failed to start server:", error);
     process.exit(1);
   }
 }

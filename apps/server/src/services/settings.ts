@@ -1,50 +1,79 @@
-import { join } from 'path';
-import { readFile, writeFile, mkdir } from 'fs/promises';
-import { existsSync } from 'fs';
+import { db, settings } from "../database";
+import { eq } from "drizzle-orm";
 
-const SETTINGS_FILE = join(process.env.DATA_DIR || join(process.cwd(), 'data'), 'settings.json');
+// Default settings
+const defaultSettings: Record<string, string> = {
+  // Reading preferences
+  "reading.defaultMode": "rtl",
+  "reading.mangaMode": "rtl",
+  "reading.manhwaMode": "vertical",
+  "reading.manhuaMode": "vertical",
+  "reading.webtoonMode": "vertical",
 
-interface Settings {
-  libraryDirectories: string[];
-}
+  // UI preferences
+  "ui.theme": "dark",
+  "ui.showNSFW": "false",
 
-const defaultSettings: Settings = {
-  libraryDirectories: [],
+  // Library preferences
+  "library.autoScan": "false",
+  "library.autoRefreshMetadata": "false",
 };
 
-export async function loadSettings(): Promise<Settings> {
+export async function getSetting(key: string): Promise<string | null> {
   try {
-    if (!existsSync(SETTINGS_FILE)) {
-      return { ...defaultSettings };
+    const setting = await db.query.settings.findFirst({
+      where: eq(settings.key, key),
+    });
+
+    if (setting) {
+      return setting.value;
     }
-    const data = await readFile(SETTINGS_FILE, 'utf-8');
-    return { ...defaultSettings, ...JSON.parse(data) };
+
+    // Return default if exists
+    if (key in defaultSettings) {
+      return defaultSettings[key] ?? null;
+    }
+
+    return null;
   } catch (error) {
-    console.error('Error loading settings:', error);
-    return { ...defaultSettings };
+    console.error(`Error fetching setting ${key}:`, error);
+    return defaultSettings[key] || null;
   }
 }
 
-export async function saveSettings(settings: Settings): Promise<void> {
+export async function getBooleanSetting(key: string): Promise<boolean> {
+  const value = await getSetting(key);
+  return value === "true";
+}
+
+export async function setSetting(key: string, value: string): Promise<void> {
   try {
-    const dir = join(SETTINGS_FILE, '..');
-    if (!existsSync(dir)) {
-      await mkdir(dir, { recursive: true });
+    const existing = await db.query.settings.findFirst({
+      where: eq(settings.key, key),
+    });
+
+    if (existing) {
+      await db
+        .update(settings)
+        .set({ value, updatedAt: new Date().toISOString() })
+        .where(eq(settings.key, key));
+    } else {
+      await db.insert(settings).values({
+        key,
+        value,
+        updatedAt: new Date().toISOString(),
+      });
     }
-    await writeFile(SETTINGS_FILE, JSON.stringify(settings, null, 2), 'utf-8');
   } catch (error) {
-    console.error('Error saving settings:', error);
+    console.error(`Error saving setting ${key}:`, error);
     throw error;
   }
 }
 
-export async function getLibraryDirectories(): Promise<string[]> {
-  const settings = await loadSettings();
-  return settings.libraryDirectories;
-}
-
-export async function setLibraryDirectories(directories: string[]): Promise<void> {
-  const settings = await loadSettings();
-  settings.libraryDirectories = directories;
-  await saveSettings(settings);
-}
+// Re-export file-based settings for backward compatibility
+export {
+  loadSettings,
+  saveSettings,
+  getLibraryDirectories,
+  setLibraryDirectories,
+} from "./settings-file";

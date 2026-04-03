@@ -2,9 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { Library } from './components/Library';
 import { MangaDetail } from './components/MangaDetail';
 import { Reader } from './components/Reader';
+import { SettingsPage } from './components/SettingsPage';
 import { Manga } from '@mugiwara/types';
 
-type View = 'library' | 'manga-detail' | 'reader';
+type View = 'library' | 'manga-detail' | 'reader' | 'settings';
 
 function App() {
   const [serverPort, setServerPort] = useState<number | null>(null);
@@ -54,6 +55,14 @@ function App() {
     setSelectedChapterId(null);
   };
 
+  const handleOpenSettings = () => {
+    setCurrentView('settings');
+  };
+
+  const handleCloseSettings = () => {
+    setCurrentView('library');
+  };
+
   if (loading) {
     return (
       <div className="loading-container">
@@ -99,6 +108,13 @@ function App() {
             onBack={handleBackToDetail}
           />
         ) : null;
+      case 'settings':
+        return (
+          <SettingsPage
+            apiBaseUrl={apiBaseUrl}
+            onBack={handleCloseSettings}
+          />
+        );
       default:
         return null;
     }
@@ -108,7 +124,19 @@ function App() {
     <div className="app">
       <header className="app-header">
         <h1 onClick={handleBackToLibrary} style={{ cursor: 'pointer' }}>Mugiwara</h1>
-        <span className="server-status">Server: localhost:{serverPort}</span>
+        <div className="header-actions">
+          <button 
+            onClick={handleOpenSettings}
+            className="btn btn-icon"
+            title="Settings"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
+              <circle cx="12" cy="12" r="3"></circle>
+            </svg>
+          </button>
+          <span className="server-status">Server: localhost:{serverPort}</span>
+        </div>
       </header>
       <main className="app-main">
         {renderContent()}
