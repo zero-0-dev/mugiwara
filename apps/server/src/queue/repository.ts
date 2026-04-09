@@ -31,9 +31,9 @@ export class ImportTaskRepository {
   }
 
   async dequeue(limit: number): Promise<ImportTask[]> {
-    return this.db.transaction(async (tx: any) => {
+    return this.db.transaction((tx: any) => {
       // Find pending tasks ordered by priority and sort order
-      const tasks = await tx
+      const tasks = tx
         .select()
         .from(schema.importTasks)
         .where(eq(schema.importTasks.status, "pending"))
@@ -42,19 +42,20 @@ export class ImportTaskRepository {
           asc(schema.importTasks.sortOrder),
           asc(schema.importTasks.createdAt),
         )
-        .limit(limit);
+        .limit(limit)
+        .all();
 
       if (tasks.length === 0) return [];
 
       // Mark as running
       const taskIds = tasks.map((t: ImportTask) => t.id);
-      await tx
-        .update(schema.importTasks)
+      tx.update(schema.importTasks)
         .set({
           status: "running",
           startedAt: new Date().toISOString(),
         })
-        .where(inArray(schema.importTasks.id, taskIds));
+        .where(inArray(schema.importTasks.id, taskIds))
+        .run();
 
       return tasks as ImportTask[];
     });
