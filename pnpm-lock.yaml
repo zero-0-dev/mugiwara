@@ -63,6 +63,9 @@ importers:
       '@mugiwara/source-local':
         specifier: workspace:*
         version: link:../../packages/source-local
+      '@mugiwara/source-mangadex':
+        specifier: workspace:*
+        version: link:../../packages/source-mangadex
       '@mugiwara/storage-local':
         specifier: workspace:*
         version: link:../../packages/storage-local
@@ -175,6 +178,19 @@ importers:
       '@types/yauzl':
         specifier: ^2.10.0
         version: 2.10.3
+      typescript:
+        specifier: ^5.3.3
+        version: 5.9.3
+
+  packages/source-mangadex:
+    dependencies:
+      '@mugiwara/plugin-api':
+        specifier: workspace:*
+        version: link:../plugin-api
+    devDependencies:
+      '@types/node':
+        specifier: ^20.10.0
+        version: 20.19.37
       typescript:
         specifier: ^5.3.3
         version: 5.9.3

@@ -19,6 +19,7 @@
   "dependencies": {
     "@mugiwara/plugin-api": "workspace:*",
     "@mugiwara/source-local": "workspace:*",
+    "@mugiwara/source-mangadex": "workspace:*",
     "@mugiwara/storage-local": "workspace:*",
     "@mugiwara/types": "workspace:*",
     "axios": "^1.14.0",

@@ -14,6 +14,8 @@ interface ReaderProps {
   onBack: () => void;
   onNextChapter?: () => void;
   onPrevChapter?: () => void;
+  initialPage?: number;
+  onInitialPageUsed?: () => void;
 }
 
 type ReadingMode = "rtl" | "ltr" | "vertical";
@@ -25,6 +27,8 @@ export function Reader({
   onBack,
   onNextChapter,
   onPrevChapter,
+  initialPage,
+  onInitialPageUsed,
 }: ReaderProps) {
   const [pages, setPages] = useState<PageInfo[]>([]);
   const [currentPage, setCurrentPage] = useState(0);
@@ -40,6 +44,14 @@ export function Reader({
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isScrollingRef = useRef(false);
   const didInitialScroll = useRef(false);
+
+  // Track initialPage in a ref so it survives re-renders
+  const initialPageRef = useRef<number | undefined>(initialPage);
+
+  // Update ref when initialPage prop changes
+  useEffect(() => {
+    initialPageRef.current = initialPage;
+  }, [initialPage]);
 
   // Reset state when chapter changes
   useEffect(() => {
@@ -57,6 +69,22 @@ export function Reader({
   useEffect(() => {
     fetchPages();
   }, [chapterId, apiBaseUrl]);
+
+  // Handle initial page after pages are loaded
+  useEffect(() => {
+    if (pages.length > 0 && initialPageRef.current !== undefined) {
+      if (initialPageRef.current === -1) {
+        // -1 means "last page" (navigating from next chapter)
+        setCurrentPage(pages.length - 1);
+      } else {
+        // Specific page number
+        setCurrentPage(initialPageRef.current);
+      }
+      // Clear the ref and notify parent
+      initialPageRef.current = undefined;
+      onInitialPageUsed?.();
+    }
+  }, [pages.length, onInitialPageUsed]);
 
   // Load progress once when pages are loaded
   useEffect(() => {

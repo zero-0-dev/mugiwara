@@ -166,40 +166,78 @@ router.post("/import", async (req: Request, res: Response) => {
 
     // Determine which chapters to import
     const chaptersToImport = chapters || mangaDetails.chapters;
-    const newChapters = chaptersToImport.filter(
+
+    // Deduplicate chapters from source (some sources may return duplicates)
+    const seenChapterIds = new Set<string>();
+    const uniqueChapters = chaptersToImport.filter((c: any) => {
+      if (seenChapterIds.has(c.chapterId)) {
+        return false;
+      }
+      seenChapterIds.add(c.chapterId);
+      return true;
+    });
+
+    // Filter out already existing chapters
+    const newChapters = uniqueChapters.filter(
       (c: any) => !existingChapterIds.has(c.chapterId),
     );
 
     // Add chapters to database with pending status
+    let chaptersAdded = 0;
     for (const chapter of newChapters) {
-      await chapterRepository.create({
-        id: uuidv4(),
-        mangaId,
-        chapterId: chapter.chapterId,
-        title: chapter.title,
-        pagesCount: chapter.pageCount || 0,
-        sortOrder: chapter.sortOrder,
-        importStatus: "pending",
-      });
+      try {
+        await chapterRepository.create({
+          id: uuidv4(),
+          mangaId,
+          chapterId: chapter.chapterId,
+          title: chapter.title,
+          pagesCount: chapter.pageCount || 0,
+          sortOrder: chapter.sortOrder,
+          importStatus: "pending",
+        });
+        chaptersAdded++;
+      } catch (err: any) {
+        // Log but don't fail - chapter might already exist (race condition)
+        if (err.message?.includes("UNIQUE constraint failed")) {
+          console.log(
+            `[Import] Chapter ${chapter.chapterId} already exists, skipping`,
+          );
+        } else {
+          console.error(
+            `[Import] Failed to create chapter ${chapter.chapterId}:`,
+            err,
+          );
+        }
+      }
     }
 
     // Queue chapters for import
+    let chaptersQueued = 0;
     for (const chapter of newChapters) {
-      await global.taskRepository.create({
-        type: "chapter",
-        mangaId,
-        chapterId: chapter.chapterId,
-        sortOrder: chapter.sortOrder,
-        sourceId,
-        sourceChapterId: chapter.sourceChapterId,
-      });
+      try {
+        await global.taskRepository.create({
+          type: "chapter",
+          mangaId,
+          chapterId: chapter.chapterId,
+          sortOrder: chapter.sortOrder,
+          sourceId,
+          sourceChapterId: chapter.sourceChapterId,
+        });
+        chaptersQueued++;
+      } catch (err) {
+        // Log but continue with other chapters
+        console.error(
+          `[Import] Failed to queue chapter ${chapter.chapterId}:`,
+          err,
+        );
+      }
     }
 
     res.json({
       success: true,
       mangaId,
-      chaptersAdded: newChapters.length,
-      chaptersQueued: newChapters.length,
+      chaptersAdded,
+      chaptersQueued,
     });
   } catch (error) {
     console.error("Error importing manga:", error);

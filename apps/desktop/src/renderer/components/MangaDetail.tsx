@@ -5,7 +5,7 @@ interface MangaDetailProps {
   apiBaseUrl: string;
   mangaId: string;
   onBack: () => void;
-  onReadChapter: (chapterId: string) => void;
+  onReadChapter: (chapterId: string, chaptersList?: Chapter[]) => void;
 }
 
 interface ChapterWithProgress extends Chapter {
@@ -132,24 +132,14 @@ export function MangaDetail({
       let progressPercent = 0;
 
       if (isCurrent) {
+        // Current chapter - show actual progress
         progressPercent = Math.round((currentPage / totalPages) * 100);
-      } else if (progressData.isCompleted) {
-        // If manga is completed, all chapters are read
-        isRead = true;
-        progressPercent = 100;
-      } else {
-        // Check if this chapter is before the current chapter
-        const currentChapterIndex = chaptersData.findIndex(
-          (c) => c.id === currentChapterId,
-        );
-        const thisChapterIndex = chaptersData.findIndex(
-          (c) => c.id === chapter.id,
-        );
-        if (thisChapterIndex < currentChapterIndex) {
-          isRead = true;
-          progressPercent = 100;
-        }
+        // Only mark as fully read if completed
+        isRead = progressData.isCompleted || false;
       }
+      // Note: We don't mark other chapters as read automatically.
+      // A chapter is only "read" if the user actually read it.
+      // This would require per-chapter reading progress tracking.
 
       return {
         ...chapter,
@@ -222,11 +212,11 @@ export function MangaDetail({
     if (!progress || !progress.chapterId) {
       // Start from first chapter
       if (chapters.length > 0) {
-        onReadChapter(chapters[0].id);
+        onReadChapter(chapters[0].id, chapters);
       }
       return;
     }
-    onReadChapter(progress.chapterId);
+    onReadChapter(progress.chapterId, chapters);
   };
 
   const getContinueReadingText = () => {
@@ -679,7 +669,7 @@ export function MangaDetail({
                 <div
                   key={chapter.id}
                   className={`chapter-item ${chapter.isRead ? "read" : ""} ${chapter.isCurrent ? "current" : ""}`}
-                  onClick={() => onReadChapter(chapter.id)}
+                  onClick={() => onReadChapter(chapter.id, chapters)}
                 >
                   <div className="chapter-status-icon">
                     {chapter.isRead ? (
