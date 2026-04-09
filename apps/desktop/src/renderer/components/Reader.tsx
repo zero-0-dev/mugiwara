@@ -330,6 +330,21 @@ export function Reader({
       return;
     }
 
+    // Handle mouse button clicks for navigation
+    // Left click (button 0) -> next page, Right click (button 2) -> prev page
+    if (e.button === 0) {
+      // Left click - go forward
+      e.preventDefault();
+      goToNextPage();
+      return;
+    } else if (e.button === 2) {
+      // Right click - go backward
+      e.preventDefault();
+      goToPrevPage();
+      return;
+    }
+
+    // Fallback to zone-based clicking for other buttons (middle click, etc.)
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return;
 
@@ -350,6 +365,13 @@ export function Reader({
     } else {
       if (x < width * 0.3) goToPrevPage();
       else if (x > width * 0.7) goToNextPage();
+    }
+  };
+
+  const handleContextMenu = (e: React.MouseEvent) => {
+    // Prevent default context menu when in RTL or LTR mode for right-click navigation
+    if (readingMode !== "vertical") {
+      e.preventDefault();
     }
   };
 
@@ -394,7 +416,7 @@ export function Reader({
     return (
       <div className="reader-error">
         <p>{error}</p>
-        <button onClick={onBack} className="btn btn-primary">
+        <button onMouseDown={() => onBack()} className="btn btn-primary">
           Go Back
         </button>
       </div>
@@ -405,7 +427,7 @@ export function Reader({
     return (
       <div className="reader-empty">
         <p>No pages found in this chapter</p>
-        <button onClick={onBack} className="btn btn-primary">
+        <button onMouseDown={() => onBack()} className="btn btn-primary">
           Go Back
         </button>
       </div>
@@ -418,19 +440,26 @@ export function Reader({
     <div
       ref={containerRef}
       className={`reader reader-mode-${readingMode}`}
-      onClick={handleScreenClick}
+      onMouseDown={handleScreenClick}
+      onContextMenu={handleContextMenu}
     >
       <div
         className={`reader-controls top-controls ${showControls ? "visible" : ""}`}
       >
-        <button onClick={onBack} className="btn btn-secondary">
+        <button
+          onMouseDown={(e) => {
+            e.stopPropagation();
+            onBack();
+          }}
+          className="btn btn-secondary"
+        >
           Back
         </button>
         <div className="reader-settings">
           <select
             value={readingMode}
             onChange={(e) => handleModeChange(e.target.value as ReadingMode)}
-            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
           >
             <option value="rtl">Right to Left (Manga)</option>
             <option value="ltr">Left to Right</option>
@@ -468,7 +497,7 @@ export function Reader({
         className={`reader-controls bottom-controls ${showControls ? "visible" : ""}`}
       >
         <button
-          onClick={(e) => {
+          onMouseDown={(e) => {
             e.stopPropagation();
             goToPrevPage();
           }}
@@ -486,7 +515,7 @@ export function Reader({
         </div>
 
         <button
-          onClick={(e) => {
+          onMouseDown={(e) => {
             e.stopPropagation();
             goToNextPage();
           }}
