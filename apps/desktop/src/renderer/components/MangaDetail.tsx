@@ -12,6 +12,7 @@ interface ChapterWithProgress extends Chapter {
   isRead?: boolean;
   isCurrent?: boolean;
   progressPercent?: number;
+  downloadStatus?: "pending" | "downloading" | "complete" | "error" | "idle";
 }
 
 interface AniListResult {
@@ -62,6 +63,11 @@ export function MangaDetail({
     Array<{ id: string; name: string; color: string | null }>
   >([]);
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+
+  // Download state
+  const [downloadingChapters, setDownloadingChapters] = useState<Set<string>>(
+    new Set(),
+  );
 
   useEffect(() => {
     fetchMangaDetail();
@@ -205,6 +211,52 @@ export function MangaDetail({
       await fetchMangaCategories();
     } catch (err) {
       console.error("Failed to remove from category:", err);
+    }
+  }
+
+  async function handleDownloadChapter(chapterId: string, e: React.MouseEvent) {
+    e.stopPropagation(); // Prevent chapter click
+
+    // Check if already downloading
+    if (downloadingChapters.has(chapterId)) return;
+
+    // Add to downloading set
+    setDownloadingChapters((prev) => new Set(prev).add(chapterId));
+
+    try {
+      const response = await fetch(
+        `${apiBaseUrl}/api/manga/${mangaId}/chapters/${chapterId}/download`,
+        {
+          method: "POST",
+        },
+      );
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to queue download");
+      }
+
+      const data = await response.json();
+
+      // If already downloaded, show a brief status
+      if (data.message === "Chapter is already downloaded") {
+        // Refresh chapters to show updated status
+        await fetchMangaDetail();
+      }
+    } catch (err) {
+      console.error("Failed to download chapter:", err);
+      setError(
+        err instanceof Error ? err.message : "Failed to download chapter",
+      );
+    } finally {
+      // Remove from downloading set after a delay to show feedback
+      setTimeout(() => {
+        setDownloadingChapters((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(chapterId);
+          return newSet;
+        });
+      }, 500);
     }
   }
 
@@ -357,6 +409,25 @@ export function MangaDetail({
 
   const readChaptersCount = chapters.filter((c) => c.isRead).length;
   const hasProgress = progress && progress.chapterId;
+
+  const getChapterDownloadStatus = (chapter: ChapterWithProgress) => {
+    if (downloadingChapters.has(chapter.chapterId)) {
+      return "downloading";
+    }
+    if (chapter.importStatus === "complete" || chapter.pagesCount > 0) {
+      return "complete";
+    }
+    if (chapter.importStatus === "error") {
+      return "error";
+    }
+    if (
+      chapter.importStatus === "pending" ||
+      chapter.importStatus === "downloading"
+    ) {
+      return "pending";
+    }
+    return "idle";
+  };
 
   return (
     <div className="manga-detail">
@@ -665,51 +736,89 @@ export function MangaDetail({
             <p className="no-chapters">No chapters available</p>
           ) : (
             <div className="chapters-list">
-              {chapters.map((chapter) => (
-                <div
-                  key={chapter.id}
-                  className={`chapter-item ${chapter.isRead ? "read" : ""} ${chapter.isCurrent ? "current" : ""}`}
-                  onClick={() => onReadChapter(chapter.id, chapters)}
-                >
-                  <div className="chapter-status-icon">
-                    {chapter.isRead ? (
-                      <span className="status-read">✓</span>
-                    ) : chapter.isCurrent ? (
-                      <span className="status-current">▶</span>
-                    ) : (
-                      <span className="status-unread">○</span>
-                    )}
-                  </div>
-                  <div className="chapter-info">
-                    <span className="chapter-title">
-                      {chapter.title || `Chapter ${chapter.chapterId}`}
-                    </span>
-                  </div>
-                  <div className="chapter-meta">
-                    {chapter.isCurrent &&
-                      chapter.progressPercent !== undefined &&
-                      chapter.progressPercent > 0 && (
-                        <div className="chapter-progress">
-                          <div className="chapter-progress-bar">
-                            <div
-                              className="chapter-progress-fill"
-                              style={{ width: `${chapter.progressPercent}%` }}
-                            />
-                          </div>
-                          <span className="chapter-progress-text">
-                            {chapter.progressPercent}%
-                          </span>
-                        </div>
+              {chapters.map((chapter) => {
+                const downloadStatus = getChapterDownloadStatus(chapter);
+                return (
+                  <div
+                    key={chapter.id}
+                    className={`chapter-item ${chapter.isRead ? "read" : ""} ${chapter.isCurrent ? "current" : ""}`}
+                    onClick={() => onReadChapter(chapter.id, chapters)}
+                  >
+                    <div className="chapter-status-icon">
+                      {chapter.isRead ? (
+                        <span className="status-read">✓</span>
+                      ) : chapter.isCurrent ? (
+                        <span className="status-current">▶</span>
+                      ) : (
+                        <span className="status-unread">○</span>
                       )}
-                    {chapter.isRead && (
-                      <span className="chapter-read-badge">Read</span>
-                    )}
-                    <span className="chapter-pages">
-                      {chapter.pagesCount} pages
-                    </span>
+                    </div>
+                    <div className="chapter-info">
+                      <span className="chapter-title">
+                        {chapter.title || `Chapter ${chapter.chapterId}`}
+                      </span>
+                    </div>
+                    <div className="chapter-meta">
+                      {chapter.isCurrent &&
+                        chapter.progressPercent !== undefined &&
+                        chapter.progressPercent > 0 && (
+                          <div className="chapter-progress">
+                            <div className="chapter-progress-bar">
+                              <div
+                                className="chapter-progress-fill"
+                                style={{ width: `${chapter.progressPercent}%` }}
+                              />
+                            </div>
+                            <span className="chapter-progress-text">
+                              {chapter.progressPercent}%
+                            </span>
+                          </div>
+                        )}
+                      {chapter.isRead && (
+                        <span className="chapter-read-badge">Read</span>
+                      )}
+                      <span className="chapter-pages">
+                        {chapter.pagesCount > 0
+                          ? `${chapter.pagesCount} pages`
+                          : "Not downloaded"}
+                      </span>
+                      <button
+                        className={`chapter-download-btn ${downloadStatus}`}
+                        onClick={(e) =>
+                          handleDownloadChapter(chapter.chapterId, e)
+                        }
+                        disabled={
+                          downloadStatus === "downloading" ||
+                          downloadStatus === "pending"
+                        }
+                        title={
+                          downloadStatus === "complete"
+                            ? "Downloaded (click to re-download)"
+                            : downloadStatus === "downloading"
+                              ? "Downloading..."
+                              : downloadStatus === "error"
+                                ? "Download failed - click to retry"
+                                : downloadStatus === "pending"
+                                  ? "Queued for download"
+                                  : "Download chapter"
+                        }
+                      >
+                        {downloadStatus === "complete" ? (
+                          <span className="download-icon complete">✓</span>
+                        ) : downloadStatus === "downloading" ? (
+                          <span className="download-icon downloading">◌</span>
+                        ) : downloadStatus === "error" ? (
+                          <span className="download-icon error">!</span>
+                        ) : downloadStatus === "pending" ? (
+                          <span className="download-icon pending">◷</span>
+                        ) : (
+                          <span className="download-icon">↓</span>
+                        )}
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

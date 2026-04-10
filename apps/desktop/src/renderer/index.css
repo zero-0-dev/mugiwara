@@ -2048,3 +2048,76 @@ body {
   display: flex;
   gap: 0.5rem;
 }
+
+/* Chapter Download Button */
+.chapter-download-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--bg-tertiary);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-left: 0.5rem;
+}
+
+.chapter-download-btn:hover:not(:disabled) {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border-color: var(--accent);
+}
+
+.chapter-download-btn:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.chapter-download-btn.complete {
+  border-color: var(--success);
+  color: var(--success);
+}
+
+.chapter-download-btn.complete:hover {
+  background: rgba(34, 197, 94, 0.1);
+}
+
+.chapter-download-btn.error {
+  border-color: var(--error);
+  color: var(--error);
+}
+
+.chapter-download-btn.error:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.chapter-download-btn.pending {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.chapter-download-btn.downloading {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.download-icon {
+  font-size: 0.875rem;
+  line-height: 1;
+}
+
+.download-icon.downloading {
+  animation: spin 1s linear infinite;
+}
+
+.download-icon.error {
+  font-weight: bold;
+}
+
+.download-icon.complete {
+  font-weight: bold;
+}

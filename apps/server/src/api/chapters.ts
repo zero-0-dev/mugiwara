@@ -152,6 +152,109 @@ router.get(
   },
 );
 
+// POST /api/manga/:mangaId/chapters/:chapterId/download - Trigger download for a chapter
+router.post(
+  "/:chapterId/download",
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const mangaId = req.params.mangaId;
+      const chapterId = req.params.chapterId;
+
+      if (!mangaId || !chapterId) {
+        res.status(400).json({ error: "Manga ID and Chapter ID are required" });
+        return;
+      }
+
+      // Get manga details
+      const manga = await mangaRepository.findById(mangaId);
+      if (!manga) {
+        res.status(404).json({ error: "Manga not found" });
+        return;
+      }
+
+      // Get chapter details
+      const chapters = await chapterRepository.findByMangaId(mangaId);
+      const chapter = chapters.find((c: any) => c.chapterId === chapterId);
+      if (!chapter) {
+        res.status(404).json({ error: "Chapter not found" });
+        return;
+      }
+
+      // Check if chapter is already downloaded or queued
+      const storage = await global.storageManager.getBackendForManga(mangaId);
+      const storedPageCount = await storage.listChapterPages(
+        mangaId,
+        chapterId,
+      );
+      const pageCount = Math.max(storedPageCount, chapter.pagesCount || 0);
+
+      // Check if there's already a pending or running task for this chapter
+      const existingTask = await global.taskRepository.getByChapter(
+        mangaId,
+        chapterId,
+      );
+      if (
+        existingTask &&
+        ["pending", "running"].includes(existingTask.status)
+      ) {
+        res.json({
+          message: "Chapter is already queued for download",
+          taskId: existingTask.id,
+          status: existingTask.status,
+        });
+        return;
+      }
+
+      // Need to get source chapter info from the source
+      if (!manga.sourceMangaId) {
+        res.status(400).json({ error: "Manga source information missing" });
+        return;
+      }
+
+      const source = global.pluginManager.getSource(manga.sourceId);
+      if (!source) {
+        res.status(400).json({ error: "Source not found" });
+        return;
+      }
+
+      const mangaDetails = await source.getMangaDetails(manga.sourceMangaId);
+      const sourceChapter = mangaDetails.chapters.find(
+        (c) => c.chapterId === chapterId,
+      );
+
+      if (!sourceChapter) {
+        res.status(404).json({ error: "Chapter not found in source" });
+        return;
+      }
+
+      // Create import task for this chapter
+      const task = await global.taskRepository.create({
+        type: "chapter",
+        mangaId,
+        chapterId,
+        sortOrder: chapter.sortOrder,
+        sourceId: manga.sourceId,
+        sourceChapterId: sourceChapter.sourceChapterId,
+        priority: 10, // Higher priority for on-demand downloads
+      });
+
+      // Update chapter status to pending
+      await chapterRepository.update(chapter.id, {
+        importStatus: "pending",
+      });
+
+      res.json({
+        message: "Chapter queued for download",
+        taskId: task.id,
+        status: task.status,
+      });
+    } catch (error) {
+      console.error("Error queuing chapter download:", error);
+      res.status(500).json({ error: "Failed to queue chapter for download" });
+    }
+  },
+);
+
 // GET /api/manga/:mangaId/chapters/:chapterId/pages/:pageNumber - Serve a specific page
 router.get(
   "/:chapterId/pages/:pageNumber",
@@ -162,11 +265,9 @@ router.get(
       const pageNumber = req.params.pageNumber;
 
       if (!mangaId || !chapterId || !pageNumber) {
-        res
-          .status(400)
-          .json({
-            error: "Manga ID, Chapter ID, and Page Number are required",
-          });
+        res.status(400).json({
+          error: "Manga ID, Chapter ID, and Page Number are required",
+        });
         return;
       }
 
