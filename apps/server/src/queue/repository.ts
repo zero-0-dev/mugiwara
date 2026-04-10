@@ -1,4 +1,4 @@
-import { eq, inArray, desc, asc } from "drizzle-orm";
+import { eq, inArray, desc, asc, and } from "drizzle-orm";
 import { ImportTask, CreateTaskInput, TaskStatus } from "./types";
 import * as schema from "../database/schema";
 
@@ -147,10 +147,10 @@ export class ImportTaskRepository {
     chapterId: string,
   ): Promise<ImportTask | undefined> {
     const result = await this.db.query.importTasks.findFirst({
-      where: [
+      where: and(
         eq(schema.importTasks.mangaId, mangaId),
         eq(schema.importTasks.chapterId, chapterId),
-      ],
+      ),
     });
     return result as ImportTask | undefined;
   }
