@@ -54,9 +54,6 @@ async function initialize() {
         "[Main] Dev mode: Assuming server is running on port",
         DEV_SERVER_PORT,
       );
-      console.log(
-        "[Main] Start server separately with: cd apps/server && pnpm dev",
-      );
       serverPort = DEV_SERVER_PORT;
     } else {
       // In production, start the embedded server
