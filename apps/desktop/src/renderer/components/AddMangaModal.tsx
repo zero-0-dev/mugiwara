@@ -45,6 +45,7 @@ export function AddMangaModal({
   const [importing, setImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState<"search" | "select" | "import">("search");
+  const [hasSearched, setHasSearched] = useState(false);
 
   useEffect(() => {
     loadSources();
@@ -71,6 +72,7 @@ export function AddMangaModal({
     setLoading(true);
     setError(null);
     setSearchResults([]);
+    setHasSearched(true);
 
     try {
       const response = await fetch(
@@ -208,7 +210,13 @@ export function AddMangaModal({
                   <label style={labelStyles}>Source</label>
                   <select
                     value={selectedSource}
-                    onChange={(e) => setSelectedSource(e.target.value)}
+                    onChange={(e) => {
+                      setSelectedSource(e.target.value);
+                      setSearchQuery("");
+                      setSearchResults([]);
+                      setError(null);
+                      setHasSearched(false);
+                    }}
                     style={selectStyles}
                   >
                     {sources.map((source) => (
@@ -300,7 +308,7 @@ export function AddMangaModal({
                 </div>
               )}
 
-              {searchResults.length === 0 && searchQuery && !loading && (
+              {searchResults.length === 0 && hasSearched && !loading && (
                 <div style={emptyStateStyles}>
                   <p>No results found.</p>
                 </div>
