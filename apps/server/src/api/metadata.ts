@@ -41,6 +41,7 @@ router.post("/fetch", async (req: Request, res: Response): Promise<void> => {
 
     console.log('[Metadata] Best match found:', {
       title: bestMatch.title.romaji,
+      mediaType: bestMatch.mediaType,
       hasCoverImage: !!bestMatch.coverImage,
       coverImageUrl: bestMatch.coverImage?.large,
     });
@@ -78,6 +79,7 @@ router.post("/fetch", async (req: Request, res: Response): Promise<void> => {
       bannerImage: bestMatch.bannerImage || undefined,
       anilistId: bestMatch.id,
       genres: bestMatch.genres,
+      mediaType: bestMatch.mediaType,
       tags: bestMatch.tags.map((t) => t.name),
       lastMetadataSync: new Date().toISOString(),
     });
@@ -197,6 +199,7 @@ router.post("/apply", async (req: Request, res: Response): Promise<void> => {
       anilistId: metadata.id,
       genres: metadata.genres,
       tags: metadata.tags.map((t) => t.name),
+      mediaType: metadata.mediaType,
       lastMetadataSync: new Date().toISOString(),
     });
 

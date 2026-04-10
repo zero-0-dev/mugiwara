@@ -19,6 +19,7 @@ interface AniListManga {
   artist: string | null;
   status: string;
   genres: string[];
+  mediaType: string;
   tags: { name: string }[];
   startDate: {
     year: number | null;
@@ -58,6 +59,7 @@ const SEARCH_MANGA_QUERY = `
         }
         status
         genres
+        countryOfOrigin
         tags {
           name
         }
@@ -101,6 +103,7 @@ const GET_MANGA_QUERY = `
       }
       status
       genres
+      countryOfOrigin
       tags {
         name
       }
@@ -165,6 +168,13 @@ export class AniListService {
     // Extract author and artist from staff
     let author: string | null = null;
     let artist: string | null = null;
+    let mediaType = 'manga';
+
+    if (media.countryOfOrigin === "KR") {
+      mediaType = 'manhwa';
+    } else if (media.countryOfOrigin === "CN") {
+      mediaType = 'manhua';
+    }
 
     if (media.staff && media.staff.edges) {
       for (const edge of media.staff.edges) {
@@ -206,6 +216,7 @@ export class AniListService {
       chapters: media.chapters,
       volumes: media.volumes,
       synonyms: media.synonyms || [],
+      mediaType: mediaType,
     };
   }
 
