@@ -381,6 +381,7 @@ async function fetchMetadataForManga(
     bannerImage: bestMatch.bannerImage || undefined,
     anilistId: bestMatch.id,
     genres: bestMatch.genres,
+    mediaType: bestMatch.mediaType,
     tags: bestMatch.tags.map((t) => t.name),
     lastMetadataSync: new Date().toISOString(),
   });
