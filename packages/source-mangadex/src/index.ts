@@ -322,7 +322,10 @@ class MangaDexSource extends BaseSource {
         break;
       }
 
-      allChapters.push(...response.data);
+      // Filter out chapters with 0 pages, as they are not useful for import
+      const validChapters = response.data.filter(ch => ch.attributes.pages > 0);
+
+      allChapters.push(...validChapters);
 
       if (response.data.length < limit) {
         hasMore = false;
