@@ -7,14 +7,14 @@ import {
   StyleSheet,
 } from "react-native";
 import { Image } from "expo-image";
-import { apiClient } from "../../api/client";
+import { apiClient } from "@/api/client";
 
 const { width, height } = Dimensions.get("window");
 
 interface RTLReaderProps {
   mangaId: string;
   chapterId: string;
-  initialPage: number;
+    initialPage: number;
   totalPages: number;
   onPageChange: (page: number, total: number) => void;
   onPrevChapter?: () => void;

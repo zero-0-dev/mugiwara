@@ -136,13 +136,13 @@ class ApiClient {
   }
 
   getPageUrl(mangaId: string, chapterId: string, pageNumber: number): string {
-    return `${this.serverUrl}/api/content/manga/${mangaId}/chapters/${chapterId}/pages/${pageNumber}`;
+    return `${this.serverUrl}/api/manga/${mangaId}/chapters/${chapterId}/pages/${pageNumber}`;
   }
 
   getCoverUrl(coverPath?: string): string | undefined {
     if (!coverPath) return undefined;
     if (coverPath.startsWith("http")) return coverPath;
-    return `${this.serverUrl}/api/content/covers/${coverPath}`;
+    return `${this.serverUrl}${coverPath}`;
   }
 
   // Reading Progress

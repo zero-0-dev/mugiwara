@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { View, ScrollView, StyleSheet, Dimensions } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import {
@@ -12,6 +12,7 @@ import {
   Portal,
   Dialog,
 } from "react-native-paper";
+import { WebView } from "react-native-webview";
 import { Image } from "expo-image";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import {
@@ -26,13 +27,14 @@ import {
 } from "@/api/hooks";
 import { apiClient } from "@/api/client";
 import { Chapter, Category } from "@/types";
-
-const { width } = Dimensions.get("window");
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
 export default function MangaDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [categoryMenuVisible, setCategoryMenuVisible] = useState(false);
   const [deleteDialogVisible, setDeleteDialogVisible] = useState(false);
+  const [webViewHeight, setWebViewHeight] = useState(100);
+  const [showFullDescription, setShowFullDescription] = useState(false);
 
   const { data: manga, isLoading: mangaLoading } = useManga(id);
   const { data: chapters, isLoading: chaptersLoading } = useChapters(id);
@@ -87,196 +89,255 @@ export default function MangaDetailScreen() {
     }
   };
 
+  const webViewScript = `
+    setInterval(function() { 
+      window.ReactNativeWebView.postMessage(document.documentElement.scrollHeight.toString()); 
+    }, 500);
+    true;
+  `;
+
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.coverSection}>
-          {coverUrl ? (
-            <Image
-              source={{ uri: coverUrl }}
-              style={styles.cover}
-              contentFit="cover"
-            />
-          ) : (
-            <View style={[styles.cover, styles.coverPlaceholder]}>
-              <Text style={styles.coverPlaceholderText}>{manga.title}</Text>
-            </View>
-          )}
-          <View style={styles.infoSection}>
-            <Text variant="titleLarge" style={styles.title} numberOfLines={3}>
-              {manga.title}
-            </Text>
-            {manga.author && (
-              <Text variant="bodyMedium" style={styles.meta}>
-                Author: {manga.author}
-              </Text>
-            )}
-            {manga.artist && (
-              <Text variant="bodyMedium" style={styles.meta}>
-                Artist: {manga.artist}
-              </Text>
-            )}
-            <Text variant="bodyMedium" style={styles.meta}>
-              Status: {manga.status}
-            </Text>
-            <Text variant="bodyMedium" style={styles.meta}>
-              Type: {manga.mediaType}
-            </Text>
-            <Text variant="bodyMedium" style={styles.meta}>
-              Chapters: {chapters?.length || 0}
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.actions}>
-          <Button
-            mode="contained"
-            onPress={handleContinueReading}
-            style={styles.continueButton}
-            disabled={sortedChapters.length === 0}
-          >
-            {progress?.chapterId
-              ? `Continue Chapter ${currentChapter?.chapterId || ""}`
-              : "Start Reading"}
-          </Button>
-
-          <Menu
-            visible={categoryMenuVisible}
-            onDismiss={() => setCategoryMenuVisible(false)}
-            anchor={
-              <IconButton
-                icon="tag"
-                onPress={() => setCategoryMenuVisible(true)}
-                iconColor="#d1d5db"
-              />
-            }
-          >
-            {allCategories?.map((category) => (
-              <Menu.Item
-                key={category.id}
-                onPress={() => handleCategoryToggle(category)}
-                title={category.name}
-                leadingIcon={isInCategory(category.id) ? "check" : undefined}
-              />
-            ))}
-          </Menu>
-
-          <IconButton
-            icon="delete"
-            onPress={() => setDeleteDialogVisible(true)}
-            iconColor="#ef4444"
-          />
-        </View>
-
-        {mangaCategories && mangaCategories.length > 0 && (
-          <View style={styles.categories}>
-            {mangaCategories.map((category) => (
-              <Chip
-                key={category.id}
-                style={styles.categoryChip}
-                textStyle={{ color: "#fff" }}
-              >
-                {category.name}
-              </Chip>
-            ))}
-          </View>
-        )}
-
-        {manga.genres && manga.genres.length > 0 && (
-          <View style={styles.genres}>
-            {manga.genres.map((genre) => (
-              <Chip
-                key={genre}
-                style={styles.genreChip}
-                textStyle={{ color: "#d1d5db" }}
-              >
-                {genre}
-              </Chip>
-            ))}
-          </View>
-        )}
-
-        {manga.description && (
-          <View style={styles.descriptionSection}>
-            <Text variant="titleSmall" style={styles.sectionTitle}>
-              Description
-            </Text>
-            <Text variant="bodyMedium" style={styles.description}>
-              {manga.description}
-            </Text>
-          </View>
-        )}
-
-        <Divider style={styles.divider} />
-
-        <Text variant="titleSmall" style={styles.sectionTitle}>
-          Chapters
-        </Text>
-      </View>
-
-      <View style={styles.chapterList}>
-        {chaptersLoading ? (
-          <ActivityIndicator style={styles.loader} color="#6366f1" />
-        ) : sortedChapters.length === 0 ? (
-          <Text style={styles.emptyText}>No chapters available</Text>
-        ) : (
-          sortedChapters.map((chapter) => (
-            <Button
-              key={chapter.id}
-              mode="text"
-              onPress={() => handleChapterPress(chapter)}
-              style={[
-                styles.chapterButton,
-                progress?.chapterId === chapter.id && styles.currentChapter,
-              ]}
-              labelStyle={styles.chapterLabel}
-              contentStyle={styles.chapterContent}
-            >
-              <View style={styles.chapterRow}>
-                <Text style={styles.chapterText}>
-                  Chapter {chapter.chapterId}
-                  {chapter.title ? ` - ${chapter.title}` : ""}
+    <SafeAreaProvider>
+      <SafeAreaView style={styles.container}>
+        <ScrollView>
+          <View style={styles.header}>
+            <View style={styles.coverSection}>
+              {coverUrl ? (
+                <Image
+                  source={{ uri: coverUrl }}
+                  style={styles.cover}
+                  contentFit="cover"
+                />
+              ) : (
+                <View style={[styles.cover, styles.coverPlaceholder]}>
+                  <Text style={styles.coverPlaceholderText}>{manga.title}</Text>
+                </View>
+              )}
+              <View style={styles.infoSection}>
+                <Text variant="titleLarge" style={styles.title} numberOfLines={3}>
+                  {manga.title}
                 </Text>
-                {chapter.importStatus !== "complete" && (
-                  <MaterialCommunityIcons
-                    name="download"
-                    size={16}
-                    color="#6366f1"
-                  />
+                {manga.author && (
+                  <Text variant="bodyMedium" style={styles.meta}>
+                    Author: {manga.author}
+                  </Text>
                 )}
+                {manga.artist && (
+                  <Text variant="bodyMedium" style={styles.meta}>
+                    Artist: {manga.artist}
+                  </Text>
+                )}
+                <Text variant="bodyMedium" style={styles.meta}>
+                  Status: {manga.status}
+                </Text>
+                <Text variant="bodyMedium" style={styles.meta}>
+                  Type: {manga.mediaType}
+                </Text>
+                <Text variant="bodyMedium" style={styles.meta}>
+                  Chapters: {chapters?.length || 0}
+                </Text>
               </View>
-            </Button>
-          ))
-        )}
-      </View>
+            </View>
 
-      <Portal>
-        <Dialog
-          visible={deleteDialogVisible}
-          onDismiss={() => setDeleteDialogVisible(false)}
-          style={{ backgroundColor: "#252525" }}
-        >
-          <Dialog.Title style={{ color: "#fff" }}>Delete Manga</Dialog.Title>
-          <Dialog.Content>
-            <Text style={{ color: "#d1d5db" }}>
-              Are you sure you want to delete "{manga.title}"? This action
-              cannot be undone.
+            <View style={styles.actions}>
+              <Button
+                mode="contained"
+                onPress={handleContinueReading}
+                style={styles.continueButton}
+                disabled={sortedChapters.length === 0}
+              >
+                {progress?.chapterId
+                  ? `Continue Chapter ${currentChapter?.chapterId || ""}`
+                  : "Start Reading"}
+              </Button>
+
+              <Menu
+                visible={categoryMenuVisible}
+                onDismiss={() => setCategoryMenuVisible(false)}
+                anchor={
+                  <IconButton
+                    icon="tag"
+                    onPress={() => setCategoryMenuVisible(true)}
+                    iconColor="#d1d5db"
+                  />
+                }
+              >
+                {allCategories?.map((category) => (
+                  <Menu.Item
+                    key={category.id}
+                    onPress={() => handleCategoryToggle(category)}
+                    title={category.name}
+                    leadingIcon={isInCategory(category.id) ? "check" : undefined}
+                  />
+                ))}
+              </Menu>
+
+              <IconButton
+                icon="delete"
+                onPress={() => setDeleteDialogVisible(true)}
+                iconColor="#ef4444"
+              />
+            </View>
+
+            {mangaCategories && mangaCategories.length > 0 && (
+              <View style={styles.categories}>
+                {mangaCategories.map((category) => (
+                  <Chip
+                    key={category.id}
+                    style={styles.categoryChip}
+                    textStyle={{ color: "#fff" }}
+                  >
+                    {category.name}
+                  </Chip>
+                ))}
+              </View>
+            )}
+
+            {manga.genres && manga.genres.length > 0 && (
+              <View style={styles.genres}>
+                {manga.genres.map((genre) => (
+                  <Chip
+                    key={genre}
+                    style={styles.genreChip}
+                    textStyle={{ color: "#d1d5db" }}
+                  >
+                    {genre}
+                  </Chip>
+                ))}
+              </View>
+            )}
+
+            {manga.description && (
+              <View style={styles.descriptionSection}>
+                <Text variant="titleSmall" style={styles.sectionTitle}>
+                  Description
+                </Text>
+                <View style={{ height: showFullDescription ? webViewHeight : 100, overflow: "hidden" }}>
+                  <WebView
+                    originWhitelist={["*"]}
+                    source={{
+                      html: `
+                        <!DOCTYPE html>
+                        <html>
+                          <head>
+                            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+                            <style>
+                              body {
+                                margin: 0;
+                                padding: 8px 0;
+                                background-color: #1a1a1a;
+                                color: #9ca3af;
+                                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                                font-size: 14px;
+                                line-height: 1.5;
+                              }
+                              a { color: #6366f1; }
+                              p { margin: 0 0 8px 0; }
+                            </style>
+                          </head>
+                          <body>
+                            ${manga.description}
+                          </body>
+                        </html>
+                      `,
+                    }}
+                    style={[
+                      styles.webview,
+                      { height: webViewHeight },
+                    ]}
+                    automaticallyAdjustContentInsets={false}
+                    scrollEnabled={false}
+                    javaScriptEnabled={true}
+                    injectedJavaScript ={webViewScript}
+                    domStorageEnabled={true}
+                    onMessage={(event) => {
+                      setWebViewHeight(parseInt(event.nativeEvent.data, 10));
+                    }}
+                  />
+                </View>
+                <Button
+                  mode="text"
+                  onPress={() => setShowFullDescription(!showFullDescription)}
+                  textColor="#6366f1"
+                  style={styles.showMoreButton}
+                >
+                  {showFullDescription ? "Show less" : "Show more"}
+                </Button>
+              </View>
+            )}
+
+            <Divider style={styles.divider} />
+
+            <Text variant="titleSmall" style={styles.sectionTitle}>
+              Chapters
             </Text>
-          </Dialog.Content>
-          <Dialog.Actions>
-            <Button
-              onPress={() => setDeleteDialogVisible(false)}
-              textColor="#d1d5db"
+          </View>
+
+          <View style={styles.chapterList}>
+            {chaptersLoading ? (
+              <ActivityIndicator style={styles.loader} color="#6366f1" />
+            ) : sortedChapters.length === 0 ? (
+              <Text style={styles.emptyText}>No chapters available</Text>
+            ) : (
+              sortedChapters.map((chapter) => (
+                <Button
+                  key={chapter.id}
+                  mode="text"
+                  onPress={() => handleChapterPress(chapter)}
+                  style={[
+                    styles.chapterButton,
+                    progress?.chapterId === chapter.id && styles.currentChapter,
+                  ]}
+                  labelStyle={styles.chapterLabel}
+                  contentStyle={styles.chapterContent}
+                >
+                  <View style={styles.chapterRow}>
+                    <Text style={styles.chapterText}>
+                      Chapter {chapter.chapterId}
+                      {chapter.title ? ` - ${chapter.title}` : ""}
+                    </Text>
+                    {chapter.importStatus !== "complete" && (
+                      <MaterialCommunityIcons
+                        name="download"
+                        size={16}
+                        color="#6366f1"
+                      />
+                    )}
+                  </View>
+                </Button>
+              ))
+            )}
+          </View>
+
+          <Portal>
+            <Dialog
+              visible={deleteDialogVisible}
+              onDismiss={() => setDeleteDialogVisible(false)}
+              style={{ backgroundColor: "#252525" }}
             >
-              Cancel
-            </Button>
-            <Button onPress={handleDelete} textColor="#ef4444">
-              Delete
-            </Button>
-          </Dialog.Actions>
-        </Dialog>
-      </Portal>
-    </ScrollView>
+              <Dialog.Title style={{ color: "#fff" }}>Delete Manga</Dialog.Title>
+              <Dialog.Content>
+                <Text style={{ color: "#d1d5db" }}>
+                  Are you sure you want to delete "{manga.title}"? This action
+                  cannot be undone.
+                </Text>
+              </Dialog.Content>
+              <Dialog.Actions>
+                <Button
+                  onPress={() => setDeleteDialogVisible(false)}
+                  textColor="#d1d5db"
+                >
+                  Cancel
+                </Button>
+                <Button onPress={handleDelete} textColor="#ef4444">
+                  Delete
+                </Button>
+              </Dialog.Actions>
+            </Dialog>
+          </Portal>
+        </ScrollView>
+      </SafeAreaView>
+    </SafeAreaProvider>
   );
 }
 
@@ -362,6 +423,13 @@ const styles = StyleSheet.create({
   description: {
     color: "#9ca3af",
     lineHeight: 20,
+  },
+  webview: {
+    backgroundColor: "#1a1a1a",
+  },
+  showMoreButton: {
+    marginTop: 8,
+    alignSelf: "flex-start",
   },
   divider: {
     backgroundColor: "#374151",

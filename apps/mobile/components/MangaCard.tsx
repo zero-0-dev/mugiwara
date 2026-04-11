@@ -2,7 +2,7 @@ import { View, TouchableOpacity, StyleSheet, Dimensions } from "react-native";
 import { Text, ProgressBar } from "react-native-paper";
 import { Image } from "expo-image";
 import { Manga } from "../types";
-import { apiClient } from "../api/client";
+import { apiClient } from "@/api/client";
 
 interface MangaCardProps {
   manga: Manga;
