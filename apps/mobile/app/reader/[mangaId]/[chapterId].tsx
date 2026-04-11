@@ -3,7 +3,7 @@ import { View, StyleSheet, Dimensions } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { ActivityIndicator, IconButton, Menu, Text } from "react-native-paper";
 import { StatusBar } from "expo-status-bar";
-import {SafeAreaView, SafeAreaProvider} from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   useManga,
   useChapters,
@@ -25,6 +25,7 @@ export default function ReaderScreen() {
     chapterId: string;
   }>();
 
+  const insets = useSafeAreaInsets();
   const [controlsVisible, setControlsVisible] = useState(true);
   const [modeMenuVisible, setModeMenuVisible] = useState(false);
 
@@ -134,87 +135,84 @@ export default function ReaderScreen() {
   };
 
   return (
-    <SafeAreaProvider>
-      <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
+      <StatusBar hidden={!controlsVisible} />
 
-        <StatusBar hidden={!controlsVisible} />
-
-        {/* Top Controls */}
-        {controlsVisible && (
-          <View style={[styles.topBar]}>
-            <IconButton
-              icon="arrow-left"
-              onPress={handleBack}
-              iconColor="#fff"
-              size={24}
-            />
-            <Text style={styles.chapterTitle} numberOfLines={1}>
-              {manga?.title} - Chapter {currentChapter.chapterId}
-            </Text>
-            <Menu
-              visible={modeMenuVisible}
-              onDismiss={() => setModeMenuVisible(false)}
-              anchor={
-                <IconButton
-                  icon={
-                    readingMode === "rtl"
+      {/* Top Controls */}
+      {controlsVisible && (
+        <View style={[styles.topBar, { paddingTop: insets.top }]}>
+          <IconButton
+            icon="arrow-left"
+            onPress={handleBack}
+            iconColor="#fff"
+            size={24}
+          />
+          <Text style={styles.chapterTitle} numberOfLines={1}>
+            {manga?.title} - Chapter {currentChapter.chapterId}
+          </Text>
+          <Menu
+            visible={modeMenuVisible}
+            onDismiss={() => setModeMenuVisible(false)}
+            anchor={
+              <IconButton
+                icon={
+                  readingMode === "rtl"
+                    ? "book-arrow-left"
+                    : readingMode === "ltr"
                       ? "book-arrow-right"
-                      : readingMode === "ltr"
-                        ? "book-arrow-left"
-                        : "swap-vertical"
-                  }
-                  onPress={() => setModeMenuVisible(true)}
-                  iconColor="#fff"
-                  size={24}
-                />
-              }
-            >
-              <Menu.Item
-                onPress={() => handleModeChange("rtl")}
-                title="Right to Left (Manga)"
-                leadingIcon={readingMode === "rtl" ? "check" : undefined}
+                      : "swap-vertical"
+                }
+                onPress={() => setModeMenuVisible(true)}
+                iconColor="#fff"
+                size={24}
               />
-              <Menu.Item
-                onPress={() => handleModeChange("ltr")}
-                title="Left to Right (Comics)"
-                leadingIcon={readingMode === "ltr" ? "check" : undefined}
-              />
-              <Menu.Item
-                onPress={() => handleModeChange("vertical")}
-                title="Vertical (Webtoon)"
-                leadingIcon={readingMode === "vertical" ? "check" : undefined}
-              />
-            </Menu>
-          </View>
-        )}
-
-        {/* Reader */}
-        <View style={styles.readerContainer}>{renderReader()}</View>
-
-        {/* Bottom Controls */}
-        {controlsVisible && (
-          <View style={[styles.bottomBar]}>
-            <IconButton
-              icon="chevron-left"
-              onPress={handlePrevChapter}
-              disabled={!prevChapter}
-              iconColor={prevChapter ? "#fff" : "#6b7280"}
-              size={28}
+            }
+          >
+            <Menu.Item
+              onPress={() => handleModeChange("rtl")}
+              title="Right to Left (Manga)"
+              leadingIcon={readingMode === "rtl" ? "check" : undefined}
             />
-            <Text style={styles.pageInfo}>
-              {currentChapter.chapterId} / {sortedChapters.length} chapters
-            </Text>
-            <IconButton
-              icon="chevron-right"
-              onPress={handleNextChapter}
-              disabled={!nextChapter}
-              iconColor={nextChapter ? "#fff" : "#6b7280"}
-              size={28}
+            <Menu.Item
+              onPress={() => handleModeChange("ltr")}
+              title="Left to Right (Comics)"
+              leadingIcon={readingMode === "ltr" ? "check" : undefined}
             />
-          </View>
-        )}
-      </SafeAreaView>
-    </SafeAreaProvider>
+            <Menu.Item
+              onPress={() => handleModeChange("vertical")}
+              title="Vertical (Webtoon)"
+              leadingIcon={readingMode === "vertical" ? "check" : undefined}
+            />
+          </Menu>
+        </View>
+      )}
+
+      {/* Reader */}
+      <View style={styles.readerContainer}>{renderReader()}</View>
+
+      {/* Bottom Controls */}
+      {controlsVisible && (
+        <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 8 }]}>
+          <IconButton
+            icon="chevron-left"
+            onPress={handlePrevChapter}
+            disabled={!prevChapter}
+            iconColor={prevChapter ? "#fff" : "#6b7280"}
+            size={28}
+          />
+          <Text style={styles.pageInfo}>
+            {currentChapter.chapterId} / {sortedChapters.length} chapters
+          </Text>
+          <IconButton
+            icon="chevron-right"
+            onPress={handleNextChapter}
+            disabled={!nextChapter}
+            iconColor={nextChapter ? "#fff" : "#6b7280"}
+            size={28}
+          />
+        </View>
+      )}
+    </View>
   );
 }
 
