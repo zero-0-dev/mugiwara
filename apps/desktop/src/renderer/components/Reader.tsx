@@ -209,7 +209,7 @@ export function Reader({
       if (mangaResponse.ok) {
         const mangaData: Manga = await mangaResponse.json();
         setManga(mangaData);
-        await loadReadingMode(mangaData.mediaType);
+        await loadReadingMode();
       }
     } catch (err) {
       console.error("Failed to load manga info:", err);
@@ -217,25 +217,13 @@ export function Reader({
     }
   }
 
-  async function loadReadingMode(mediaType: string) {
+  async function loadReadingMode() {
     try {
-      const mangaSettingResponse = await fetch(
-        `${apiBaseUrl}/api/settings/readingMode/${mangaId}`,
+      const response = await fetch(
+        `${apiBaseUrl}/api/settings/readingMode/manga/${mangaId}`,
       );
-      if (mangaSettingResponse.ok) {
-        const data = await mangaSettingResponse.json();
-        if (data && data.value) {
-          setReadingMode(data.value as ReadingMode);
-          return;
-        }
-      }
-
-      const mediaTypeKey = mediaType !== "unknown" ? mediaType : "manga";
-      const mediaTypeResponse = await fetch(
-        `${apiBaseUrl}/api/settings/reading/mode/${mediaTypeKey}`,
-      );
-      if (mediaTypeResponse.ok) {
-        const data = await mediaTypeResponse.json();
+      if (response.ok) {
+        const data = await response.json();
         setReadingMode(data.mode as ReadingMode);
       } else {
         setReadingMode("rtl");
@@ -407,7 +395,7 @@ export function Reader({
     setReadingMode(newMode);
 
     try {
-      await fetch(`${apiBaseUrl}/api/settings/readingMode/${mangaId}`, {
+      await fetch(`${apiBaseUrl}/api/settings/readingMode.${mangaId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ value: newMode }),

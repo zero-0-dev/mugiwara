@@ -49,26 +49,19 @@ export default function ReaderScreen() {
   const { data: manga } = useManga(mangaId);
   const { data: chapters } = useChapters(mangaId);
   const { data: progress } = useProgress(mangaId);
-  const { data: savedReadingMode } = useReadingMode(mangaId);
+  const { data: serverReadingMode } = useReadingMode(mangaId);
   const updateProgress = useUpdateProgress();
   const setReadingMode = useSetReadingMode();
 
+  // Local state for reading mode, initialized from server
   const [readingMode, setReadingModeState] = useState<ReadingMode>("rtl");
 
-  // Determine reading mode
+  // Update local state when server returns the resolved reading mode
   useEffect(() => {
-    if (savedReadingMode) {
-      setReadingModeState(savedReadingMode);
-    } else if (manga?.mediaType) {
-      const mediaTypeMode: Record<string, ReadingMode> = {
-        manga: "rtl",
-        manhwa: "vertical",
-        manhua: "vertical",
-        webtoon: "vertical",
-      };
-      setReadingModeState(mediaTypeMode[manga.mediaType] || "rtl");
+    if (serverReadingMode) {
+      setReadingModeState(serverReadingMode);
     }
-  }, [savedReadingMode, manga?.mediaType]);
+  }, [serverReadingMode]);
 
   const sortedChapters = chapters
     ? [...chapters].sort((a, b) => a.sortOrder - b.sortOrder)
@@ -176,7 +169,12 @@ export default function ReaderScreen() {
 
       {/* Top Controls */}
       <TouchableWithoutFeedback onPress={toggleControls}>
-        <View style={[styles.topBar, { paddingTop: insets.top, opacity: controlsVisible ? 1 : 0 }]}>
+        <View
+          style={[
+            styles.topBar,
+            { paddingTop: insets.top, opacity: controlsVisible ? 1 : 0 },
+          ]}
+        >
           <IconButton
             icon="arrow-left"
             onPress={handleBack}
@@ -230,7 +228,13 @@ export default function ReaderScreen() {
       {readingMode === "vertical" && (
         <TouchableWithoutFeedback onPress={toggleControls}>
           <View
-            style={[styles.bottomBar, { paddingBottom: insets.bottom + 8, opacity: controlsVisible ? 1 : 0 }]}
+            style={[
+              styles.bottomBar,
+              {
+                paddingBottom: insets.bottom + 8,
+                opacity: controlsVisible ? 1 : 0,
+              },
+            ]}
           >
             <IconButton
               icon="chevron-left"

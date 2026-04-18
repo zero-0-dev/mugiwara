@@ -237,19 +237,17 @@ class ApiClient {
     return response.data;
   }
 
-  async getReadingMode(mangaId: string): Promise<ReadingMode | null> {
-    try {
-      const response = await this.getClient().get(
-        `/settings/readingMode/${mangaId}`,
-      );
-      return response.data.mode;
-    } catch {
-      return null;
-    }
+  async getReadingMode(mangaId: string): Promise<ReadingMode> {
+    const response = await this.getClient().get(
+      `/settings/readingMode/manga/${mangaId}`,
+    );
+    return response.data.mode;
   }
 
   async setReadingMode(mangaId: string, mode: ReadingMode): Promise<void> {
-    await this.getClient().put(`/settings/readingMode/${mangaId}`, { mode });
+    await this.getClient().put(`/settings/readingMode.${mangaId}`, {
+      value: mode,
+    });
   }
 }
 

@@ -262,7 +262,7 @@ export function useSettings() {
 }
 
 export function useReadingMode(mangaId: string) {
-  return useQuery({
+  return useQuery<ReadingMode>({
     queryKey: ["readingMode", mangaId],
     queryFn: () => apiClient.getReadingMode(mangaId),
     enabled: !!mangaId,
