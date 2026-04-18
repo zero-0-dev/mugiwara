@@ -3,13 +3,16 @@ import {
   View,
   ScrollView,
   Dimensions,
-  TouchableWithoutFeedback,
   StyleSheet,
+  Animated,
+  PanResponder,
 } from "react-native";
 import { Image } from "expo-image";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { apiClient } from "@/api/client";
 
 const { width, height } = Dimensions.get("window");
+const SWIPE_THRESHOLD = width * 0.15;
 
 interface VerticalReaderProps {
   mangaId: string;
@@ -19,7 +22,6 @@ interface VerticalReaderProps {
   onPageChange: (page: number, total: number) => void;
   onPrevChapter?: () => void;
   onNextChapter?: () => void;
-  onTap: () => void;
 }
 
 export function VerticalReader({
@@ -30,35 +32,106 @@ export function VerticalReader({
   onPageChange,
   onPrevChapter,
   onNextChapter,
-  onTap,
 }: VerticalReaderProps) {
   const scrollViewRef = useRef<ScrollView>(null);
   const [currentPage, setCurrentPage] = useState(initialPage);
   const pageRefs = useRef<(View | null)[]>([]);
 
+  // Animated values for arrow indicators
+  const leftArrowOpacity = useRef(new Animated.Value(0)).current;
+  const rightArrowOpacity = useRef(new Animated.Value(0)).current;
+  const leftArrowTranslateX = useRef(new Animated.Value(-20)).current;
+  const rightArrowTranslateX = useRef(new Animated.Value(20)).current;
+
   const pages = Array.from({ length: totalPages }, (_, i) => i);
 
-  const handleTap = (event: any) => {
-    const { locationY } = event.nativeEvent;
-    const tapZone = height / 3;
-
-    if (locationY < tapZone) {
-      // Tap top - scroll up
-      scrollViewRef.current?.scrollTo({
-        y: Math.max(0, (currentPage - 1) * height * 0.8),
-        animated: true,
-      });
-    } else if (locationY > height - tapZone) {
-      // Tap bottom - scroll down
-      scrollViewRef.current?.scrollTo({
-        y: (currentPage + 1) * height * 0.8,
-        animated: true,
-      });
-    } else {
-      // Tap center - toggle controls
-      onTap();
-    }
+  const showArrow = (
+    opacity: Animated.Value,
+    translateX: Animated.Value,
+    toValue: number,
+  ) => {
+    Animated.parallel([
+      Animated.timing(opacity, {
+        toValue: 1,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+      Animated.spring(translateX, {
+        toValue,
+        friction: 8,
+        tension: 40,
+        useNativeDriver: true,
+      }),
+    ]).start();
   };
+
+  const hideArrow = (opacity: Animated.Value, translateX: Animated.Value) => {
+    Animated.parallel([
+      Animated.timing(opacity, {
+        toValue: 0,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+      Animated.timing(translateX, {
+        toValue: 0,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        // Only respond to horizontal movements
+        return (
+          Math.abs(gestureState.dx) > Math.abs(gestureState.dy) &&
+          Math.abs(gestureState.dx) > 5
+        );
+      },
+      onPanResponderMove: (_, gestureState) => {
+        const dx = gestureState.dx;
+
+        // Show appropriate arrow based on swipe direction and current page
+        if (dx > 0 && currentPage === 0 && onPrevChapter) {
+          // Swiping right on first page - show left arrow
+          const progress = Math.min(dx / SWIPE_THRESHOLD, 1);
+          leftArrowOpacity.setValue(progress);
+          leftArrowTranslateX.setValue(-20 + progress * 20);
+        } else if (dx < 0 && currentPage === totalPages - 1 && onNextChapter) {
+          // Swiping left on last page - show right arrow
+          const progress = Math.min(Math.abs(dx) / SWIPE_THRESHOLD, 1);
+          rightArrowOpacity.setValue(progress);
+          rightArrowTranslateX.setValue(20 - progress * 20);
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        const dx = gestureState.dx;
+
+        if (dx > SWIPE_THRESHOLD && currentPage === 0 && onPrevChapter) {
+          // Swiped right on first page - go to previous chapter
+          hideArrow(leftArrowOpacity, leftArrowTranslateX);
+          onPrevChapter();
+        } else if (
+          dx < -SWIPE_THRESHOLD &&
+          currentPage === totalPages - 1 &&
+          onNextChapter
+        ) {
+          // Swiped left on last page - go to next chapter
+          hideArrow(rightArrowOpacity, rightArrowTranslateX);
+          onNextChapter();
+        } else {
+          // Not enough swipe - hide arrows
+          hideArrow(leftArrowOpacity, leftArrowTranslateX);
+          hideArrow(rightArrowOpacity, rightArrowTranslateX);
+        }
+      },
+      onPanResponderTerminate: () => {
+        hideArrow(leftArrowOpacity, leftArrowTranslateX);
+        hideArrow(rightArrowOpacity, rightArrowTranslateX);
+      },
+    }),
+  ).current;
 
   const handleScroll = useCallback(
     (event: any) => {
@@ -70,19 +143,8 @@ export function VerticalReader({
         setCurrentPage(newPage);
         onPageChange(newPage + 1, totalPages);
       }
-
-      // Check if reached end
-      const contentHeight = event.nativeEvent.contentSize.height;
-      const scrollViewHeight = event.nativeEvent.layoutMeasurement.height;
-
-      if (scrollY + scrollViewHeight >= contentHeight - 100) {
-        // Near end of chapter
-        if (currentPage === totalPages - 1) {
-          onNextChapter?.();
-        }
-      }
     },
-    [currentPage, totalPages, onPageChange, onNextChapter],
+    [currentPage, totalPages, onPageChange],
   );
 
   // Scroll to initial page on mount
@@ -98,38 +160,68 @@ export function VerticalReader({
   }, [initialPage]);
 
   return (
-    <TouchableWithoutFeedback onPress={handleTap}>
-      <View style={styles.container}>
-        <ScrollView
-          ref={scrollViewRef}
-          style={styles.scrollView}
-          contentContainerStyle={styles.content}
-          onScroll={handleScroll}
-          scrollEventThrottle={200}
-          showsVerticalScrollIndicator={false}
+    <View style={styles.container} {...panResponder.panHandlers}>
+      <ScrollView
+        ref={scrollViewRef}
+        style={styles.scrollView}
+        contentContainerStyle={styles.content}
+        onScroll={handleScroll}
+        scrollEventThrottle={200}
+        showsVerticalScrollIndicator={false}
+      >
+        {pages.map((index) => {
+          const pageUrl = apiClient.getPageUrl(mangaId, chapterId, index + 1);
+          return (
+            <View
+              key={index}
+              ref={(ref) => {
+                pageRefs.current[index] = ref;
+              }}
+              style={styles.pageContainer}
+            >
+              <Image
+                source={{ uri: pageUrl }}
+                style={styles.image}
+                contentFit="contain"
+                transition={200}
+              />
+            </View>
+          );
+        })}
+      </ScrollView>
+
+      {/* Left Arrow Indicator (Previous Chapter) */}
+      {currentPage === 0 && onPrevChapter && (
+        <Animated.View
+          style={[
+            styles.arrowContainer,
+            styles.leftArrow,
+            {
+              opacity: leftArrowOpacity,
+              transform: [{ translateX: leftArrowTranslateX }],
+            },
+          ]}
         >
-          {pages.map((index) => {
-            const pageUrl = apiClient.getPageUrl(mangaId, chapterId, index);
-            return (
-              <View
-                key={index}
-                ref={(ref) => {
-                  pageRefs.current[index] = ref;
-                }}
-                style={styles.pageContainer}
-              >
-                <Image
-                  source={{ uri: pageUrl }}
-                  style={styles.image}
-                  contentFit="contain"
-                  transition={200}
-                />
-              </View>
-            );
-          })}
-        </ScrollView>
-      </View>
-    </TouchableWithoutFeedback>
+          <MaterialCommunityIcons name="chevron-left" size={48} color="#fff" />
+        </Animated.View>
+      )}
+
+      {/* Right Arrow Indicator (Next Chapter) */}
+      {currentPage === totalPages - 1 && onNextChapter && (
+        <Animated.View
+          style={[
+            styles.arrowContainer,
+            styles.rightArrow,
+            {
+              opacity: rightArrowOpacity,
+              transform: [{ translateX: rightArrowTranslateX }],
+            },
+          ]}
+        >
+          <MaterialCommunityIcons name="chevron-right" size={48} color="#fff" />
+        </Animated.View>
+      )}
+    </View>
   );
 }
 
@@ -154,5 +246,22 @@ const styles = StyleSheet.create({
   image: {
     width: width * 0.95,
     height: height * 0.8,
+  },
+  arrowContainer: {
+    position: "absolute",
+    top: "50%",
+    width: 60,
+    height: 60,
+    marginTop: -30,
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    borderRadius: 30,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  leftArrow: {
+    left: 20,
+  },
+  rightArrow: {
+    right: 20,
   },
 });

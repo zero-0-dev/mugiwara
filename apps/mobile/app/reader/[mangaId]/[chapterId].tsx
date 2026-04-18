@@ -1,5 +1,10 @@
 import { useState, useCallback, useEffect } from "react";
-import { View, StyleSheet, Dimensions } from "react-native";
+import {
+  View,
+  StyleSheet,
+  Dimensions,
+  TouchableWithoutFeedback,
+} from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { ActivityIndicator, IconButton, Menu, Text } from "react-native-paper";
 import { StatusBar } from "expo-status-bar";
@@ -12,17 +17,29 @@ import {
   useReadingMode,
   useSetReadingMode,
 } from "@/api/hooks";
-import { RTLReader } from "@/components/Reader/RTLReader";
-import { LTRReader } from "@/components/Reader/LTRReader";
+import { HorizontalReader } from "@/components/Reader/HorizontalReader";
 import { VerticalReader } from "@/components/Reader/VerticalReader";
 import { ReadingMode } from "@/types";
 
 const { width, height } = Dimensions.get("window");
 
+export const ScreenOptions = {
+  headerShown: false,
+  gestureEnabled: false,
+  fullScreenGestureEnabled: false,
+  animation: "none",
+  contentStyle: { backgroundColor: "#000" },
+};
+
 export default function ReaderScreen() {
-  const { mangaId, chapterId } = useLocalSearchParams<{
+  const {
+    mangaId,
+    chapterId,
+    initialPage: initialPageParam,
+  } = useLocalSearchParams<{
     mangaId: string;
     chapterId: string;
+    initialPage?: string;
   }>();
 
   const insets = useSafeAreaInsets();
@@ -79,13 +96,17 @@ export default function ReaderScreen() {
 
   const handlePrevChapter = useCallback(() => {
     if (prevChapter) {
-      router.replace(`/reader/${mangaId}/${prevChapter.id}`);
+      // Navigate to previous chapter, start at last page
+      router.replace(
+        `/reader/${mangaId}/${prevChapter.id}?initialPage=${prevChapter.pagesCount - 1}`,
+      );
     }
   }, [mangaId, prevChapter]);
 
   const handleNextChapter = useCallback(() => {
     if (nextChapter) {
-      router.replace(`/reader/${mangaId}/${nextChapter.id}`);
+      // Navigate to next chapter, start at first page
+      router.replace(`/reader/${mangaId}/${nextChapter.id}?initialPage=0`);
     }
   }, [mangaId, nextChapter]);
 
@@ -111,26 +132,41 @@ export default function ReaderScreen() {
     );
   }
 
+  // Get initial page from route params or from progress
+  const pageFromParams = initialPageParam
+    ? parseInt(initialPageParam, 10)
+    : undefined;
+  const savedProgressPage =
+    progress?.chapterId === chapterId ? progress.pageNumber : 0;
+  const initialPage =
+    pageFromParams !== undefined
+      ? pageFromParams
+      : savedProgressPage > 0
+        ? savedProgressPage - 1
+        : 0; // Convert to 0-based
+
   const renderReader = () => {
     const readerProps = {
       mangaId,
       chapterId,
-      initialPage: progress?.chapterId === chapterId ? progress.pageNumber : 0,
+      initialPage,
       totalPages: currentChapter.pagesCount,
       onPageChange: handlePageChange,
       onPrevChapter: prevChapter ? handlePrevChapter : undefined,
       onNextChapter: nextChapter ? handleNextChapter : undefined,
-      onTap: toggleControls,
     };
 
-    switch (readingMode) {
-      case "ltr":
-        return <LTRReader {...readerProps} />;
-      case "vertical":
-        return <VerticalReader {...readerProps} />;
-      case "rtl":
-      default:
-        return <RTLReader {...readerProps} />;
+    if (readingMode === "vertical") {
+      return <VerticalReader {...readerProps} />;
+    } else {
+      return (
+        <HorizontalReader
+          {...readerProps}
+          direction={readingMode}
+          controlsVisible={controlsVisible}
+          onToggleControls={toggleControls}
+        />
+      );
     }
   };
 
@@ -139,8 +175,8 @@ export default function ReaderScreen() {
       <StatusBar hidden={!controlsVisible} />
 
       {/* Top Controls */}
-      {controlsVisible && (
-        <View style={[styles.topBar, { paddingTop: insets.top }]}>
+      <TouchableWithoutFeedback onPress={toggleControls}>
+        <View style={[styles.topBar, { paddingTop: insets.top, opacity: controlsVisible ? 1 : 0 }]}>
           <IconButton
             icon="arrow-left"
             onPress={handleBack}
@@ -185,32 +221,36 @@ export default function ReaderScreen() {
             />
           </Menu>
         </View>
-      )}
+      </TouchableWithoutFeedback>
 
       {/* Reader */}
       <View style={styles.readerContainer}>{renderReader()}</View>
 
-      {/* Bottom Controls */}
-      {controlsVisible && (
-        <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 8 }]}>
-          <IconButton
-            icon="chevron-left"
-            onPress={handlePrevChapter}
-            disabled={!prevChapter}
-            iconColor={prevChapter ? "#fff" : "#6b7280"}
-            size={28}
-          />
-          <Text style={styles.pageInfo}>
-            {currentChapter.chapterId} / {sortedChapters.length} chapters
-          </Text>
-          <IconButton
-            icon="chevron-right"
-            onPress={handleNextChapter}
-            disabled={!nextChapter}
-            iconColor={nextChapter ? "#fff" : "#6b7280"}
-            size={28}
-          />
-        </View>
+      {/* Bottom Controls - Only for Vertical mode */}
+      {readingMode === "vertical" && (
+        <TouchableWithoutFeedback onPress={toggleControls}>
+          <View
+            style={[styles.bottomBar, { paddingBottom: insets.bottom + 8, opacity: controlsVisible ? 1 : 0 }]}
+          >
+            <IconButton
+              icon="chevron-left"
+              onPress={handlePrevChapter}
+              disabled={!prevChapter}
+              iconColor={prevChapter ? "#fff" : "#6b7280"}
+              size={28}
+            />
+            <Text style={styles.pageInfo}>
+              Chapter {currentChapter.chapterId}
+            </Text>
+            <IconButton
+              icon="chevron-right"
+              onPress={handleNextChapter}
+              disabled={!nextChapter}
+              iconColor={nextChapter ? "#fff" : "#6b7280"}
+              size={28}
+            />
+          </View>
+        </TouchableWithoutFeedback>
       )}
     </View>
   );

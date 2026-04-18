@@ -74,6 +74,8 @@ export default function RootLayout() {
                 options={{
                   headerShown: false,
                   gestureEnabled: false,
+                  animation: "none",
+                  fullScreenGestureEnabled: false,
                 }}
               />
             </Stack>
