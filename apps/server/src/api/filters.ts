@@ -104,15 +104,19 @@ router.get("/filter", async (req: Request, res: Response): Promise<void> => {
     if (readingStatus && readingStatus !== "all") {
       switch (readingStatus) {
         case "reading":
+          // Has progress but not completed (pageNumber < totalPages)
           conditions.push(
             and(
               isNotNull(readingProgress.id),
-              eq(readingProgress.isCompleted, false),
+              sql`${readingProgress.pageNumber} < ${readingProgress.totalPages}`,
             ),
           );
           break;
         case "completed":
-          conditions.push(eq(readingProgress.isCompleted, true));
+          // Completed: pageNumber >= totalPages
+          conditions.push(
+            sql`${readingProgress.pageNumber} >= ${readingProgress.totalPages}`,
+          );
           break;
         case "not-started":
           conditions.push(isNull(readingProgress.id));
@@ -182,14 +186,20 @@ router.get(
       const totalManga = await db
         .select({ count: count(manga.id) })
         .from(manga);
+      // Reading: has progress but pageNumber < totalPages
       const readingCount = await db
         .select({ count: count(readingProgress.id) })
         .from(readingProgress)
-        .where(eq(readingProgress.isCompleted, false));
+        .where(
+          sql`${readingProgress.pageNumber} < ${readingProgress.totalPages}`,
+        );
+      // Completed: pageNumber >= totalPages
       const completedCount = await db
         .select({ count: count(readingProgress.id) })
         .from(readingProgress)
-        .where(eq(readingProgress.isCompleted, true));
+        .where(
+          sql`${readingProgress.pageNumber} >= ${readingProgress.totalPages}`,
+        );
 
       res.json({
         categories: allCategories,
@@ -221,7 +231,12 @@ function getSortColumn(sortBy: string) {
     case "dateAdded":
       return manga.createdAt;
     case "progress":
-      return sql`COALESCE(${readingProgress.percentComplete}, 0)`;
+      // Calculate progress dynamically: (pageNumber / totalPages) * 100
+      return sql`CASE 
+        WHEN ${readingProgress.totalPages} > 0 
+        THEN (${readingProgress.pageNumber} * 100.0 / ${readingProgress.totalPages}) 
+        ELSE 0 
+      END`;
     case "chapterCount":
       return count(chapters.id);
     default:

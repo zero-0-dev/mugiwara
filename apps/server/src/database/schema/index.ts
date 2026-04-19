@@ -165,10 +165,9 @@ export const readingProgress = sqliteTable("reading_progress", {
   }),
   pageNumber: integer("page_number").notNull().default(1),
   totalPages: integer("total_pages").notNull().default(0),
-  percentComplete: real("percent_complete").notNull().default(0),
-  isCompleted: integer("is_completed", { mode: "boolean" })
-    .notNull()
-    .default(false),
+  // percentComplete and isCompleted are now calculated dynamically
+  // percentComplete = (pageNumber / totalPages) * 100
+  // isCompleted = pageNumber >= totalPages
   lastReadAt: text("last_read_at")
     .notNull()
     .default(sql`(current_timestamp)`),

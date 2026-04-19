@@ -1,5 +1,9 @@
 import { Router, Request, Response } from "express";
-import { mangaRepository, progressRepository } from "../database";
+import {
+  mangaRepository,
+  progressRepository,
+  chapterRepository,
+} from "../database";
 import { v4 as uuidv4 } from "uuid";
 
 const router: Router = Router();
@@ -126,19 +130,66 @@ router.delete("/:id", async (req: Request, res: Response): Promise<void> => {
   }
 });
 
-// GET /api/manga/:id/progress - Get reading progress
+// GET /api/manga/:id/progress - Get overall manga progress
+// Returns overall reading stats: total chapters, completed chapters, percentage
+// For per-chapter progress, use GET /api/manga/:id/progress/all
 router.get(
   "/:id/progress",
   async (req: Request, res: Response): Promise<void> => {
     try {
       const id = req.params.id;
+      const deviceId = req.query.deviceId as string | undefined;
       if (!id) {
         res.status(400).json({ error: "ID is required" });
         return;
       }
-      const progress = await progressRepository.findByMangaId(id);
-      // Return null if no progress found (user hasn't started reading yet)
-      res.json(progress || null);
+
+      // Get all chapters for this manga
+      const chapters = await chapterRepository.findByMangaId(id);
+      const totalChapters = chapters.length;
+
+      // Get all progress for this manga
+      const allProgress = deviceId
+        ? await progressRepository.findAllByMangaId(id, deviceId)
+        : await progressRepository.findAllByMangaId(id);
+
+      // Count completed chapters
+      const completedChapters = allProgress.filter(
+        (p) => p.isCompleted || p.percentComplete >= 95,
+      ).length;
+
+      // Calculate overall percentage
+      const percentComplete =
+        totalChapters > 0
+          ? Math.round((completedChapters / totalChapters) * 100)
+          : 0;
+
+      // Get the most recently read chapter
+      const mostRecentProgress = allProgress[0];
+
+      // Build the response
+      const overallProgress = {
+        id: mostRecentProgress?.id || uuidv4(),
+        mangaId: id,
+        chapterId: mostRecentProgress?.chapterId || null,
+        pageNumber: mostRecentProgress?.pageNumber || 1,
+        totalPages: mostRecentProgress?.totalPages || 0,
+        percentComplete,
+        isCompleted: percentComplete >= 100,
+        lastReadAt: mostRecentProgress?.lastReadAt || new Date().toISOString(),
+        deviceId: deviceId || mostRecentProgress?.deviceId,
+        // Additional metadata for overall progress
+        _overallStats: {
+          totalChapters,
+          completedChapters,
+          inProgressChapters: allProgress.filter(
+            (p) =>
+              !p.isCompleted && p.percentComplete > 0 && p.percentComplete < 95,
+          ).length,
+        },
+      };
+
+      res.json(overallProgress);
     } catch (error) {
       console.error("Error fetching progress:", error);
       res.status(500).json({ error: "Failed to fetch progress" });
@@ -146,7 +197,28 @@ router.get(
   },
 );
 
-// POST /api/manga/:id/progress - Update reading progress
+// GET /api/manga/:id/progress/all - Get all chapter progress for a manga
+router.get(
+  "/:id/progress/all",
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const id = req.params.id;
+      const deviceId = req.query.deviceId as string | undefined;
+      if (!id) {
+        res.status(400).json({ error: "ID is required" });
+        return;
+      }
+      const progress = await progressRepository.findAllByMangaId(id, deviceId);
+      res.json(progress);
+    } catch (error) {
+      console.error("Error fetching all progress:", error);
+      res.status(500).json({ error: "Failed to fetch progress" });
+    }
+  },
+);
+
+// POST /api/manga/:id/progress - Update reading progress (backward compatible)
+// DEPRECATED: Use POST /api/manga/:id/chapters/:chapterId/progress for per-chapter tracking
 router.post(
   "/:id/progress",
   async (req: Request, res: Response): Promise<void> => {
@@ -157,20 +229,16 @@ router.post(
         res.status(400).json({ error: "ID is required" });
         return;
       }
-      const { chapterId, pageNumber, totalPages, isCompleted, deviceId } =
-        req.body;
+      const { chapterId, pageNumber, totalPages, deviceId } = req.body;
 
-      const percentComplete =
-        totalPages > 0 ? (pageNumber / totalPages) * 100 : 0;
-
-      const progress = await progressRepository.upsert({
+      // Use the legacy upsert for backward compatibility
+      // percentComplete and isCompleted are calculated dynamically
+      const progress = await progressRepository.upsertByManga({
         id: uuidv4(),
         mangaId: id,
         chapterId,
         pageNumber,
         totalPages,
-        percentComplete,
-        isCompleted: isCompleted || percentComplete >= 95,
         deviceId,
       });
 

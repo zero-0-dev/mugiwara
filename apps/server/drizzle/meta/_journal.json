@@ -8,6 +8,13 @@
       "when": 1775246921828,
       "tag": "0000_initial",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1776534681088,
+      "tag": "0001_remove-reading-progress-columns",
+      "breakpoints": true
     }
   ]
 }
