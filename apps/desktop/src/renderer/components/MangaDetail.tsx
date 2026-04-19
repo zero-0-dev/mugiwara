@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Manga, Chapter, ReadingProgress } from "@mugiwara/types";
 
 interface MangaDetailProps {
@@ -9,6 +9,7 @@ interface MangaDetailProps {
 }
 
 interface ChapterWithProgress extends Chapter {
+  progress?: ReadingProgress;
   isRead?: boolean;
   isCurrent?: boolean;
   progressPercent?: number;
@@ -39,7 +40,7 @@ export function MangaDetail({
 }: MangaDetailProps) {
   const [manga, setManga] = useState<Manga | null>(null);
   const [chapters, setChapters] = useState<ChapterWithProgress[]>([]);
-  const [progress, setProgress] = useState<ReadingProgress | null>(null);
+  const [allProgress, setAllProgress] = useState<ReadingProgress[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -69,6 +70,16 @@ export function MangaDetail({
     new Set(),
   );
 
+  // Chapter menu state
+  const [activeChapterMenu, setActiveChapterMenu] = useState<string | null>(
+    null,
+  );
+  const [menuPosition, setMenuPosition] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+
   useEffect(() => {
     fetchMangaDetail();
     fetchCategories();
@@ -92,14 +103,14 @@ export function MangaDetail({
       if (!chaptersRes.ok) throw new Error("Failed to fetch chapters");
       const chaptersData = await chaptersRes.json();
 
-      // Fetch reading progress
+      // Fetch all chapter progress
       const progressRes = await fetch(
-        `${apiBaseUrl}/api/manga/${mangaId}/progress`,
+        `${apiBaseUrl}/api/manga/${mangaId}/progress/all`,
       );
-      let progressData: ReadingProgress | null = null;
+      let progressData: ReadingProgress[] = [];
       if (progressRes.ok) {
         progressData = await progressRes.json();
-        setProgress(progressData);
+        setAllProgress(progressData);
       }
 
       // Enrich chapters with progress info
@@ -117,41 +128,36 @@ export function MangaDetail({
 
   function enrichChaptersWithProgress(
     chaptersData: Chapter[],
-    progressData: ReadingProgress | null,
+    progressData: ReadingProgress[],
   ): ChapterWithProgress[] {
-    if (!progressData || !progressData.chapterId) {
-      return chaptersData.map((ch) => ({
-        ...ch,
-        isRead: false,
-        isCurrent: false,
-        progressPercent: 0,
-      }));
-    }
+    // Create a map of chapterId -> progress for O(1) lookup
+    const progressMap = progressData.reduce(
+      (acc, progress) => {
+        if (progress.chapterId) {
+          acc[progress.chapterId] = progress;
+        }
+        return acc;
+      },
+      {} as Record<string, ReadingProgress>,
+    );
 
-    const currentChapterId = progressData.chapterId;
-    const currentPage = progressData.pageNumber || 1;
-    const totalPages = progressData.totalPages || 1;
+    // Find the most recently read chapter (first in the array since it's sorted by lastReadAt)
+    const mostRecentProgress = progressData[0];
+    const currentChapterId = mostRecentProgress?.chapterId;
 
     return chaptersData.map((chapter) => {
+      const progress = progressMap[chapter.id];
       const isCurrent = chapter.id === currentChapterId;
-      let isRead = false;
-      let progressPercent = 0;
-
-      if (isCurrent) {
-        // Current chapter - show actual progress
-        progressPercent = Math.round((currentPage / totalPages) * 100);
-        // Only mark as fully read if completed
-        isRead = progressData.isCompleted || false;
-      }
-      // Note: We don't mark other chapters as read automatically.
-      // A chapter is only "read" if the user actually read it.
-      // This would require per-chapter reading progress tracking.
+      const isRead =
+        progress?.isCompleted || (progress?.percentComplete || 0) >= 95;
+      const progressPercent = Math.round(progress?.percentComplete || 0);
 
       return {
         ...chapter,
+        progress,
         isRead,
         isCurrent,
-        progressPercent,
+        progressPercent: isRead ? 100 : progressPercent,
       };
     });
   }
@@ -260,29 +266,90 @@ export function MangaDetail({
     }
   }
 
-  const handleContinueReading = () => {
-    if (!progress || !progress.chapterId) {
-      // Start from first chapter
-      if (chapters.length > 0) {
-        onReadChapter(chapters[0].id, chapters);
+  // Chapter progress management
+  async function handleMarkChapterComplete(
+    chapterId: string,
+    markPrevious?: boolean,
+  ) {
+    try {
+      const response = await fetch(
+        `${apiBaseUrl}/api/manga/${mangaId}/chapters/${chapterId}/complete`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ markPrevious: markPrevious || false }),
+        },
+      );
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to mark chapter as complete");
       }
-      return;
+
+      // Refresh to get updated progress
+      await fetchMangaDetail();
+      setActiveChapterMenu(null);
+    } catch (err) {
+      console.error("Failed to mark chapter as complete:", err);
+      setError(err instanceof Error ? err.message : "Failed to update chapter");
     }
-    onReadChapter(progress.chapterId, chapters);
+  }
+
+  async function handleMarkChapterIncomplete(
+    chapterId: string,
+    markFollowing?: boolean,
+  ) {
+    try {
+      const response = await fetch(
+        `${apiBaseUrl}/api/manga/${mangaId}/chapters/${chapterId}/complete`,
+        {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ markFollowing: markFollowing || false }),
+        },
+      );
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to mark chapter as incomplete");
+      }
+
+      // Refresh to get updated progress
+      await fetchMangaDetail();
+      setActiveChapterMenu(null);
+    } catch (err) {
+      console.error("Failed to mark chapter as incomplete:", err);
+      setError(err instanceof Error ? err.message : "Failed to update chapter");
+    }
+  }
+
+  const handleContinueReading = () => {
+    // Find the first chapter that is not completed
+    const firstIncompleteChapter = chapters.find((c) => !c.isRead);
+
+    if (firstIncompleteChapter) {
+      onReadChapter(firstIncompleteChapter.id, chapters);
+    } else if (chapters.length > 0 && chapters[0]) {
+      // All chapters are read, start from the first one
+      onReadChapter(chapters[0].id, chapters);
+    }
   };
 
   const getContinueReadingText = () => {
-    if (!progress || !progress.chapterId) {
-      return "Start Reading";
+    const firstIncompleteChapter = chapters.find((c) => !c.isRead);
+
+    if (!firstIncompleteChapter) {
+      return chapters.length > 0 ? "Read Again" : "Start Reading";
     }
-    if (progress.isCompleted) {
-      return "Read Again";
+
+    if (
+      firstIncompleteChapter.progress &&
+      firstIncompleteChapter.progress.percentComplete > 0
+    ) {
+      return `Continue Chapter ${firstIncompleteChapter.chapterId}`;
     }
-    const currentChapter = chapters.find((c) => c.id === progress.chapterId);
-    if (currentChapter) {
-      return `Continue Chapter ${currentChapter.chapterId}`;
-    }
-    return "Continue Reading";
+
+    return `Start Chapter ${firstIncompleteChapter.chapterId}`;
   };
 
   const handleEditTitle = () => {
@@ -387,6 +454,39 @@ export function MangaDetail({
     }
   };
 
+  // Handle chapter menu click
+  const handleChapterMenuClick = (e: React.MouseEvent, chapterId: string) => {
+    e.stopPropagation();
+    const rect = (e.target as HTMLElement).getBoundingClientRect();
+    setMenuPosition({ x: rect.left, y: rect.bottom });
+    setActiveChapterMenu(chapterId);
+  };
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        menuRef.current &&
+        !menuRef.current.contains(e.target as Node) &&
+        !(e.target as HTMLElement).closest(".chapter-menu-btn")
+      ) {
+        setActiveChapterMenu(null);
+      }
+    };
+
+    if (activeChapterMenu) {
+      // Use setTimeout to avoid immediate closing from the same click that opened it
+      const timer = setTimeout(() => {
+        document.addEventListener("click", handleClickOutside);
+      }, 0);
+      return () => {
+        clearTimeout(timer);
+        document.removeEventListener("click", handleClickOutside);
+      };
+    }
+    return undefined;
+  }, [activeChapterMenu]);
+
   if (loading) {
     return (
       <div className="manga-detail-loading">
@@ -408,7 +508,6 @@ export function MangaDetail({
   }
 
   const readChaptersCount = chapters.filter((c) => c.isRead).length;
-  const hasProgress = progress && progress.chapterId;
 
   const getChapterDownloadStatus = (chapter: ChapterWithProgress) => {
     if (downloadingChapters.has(chapter.chapterId)) {
@@ -429,8 +528,136 @@ export function MangaDetail({
     return "idle";
   };
 
+  // Chapter Menu Component
+  const ChapterMenu = ({ chapter }: { chapter: ChapterWithProgress }) => {
+    if (activeChapterMenu !== chapter.id) return null;
+
+    return (
+      <div
+        ref={menuRef}
+        className="chapter-menu"
+        style={{
+          position: "fixed",
+          top: menuPosition?.y || 0,
+          left: menuPosition?.x || 0,
+          backgroundColor: "#1f2937",
+          borderRadius: "8px",
+          boxShadow: "0 4px 6px rgba(0, 0, 0, 0.3)",
+          zIndex: 1000,
+          minWidth: "200px",
+          padding: "8px 0",
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {!chapter.isRead && (
+          <button
+            className="chapter-menu-item"
+            onClick={() => handleMarkChapterComplete(chapter.id)}
+          >
+            <span className="menu-icon">✓</span>
+            Mark as Read
+          </button>
+        )}
+        {chapter.isRead && (
+          <button
+            className="chapter-menu-item"
+            onClick={() => handleMarkChapterIncomplete(chapter.id)}
+          >
+            <span className="menu-icon">○</span>
+            Mark as Unread
+          </button>
+        )}
+        <div className="chapter-menu-divider" />
+        <button
+          className="chapter-menu-item"
+          onClick={() => handleMarkChapterComplete(chapter.id, true)}
+        >
+          <span className="menu-icon">✓✓</span>
+          Mark All Previous as Read
+        </button>
+        {chapter.isRead && (
+          <button
+            className="chapter-menu-item"
+            onClick={() => handleMarkChapterIncomplete(chapter.id, true)}
+          >
+            <span className="menu-icon">○○</span>
+            Mark All Following as Unread
+          </button>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="manga-detail">
+      <style>{`
+        .chapter-menu-item {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          width: 100%;
+          padding: 8px 16px;
+          background: none;
+          border: none;
+          color: #d1d5db;
+          cursor: pointer;
+          font-size: 14px;
+          text-align: left;
+          transition: background-color 0.2s;
+        }
+        .chapter-menu-item:hover {
+          background-color: #374151;
+        }
+        .chapter-menu-divider {
+          height: 1px;
+          background-color: #374151;
+          margin: 8px 0;
+        }
+        .menu-icon {
+          font-size: 12px;
+          width: 20px;
+          text-align: center;
+        }
+        .chapter-actions {
+          position: relative;
+        }
+        .chapter-menu-btn {
+          background: none;
+          border: none;
+          color: #9ca3af;
+          cursor: pointer;
+          padding: 4px 8px;
+          font-size: 16px;
+          border-radius: 4px;
+          transition: background-color 0.2s, color 0.2s;
+        }
+        .chapter-menu-btn:hover {
+          background-color: #374151;
+          color: #fff;
+        }
+        .chapter-progress-indicator {
+          width: 24px;
+          height: 24px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+        }
+        .chapter-progress-indicator.unread {
+          border: 2px solid rgba(255, 255, 255, 0.2);
+        }
+        .chapter-progress-indicator.read {
+          background-color: #22c55e;
+          color: white;
+        }
+        .chapter-progress-indicator.in-progress {
+          background: conic-gradient(#6366f1 var(--progress, 0%), transparent 0%);
+          border: 2px solid #6366f1;
+        }
+
+      `}</style>
+
       <div className="manga-detail-header">
         <button onClick={onBack} className="btn btn-secondary back-btn">
           ← Back to Library
@@ -714,7 +941,7 @@ export function MangaDetail({
                 <span className="continue-icon">▶</span>
                 {getContinueReadingText()}
               </button>
-              {hasProgress && (
+              {readChaptersCount > 0 && (
                 <div className="reading-stats">
                   <span>
                     {readChaptersCount} / {chapters.length} chapters read
@@ -759,9 +986,10 @@ export function MangaDetail({
                       </span>
                     </div>
                     <div className="chapter-meta">
-                      {chapter.isCurrent &&
-                        chapter.progressPercent !== undefined &&
-                        chapter.progressPercent > 0 && (
+                      {/* Progress indicator - shown for all chapters with progress */}
+                      {chapter.progressPercent !== undefined &&
+                        chapter.progressPercent > 0 &&
+                        !chapter.isRead && (
                           <div className="chapter-progress">
                             <div className="chapter-progress-bar">
                               <div
@@ -782,6 +1010,19 @@ export function MangaDetail({
                           ? `${chapter.pagesCount} pages`
                           : "Not downloaded"}
                       </span>
+
+                      {/* Chapter menu button */}
+                      <div className="chapter-actions">
+                        <button
+                          className="chapter-menu-btn"
+                          onClick={(e) => handleChapterMenuClick(e, chapter.id)}
+                          title="Chapter options"
+                        >
+                          ⋯
+                        </button>
+                        <ChapterMenu chapter={chapter} />
+                      </div>
+
                       <button
                         className={`chapter-download-btn ${downloadStatus}`}
                         onClick={(e) =>

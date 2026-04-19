@@ -12,8 +12,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   useManga,
   useChapters,
-  useProgress,
-  useUpdateProgress,
+  useChapterProgress,
+  useUpdateChapterProgress,
   useReadingMode,
   useSetReadingMode,
 } from "@/api/hooks";
@@ -48,9 +48,10 @@ export default function ReaderScreen() {
 
   const { data: manga } = useManga(mangaId);
   const { data: chapters } = useChapters(mangaId);
-  const { data: progress } = useProgress(mangaId);
+  // Use chapter-specific progress instead of manga-level progress
+  const { data: chapterProgress } = useChapterProgress(mangaId, chapterId);
   const { data: serverReadingMode } = useReadingMode(mangaId);
-  const updateProgress = useUpdateProgress();
+  const updateChapterProgress = useUpdateChapterProgress();
   const setReadingMode = useSetReadingMode();
 
   // Local state for reading mode, initialized from server
@@ -76,7 +77,7 @@ export default function ReaderScreen() {
 
   const handlePageChange = useCallback(
     (pageNumber: number, totalPages: number) => {
-      updateProgress.mutate({
+      updateChapterProgress.mutate({
         mangaId,
         chapterId,
         pageNumber,
@@ -84,7 +85,7 @@ export default function ReaderScreen() {
         isCompleted: pageNumber === totalPages,
       });
     },
-    [mangaId, chapterId, updateProgress],
+    [mangaId, chapterId, updateChapterProgress],
   );
 
   const handlePrevChapter = useCallback(() => {
@@ -125,16 +126,15 @@ export default function ReaderScreen() {
     );
   }
 
-  // Get initial page from route params or from progress
+  // Get initial page from route params or from chapter-specific progress
   const pageFromParams = initialPageParam
     ? parseInt(initialPageParam, 10)
     : undefined;
-  const savedProgressPage =
-    progress?.chapterId === chapterId ? progress.pageNumber : 0;
+  const savedProgressPage = chapterProgress?.pageNumber || 1;
   const initialPage =
     pageFromParams !== undefined
       ? pageFromParams
-      : savedProgressPage > 0
+      : savedProgressPage > 1
         ? savedProgressPage - 1
         : 0; // Convert to 0-based
 

@@ -10,5 +10,6 @@ build
 coverage
 .vscode/*.log
 *.tsbuildinfo
+.agents
 
 apps/server/data

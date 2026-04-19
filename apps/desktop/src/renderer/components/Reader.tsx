@@ -256,18 +256,15 @@ export function Reader({
     }
   }
 
+  // Load chapter-specific progress
   async function loadProgress() {
     try {
       const response = await fetch(
-        `${apiBaseUrl}/api/manga/${mangaId}/progress`,
+        `${apiBaseUrl}/api/manga/${mangaId}/chapters/${chapterId}/progress`,
       );
       if (response.ok) {
         const progress: ReadingProgress | null = await response.json();
-        if (
-          progress &&
-          progress.chapterId === chapterId &&
-          progress.pageNumber > 1
-        ) {
+        if (progress && progress.pageNumber > 1) {
           const pageIndex = progress.pageNumber - 1;
           setCurrentPage(pageIndex);
 
@@ -282,18 +279,18 @@ export function Reader({
     }
   }
 
+  // Save chapter-specific progress
   async function saveProgress() {
     try {
       console.log(
         `[Reader] Saving progress: manga=${mangaId}, chapter=${chapterId}, page=${currentPage + 1}/${pages.length}`,
       );
       const response = await fetch(
-        `${apiBaseUrl}/api/manga/${mangaId}/progress`,
+        `${apiBaseUrl}/api/manga/${mangaId}/chapters/${chapterId}/progress`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            chapterId,
             pageNumber: currentPage + 1,
             totalPages: pages.length,
             isCompleted: currentPage === pages.length - 1,
@@ -452,6 +449,18 @@ export function Reader({
 
   const currentPageData = pages[currentPage];
 
+  // This should never happen, but TypeScript needs the check
+  if (!currentPageData && readingMode !== "vertical") {
+    return (
+      <div className="reader-error">
+        <p>Error: Could not load page</p>
+        <button onMouseDown={() => onBack()} className="btn btn-primary">
+          Go Back
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div
       ref={containerRef}
@@ -501,11 +510,13 @@ export function Reader({
             ))}
           </div>
         ) : (
-          <img
-            src={`${apiBaseUrl}${currentPageData.url}`}
-            alt={`Page ${currentPage + 1}`}
-            className="manga-page"
-          />
+          currentPageData && (
+            <img
+              src={`${apiBaseUrl}${currentPageData.url}`}
+              alt={`Page ${currentPage + 1}`}
+              className="manga-page"
+            />
+          )
         )}
       </div>
 

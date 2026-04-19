@@ -145,7 +145,8 @@ class ApiClient {
     return `${this.serverUrl}${coverPath}`;
   }
 
-  // Reading Progress
+  // Reading Progress - Legacy (DEPRECATED)
+  /** @deprecated Use getAllChapterProgress for per-chapter tracking */
   async getProgress(mangaId: string): Promise<ReadingProgress | null> {
     try {
       const response = await this.getClient().get(`/manga/${mangaId}/progress`);
@@ -155,6 +156,7 @@ class ApiClient {
     }
   }
 
+  /** @deprecated Use updateChapterProgress for per-chapter tracking */
   async updateProgress(
     mangaId: string,
     chapterId: string | undefined,
@@ -168,6 +170,88 @@ class ApiClient {
       totalPages,
       isCompleted,
     });
+  }
+
+  // Reading Progress - New Per-Chapter APIs
+
+  // Get all chapter progress for a manga
+  async getAllChapterProgress(mangaId: string): Promise<ReadingProgress[]> {
+    try {
+      const response = await this.getClient().get(
+        `/manga/${mangaId}/progress/all`,
+      );
+      return response.data || [];
+    } catch {
+      return [];
+    }
+  }
+
+  // Update chapter progress (for reader)
+  async updateChapterProgress(
+    mangaId: string,
+    chapterId: string,
+    pageNumber: number,
+    totalPages: number,
+    isCompleted?: boolean,
+  ): Promise<ReadingProgress> {
+    const response = await this.getClient().post(
+      `/manga/${mangaId}/chapters/${chapterId}/progress`,
+      {
+        pageNumber,
+        totalPages,
+        isCompleted,
+      },
+    );
+    return response.data;
+  }
+
+  // Get progress for a specific chapter
+  async getChapterProgress(
+    mangaId: string,
+    chapterId: string,
+  ): Promise<ReadingProgress | null> {
+    try {
+      const response = await this.getClient().get(
+        `/manga/${mangaId}/chapters/${chapterId}/progress`,
+      );
+      return response.data;
+    } catch {
+      return null;
+    }
+  }
+
+  // Mark chapter as complete (read)
+  // markPrevious: If true, also marks all previous chapters as read
+  async markChapterComplete(
+    mangaId: string,
+    chapterId: string,
+    markPrevious?: boolean,
+  ): Promise<{ success: boolean; message: string; markedCount: number }> {
+    const response = await this.getClient().post(
+      `/manga/${mangaId}/chapters/${chapterId}/complete`,
+      {
+        markPrevious: markPrevious || false,
+      },
+    );
+    return response.data;
+  }
+
+  // Mark chapter as incomplete (unread)
+  // markFollowing: If true, also marks all following chapters as unread
+  async markChapterIncomplete(
+    mangaId: string,
+    chapterId: string,
+    markFollowing?: boolean,
+  ): Promise<{ success: boolean; message: string; markedCount: number }> {
+    const response = await this.getClient().delete(
+      `/manga/${mangaId}/chapters/${chapterId}/complete`,
+      {
+        data: {
+          markFollowing: markFollowing || false,
+        },
+      },
+    );
+    return response.data;
   }
 
   // Categories

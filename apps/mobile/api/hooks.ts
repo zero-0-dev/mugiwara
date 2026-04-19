@@ -8,6 +8,7 @@ import {
   QueueStats,
   PageInfo,
   ReadingMode,
+  ReadingProgress,
 } from "../types";
 
 // Library
@@ -89,7 +90,8 @@ export function useChapterPages(mangaId: string, chapterId: string) {
   });
 }
 
-// Reading Progress
+// Reading Progress - Legacy (DEPRECATED)
+/** @deprecated Use useAllChapterProgress for per-chapter tracking */
 export function useProgress(mangaId: string) {
   return useQuery({
     queryKey: ["progress", mangaId],
@@ -97,6 +99,7 @@ export function useProgress(mangaId: string) {
   });
 }
 
+/** @deprecated Use useUpdateChapterProgress for per-chapter tracking */
 export function useUpdateProgress() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -125,6 +128,140 @@ export function useUpdateProgress() {
         queryKey: ["progress", variables.mangaId],
       });
       queryClient.invalidateQueries({ queryKey: ["library"] });
+    },
+  });
+}
+
+// Reading Progress - New Per-Chapter APIs
+
+// Get all chapter progress for a manga
+export function useAllChapterProgress(mangaId: string) {
+  return useQuery<ReadingProgress[]>({
+    queryKey: ["chapterProgress", "all", mangaId],
+    queryFn: () => apiClient.getAllChapterProgress(mangaId),
+    enabled: !!mangaId,
+  });
+}
+
+// Get progress for a specific chapter
+export function useChapterProgress(mangaId: string, chapterId: string) {
+  return useQuery<ReadingProgress | null>({
+    queryKey: ["chapterProgress", mangaId, chapterId],
+    queryFn: () => apiClient.getChapterProgress(mangaId, chapterId),
+    enabled: !!mangaId && !!chapterId,
+  });
+}
+
+// Update chapter progress (for reader)
+export function useUpdateChapterProgress() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      mangaId,
+      chapterId,
+      pageNumber,
+      totalPages,
+      isCompleted,
+    }: {
+      mangaId: string;
+      chapterId: string;
+      pageNumber: number;
+      totalPages: number;
+      isCompleted?: boolean;
+    }) =>
+      apiClient.updateChapterProgress(
+        mangaId,
+        chapterId,
+        pageNumber,
+        totalPages,
+        isCompleted,
+      ),
+    onSuccess: (_, variables) => {
+      // Invalidate all chapter progress for this manga
+      queryClient.invalidateQueries({
+        queryKey: ["chapterProgress", "all", variables.mangaId],
+      });
+      // Invalidate specific chapter progress
+      queryClient.invalidateQueries({
+        queryKey: ["chapterProgress", variables.mangaId, variables.chapterId],
+      });
+      // Keep legacy progress invalidation for backward compatibility
+      queryClient.invalidateQueries({
+        queryKey: ["progress", variables.mangaId],
+      });
+      queryClient.invalidateQueries({ queryKey: ["library"] });
+    },
+  });
+}
+
+// Mark chapter as complete (read)
+export function useMarkChapterComplete() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      mangaId,
+      chapterId,
+      markPrevious,
+    }: {
+      mangaId: string;
+      chapterId: string;
+      markPrevious?: boolean;
+    }) => apiClient.markChapterComplete(mangaId, chapterId, markPrevious),
+    onSuccess: async (_, variables) => {
+      // Invalidate and refetch all chapter progress queries for this manga
+      await queryClient.invalidateQueries({
+        queryKey: ["chapterProgress", "all", variables.mangaId],
+        refetchType: "all",
+      });
+      // Also invalidate specific chapter and legacy progress
+      await queryClient.invalidateQueries({
+        queryKey: ["chapterProgress", variables.mangaId, variables.chapterId],
+        refetchType: "all",
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ["progress", variables.mangaId],
+        refetchType: "all",
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ["library"],
+        refetchType: "all",
+      });
+    },
+  });
+}
+
+// Mark chapter as incomplete (unread)
+export function useMarkChapterIncomplete() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      mangaId,
+      chapterId,
+      markFollowing,
+    }: {
+      mangaId: string;
+      chapterId: string;
+      markFollowing?: boolean;
+    }) => apiClient.markChapterIncomplete(mangaId, chapterId, markFollowing),
+    onSuccess: async (_, variables) => {
+      // Invalidate and refetch all chapter progress queries for this manga
+      await queryClient.invalidateQueries({
+        queryKey: ["chapterProgress", "all", variables.mangaId],
+        refetchType: "all",
+      });
+      // Also invalidate specific chapter and legacy progress
+      await queryClient.invalidateQueries({
+        queryKey: ["chapterProgress", variables.mangaId, variables.chapterId],
+        refetchType: "all",
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ["progress", variables.mangaId],
+        refetchType: "all",
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ["library"],
+        refetchType: "all",
+      });
     },
   });
 }
