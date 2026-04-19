@@ -49,7 +49,8 @@ export default function ReaderScreen() {
   const { data: manga } = useManga(mangaId);
   const { data: chapters } = useChapters(mangaId);
   // Use chapter-specific progress instead of manga-level progress
-  const { data: chapterProgress } = useChapterProgress(mangaId, chapterId);
+  const { data: chapterProgress, isLoading: isProgressLoading } =
+    useChapterProgress(mangaId, chapterId);
   const { data: serverReadingMode } = useReadingMode(mangaId);
   const updateChapterProgress = useUpdateChapterProgress();
   const setReadingMode = useSetReadingMode();
@@ -118,7 +119,9 @@ export default function ReaderScreen() {
     router.back();
   };
 
-  if (!currentChapter) {
+  // Wait for chapter data and progress to load before rendering
+  // This prevents race condition where reader initializes with wrong page
+  if (!currentChapter || isProgressLoading) {
     return (
       <View style={[styles.container, styles.centered]}>
         <ActivityIndicator size="large" color="#6366f1" />
