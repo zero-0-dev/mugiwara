@@ -1,5 +1,5 @@
 import React from "react";
-import { View, StyleSheet } from "react-native";
+import { View, StyleSheet, Text } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { CircularProgress } from "./CircularProgress";
 import type { ReadingProgress } from "@/types";
@@ -83,7 +83,7 @@ export function ChapterProgressIndicator({
   // Partial progress - show circular progress
   const roundedProgress = Math.round(progress.percentComplete);
 
-  if (roundedProgress > 0 && roundedProgress < COMPLETION_THRESHOLD) {
+  if (roundedProgress >= 0 && roundedProgress < COMPLETION_THRESHOLD) {
     return (
       <CircularProgress progress={roundedProgress} size={EMPTY_PROGRESS_SIZE} />
     );
