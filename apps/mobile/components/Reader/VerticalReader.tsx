@@ -1,89 +1,187 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import React, { useRef, useCallback, useEffect, useMemo, memo } from "react";
 import {
   View,
-  ScrollView,
+  FlatList,
   Dimensions,
   StyleSheet,
   Animated,
   PanResponder,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
 } from "react-native";
 import { Image } from "expo-image";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { apiClient } from "@/api/client";
+import type { PageInfo } from "@/types";
 
 const { width, height } = Dimensions.get("window");
 const SWIPE_THRESHOLD = width * 0.15;
+const DEFAULT_ASPECT_RATIO = 0.7;
 
 interface VerticalReaderProps {
   mangaId: string;
   chapterId: string;
   initialPage: number;
   totalPages: number;
+  pages?: PageInfo[];
   onPageChange: (page: number, total: number) => void;
   onPrevChapter?: () => void;
   onNextChapter?: () => void;
 }
 
-export function VerticalReader({
+interface PageItemProps {
+  index: number;
+  url: string;
+  aspectRatio: number;
+}
+
+const PageItem = memo(({ index, url, aspectRatio }: PageItemProps) => {
+  return (
+    <View style={styles.pageContainer}>
+      <Image
+        source={{ uri: url }}
+        style={[styles.image, { aspectRatio }]}
+        contentFit="cover"
+        transition={200}
+        cachePolicy="memory-disk"
+        contentPosition="center"
+      />
+    </View>
+  );
+});
+
+PageItem.displayName = "PageItem";
+
+export const VerticalReader = React.memo(function VerticalReader({
   mangaId,
   chapterId,
   initialPage,
   totalPages,
+  pages,
   onPageChange,
   onPrevChapter,
   onNextChapter,
 }: VerticalReaderProps) {
-  const scrollViewRef = useRef<ScrollView>(null);
-  const [currentPage, setCurrentPage] = useState(initialPage);
-  const pageRefs = useRef<(View | null)[]>([]);
+  const flatListRef = useRef<FlatList>(null);
+  const currentPageRef = useRef(initialPage);
+  const onPageChangeRef = useRef(onPageChange);
+  onPageChangeRef.current = onPageChange;
+  const hasScrolledToInitialRef = useRef(false);
 
-  // Animated values for arrow indicators
   const leftArrowOpacity = useRef(new Animated.Value(0)).current;
   const rightArrowOpacity = useRef(new Animated.Value(0)).current;
   const leftArrowTranslateX = useRef(new Animated.Value(-20)).current;
   const rightArrowTranslateX = useRef(new Animated.Value(20)).current;
 
-  const pages = Array.from({ length: totalPages }, (_, i) => i);
+  const pageDataList = useMemo(() => {
+    const safePages = pages ?? [];
+    return Array.from({ length: totalPages }, (_, i) => {
+      const serverPage = safePages[i];
+      const aspectRatio =
+        serverPage?.width && serverPage?.height
+          ? serverPage.width / serverPage.height
+          : DEFAULT_ASPECT_RATIO;
+      return {
+        url: apiClient.getPageUrl(mangaId, chapterId, i + 1),
+        aspectRatio,
+      };
+    });
+  }, [mangaId, chapterId, totalPages, pages]);
 
-  const showArrow = (
-    opacity: Animated.Value,
-    translateX: Animated.Value,
-    toValue: number,
-  ) => {
-    Animated.parallel([
-      Animated.timing(opacity, {
-        toValue: 1,
-        duration: 150,
-        useNativeDriver: true,
-      }),
-      Animated.spring(translateX, {
-        toValue,
-        friction: 8,
-        tension: 40,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  };
+  const offsets = useMemo(() => {
+    const result: number[] = [];
+    let cumulativeOffset = 0;
+    for (let i = 0; i < pageDataList.length; i++) {
+      result.push(cumulativeOffset);
+      cumulativeOffset += width / pageDataList[i].aspectRatio;
+    }
+    return result;
+  }, [pageDataList]);
 
-  const hideArrow = (opacity: Animated.Value, translateX: Animated.Value) => {
-    Animated.parallel([
-      Animated.timing(opacity, {
-        toValue: 0,
-        duration: 150,
-        useNativeDriver: true,
-      }),
-      Animated.timing(translateX, {
-        toValue: 0,
-        duration: 150,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  };
+  const handleScrollEnd = useCallback(
+    (scrollY: number) => {
+      const viewportCenter = scrollY + height / 2;
+
+      for (let i = 0; i < offsets.length; i++) {
+        const pageMidY =
+          offsets[i] + (width / pageDataList[i].aspectRatio) / 2;
+        if (viewportCenter <= pageMidY) {
+          currentPageRef.current = i;
+          onPageChangeRef.current(i + 1, totalPages);
+          return;
+        }
+      }
+
+      currentPageRef.current = totalPages - 1;
+      onPageChangeRef.current(totalPages, totalPages);
+    },
+    [offsets, pageDataList, totalPages, height],
+  );
+
+  const scrollEndTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleMomentumScrollEnd = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      if (scrollEndTimerRef.current) {
+        clearTimeout(scrollEndTimerRef.current);
+      }
+      const scrollY = event.nativeEvent.contentOffset.y;
+      scrollEndTimerRef.current = setTimeout(() => {
+        scrollEndTimerRef.current = null;
+        handleScrollEnd(scrollY);
+      }, 0);
+    },
+    [handleScrollEnd],
+  );
+
+  useEffect(() => {
+    return () => {
+      if (scrollEndTimerRef.current) {
+        clearTimeout(scrollEndTimerRef.current);
+      }
+    };
+  }, []);
+
+  const showArrow = useCallback(
+    (opacity: Animated.Value, translateX: Animated.Value, toValue: number) => {
+      Animated.parallel([
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+        Animated.spring(translateX, {
+          toValue,
+          friction: 8,
+          tension: 40,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    },
+    [],
+  );
+
+  const hideArrow = useCallback(
+    (opacity: Animated.Value, translateX: Animated.Value) => {
+      Animated.parallel([
+        Animated.timing(opacity, {
+          toValue: 0,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+        Animated.timing(translateX, {
+          toValue: 0,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    },
+    [],
+  );
 
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, gestureState) => {
-        // Only respond to horizontal movements
         return (
           Math.abs(gestureState.dx) > Math.abs(gestureState.dy) &&
           Math.abs(gestureState.dx) > 5
@@ -91,15 +189,13 @@ export function VerticalReader({
       },
       onPanResponderMove: (_, gestureState) => {
         const dx = gestureState.dx;
+        const page = currentPageRef.current;
 
-        // Show appropriate arrow based on swipe direction and current page
-        if (dx > 0 && currentPage === 0 && onPrevChapter) {
-          // Swiping right on first page - show left arrow
+        if (dx > 0 && page === 0 && onPrevChapter) {
           const progress = Math.min(dx / SWIPE_THRESHOLD, 1);
           leftArrowOpacity.setValue(progress);
           leftArrowTranslateX.setValue(-20 + progress * 20);
-        } else if (dx < 0 && currentPage === totalPages - 1 && onNextChapter) {
-          // Swiping left on last page - show right arrow
+        } else if (dx < 0 && page === totalPages - 1 && onNextChapter) {
           const progress = Math.min(Math.abs(dx) / SWIPE_THRESHOLD, 1);
           rightArrowOpacity.setValue(progress);
           rightArrowTranslateX.setValue(20 - progress * 20);
@@ -107,21 +203,19 @@ export function VerticalReader({
       },
       onPanResponderRelease: (_, gestureState) => {
         const dx = gestureState.dx;
+        const page = currentPageRef.current;
 
-        if (dx > SWIPE_THRESHOLD && currentPage === 0 && onPrevChapter) {
-          // Swiped right on first page - go to previous chapter
+        if (dx > SWIPE_THRESHOLD && page === 0 && onPrevChapter) {
           hideArrow(leftArrowOpacity, leftArrowTranslateX);
           onPrevChapter();
         } else if (
           dx < -SWIPE_THRESHOLD &&
-          currentPage === totalPages - 1 &&
+          page === totalPages - 1 &&
           onNextChapter
         ) {
-          // Swiped left on last page - go to next chapter
           hideArrow(rightArrowOpacity, rightArrowTranslateX);
           onNextChapter();
         } else {
-          // Not enough swipe - hide arrows
           hideArrow(leftArrowOpacity, leftArrowTranslateX);
           hideArrow(rightArrowOpacity, rightArrowTranslateX);
         }
@@ -133,65 +227,63 @@ export function VerticalReader({
     }),
   ).current;
 
-  const handleScroll = useCallback(
-    (event: any) => {
-      const scrollY = event.nativeEvent.contentOffset.y;
-      const pageHeight = height * 0.8;
-      const newPage = Math.round(scrollY / pageHeight);
+  useEffect(() => {
+    if (!hasScrolledToInitialRef.current && initialPage > 0 && flatListRef.current && offsets.length > 0) {
+      hasScrolledToInitialRef.current = true;
+      const timeoutId = setTimeout(() => {
+        const offset = offsets[initialPage];
+        if (offset !== undefined) {
+          flatListRef.current?.scrollToOffset({
+            offset,
+            animated: false,
+          });
+        }
+      }, 100);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [initialPage, offsets]);
 
-      if (newPage !== currentPage && newPage >= 0 && newPage < totalPages) {
-        setCurrentPage(newPage);
-        onPageChange(newPage + 1, totalPages);
-      }
+  const renderItem = useCallback(
+    ({ index }: { index: number }) => {
+      const { url, aspectRatio } = pageDataList[index];
+      return <PageItem index={index} url={url} aspectRatio={aspectRatio} />;
     },
-    [currentPage, totalPages, onPageChange],
+    [pageDataList],
   );
 
-  // Scroll to initial page on mount
-  useEffect(() => {
-    if (initialPage > 0) {
-      setTimeout(() => {
-        scrollViewRef.current?.scrollTo({
-          y: initialPage * height * 0.8,
-          animated: false,
-        });
-      }, 100);
-    }
-  }, [initialPage]);
+  const keyExtractor = useCallback(
+    (_: any, index: number) => `page-${index}`,
+    [],
+  );
+
+  const listData = useMemo(() => {
+    return Array.from({ length: totalPages }, (_, i) => i);
+  }, [totalPages]);
+
+  const getItemLayout = useCallback(
+    (_data: any, index: number) => {
+      const length = width / pageDataList[index].aspectRatio;
+      return { length, offset: offsets[index], index };
+    },
+    [pageDataList, offsets, width],
+  );
 
   return (
     <View style={styles.container} {...panResponder.panHandlers}>
-      <ScrollView
-        ref={scrollViewRef}
-        style={styles.scrollView}
-        contentContainerStyle={styles.content}
-        onScroll={handleScroll}
-        scrollEventThrottle={200}
+      <FlatList
+        ref={flatListRef}
+        data={listData}
+        renderItem={renderItem}
+        keyExtractor={keyExtractor}
+        onMomentumScrollEnd={handleMomentumScrollEnd}
         showsVerticalScrollIndicator={false}
-      >
-        {pages.map((index) => {
-          const pageUrl = apiClient.getPageUrl(mangaId, chapterId, index + 1);
-          return (
-            <View
-              key={index}
-              ref={(ref) => {
-                pageRefs.current[index] = ref;
-              }}
-              style={styles.pageContainer}
-            >
-              <Image
-                source={{ uri: pageUrl }}
-                style={styles.image}
-                contentFit="contain"
-                transition={200}
-              />
-            </View>
-          );
-        })}
-      </ScrollView>
+        getItemLayout={getItemLayout}
+        initialNumToRender={5}
+        maxToRenderPerBatch={5}
+        windowSize={7}
+      />
 
-      {/* Left Arrow Indicator (Previous Chapter) */}
-      {currentPage === 0 && onPrevChapter && (
+      {onPrevChapter && (
         <Animated.View
           style={[
             styles.arrowContainer,
@@ -206,8 +298,7 @@ export function VerticalReader({
         </Animated.View>
       )}
 
-      {/* Right Arrow Indicator (Next Chapter) */}
-      {currentPage === totalPages - 1 && onNextChapter && (
+      {onNextChapter && (
         <Animated.View
           style={[
             styles.arrowContainer,
@@ -223,29 +314,20 @@ export function VerticalReader({
       )}
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#000",
   },
-  scrollView: {
-    flex: 1,
-  },
-  content: {
-    paddingVertical: 20,
-  },
   pageContainer: {
     width,
-    minHeight: height * 0.8,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 10,
+    backgroundColor: "#000",
   },
   image: {
-    width: width * 0.95,
-    height: height * 0.8,
+    width: "100%",
+    backgroundColor: "#000",
   },
   arrowContainer: {
     position: "absolute",

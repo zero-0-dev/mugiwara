@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import {
   View,
   StyleSheet,
@@ -13,6 +13,7 @@ import {
   useManga,
   useChapters,
   useChapterProgress,
+  useChapterPages,
   useUpdateChapterProgress,
   useReadingMode,
   useSetReadingMode,
@@ -45,6 +46,7 @@ export default function ReaderScreen() {
   const insets = useSafeAreaInsets();
   const [controlsVisible, setControlsVisible] = useState(true);
   const [modeMenuVisible, setModeMenuVisible] = useState(false);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { data: manga } = useManga(mangaId);
   const { data: chapters } = useChapters(mangaId);
@@ -52,6 +54,10 @@ export default function ReaderScreen() {
   const { data: chapterProgress, isLoading: isProgressLoading } =
     useChapterProgress(mangaId, chapterId);
   const { data: serverReadingMode } = useReadingMode(mangaId);
+  const { data: pages, isLoading: isPagesLoading } = useChapterPages(
+    mangaId,
+    chapterId,
+  );
   const updateChapterProgress = useUpdateChapterProgress();
   const setReadingMode = useSetReadingMode();
 
@@ -64,6 +70,16 @@ export default function ReaderScreen() {
       setReadingModeState(serverReadingMode);
     }
   }, [serverReadingMode]);
+
+  // Cleanup debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
+      }
+    };
+  }, []);
 
   const sortedChapters = chapters
     ? [...chapters].sort((a, b) => a.sortOrder - b.sortOrder)
@@ -78,13 +94,16 @@ export default function ReaderScreen() {
 
   const handlePageChange = useCallback(
     (pageNumber: number, totalPages: number) => {
-      updateChapterProgress.mutate({
-        mangaId,
-        chapterId,
-        pageNumber,
-        totalPages,
-        isCompleted: pageNumber === totalPages,
-      });
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = setTimeout(() => {
+        updateChapterProgress.mutate({
+          mangaId,
+          chapterId,
+          pageNumber,
+          totalPages,
+          isCompleted: pageNumber === totalPages,
+        });
+      }, 500);
     },
     [mangaId, chapterId, updateChapterProgress],
   );
@@ -119,9 +138,9 @@ export default function ReaderScreen() {
     router.back();
   };
 
-  // Wait for chapter data and progress to load before rendering
+  // Wait for chapter data, progress, and page data to load before rendering
   // This prevents race condition where reader initializes with wrong page
-  if (!currentChapter || isProgressLoading) {
+  if (!currentChapter || isProgressLoading || isPagesLoading) {
     return (
       <View style={[styles.container, styles.centered]}>
         <ActivityIndicator size="large" color="#6366f1" />
@@ -147,6 +166,7 @@ export default function ReaderScreen() {
       chapterId,
       initialPage,
       totalPages: currentChapter.pagesCount,
+      pages,
       onPageChange: handlePageChange,
       onPrevChapter: prevChapter ? handlePrevChapter : undefined,
       onNextChapter: nextChapter ? handleNextChapter : undefined,

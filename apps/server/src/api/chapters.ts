@@ -11,6 +11,7 @@ import { eq, and, lte, gte } from "drizzle-orm";
 import { chapters } from "../database/schema";
 import { db } from "../database";
 import { v4 as uuidv4 } from "uuid";
+import sharp from "sharp";
 
 const router: Router = Router({ mergeParams: true });
 
@@ -276,13 +277,37 @@ router.get(
 
       if (pageCount > 0) {
         // Chapter is already imported, serve from storage
-        const pages: Array<{ index: number; url: string }> = [];
-        for (let i = 1; i <= pageCount; i++) {
-          pages.push({
-            index: i - 1,
-            url: storage.getPageUrl(mangaId, chapter.chapterId, i),
-          });
-        }
+        const pagePromises = Array.from({ length: pageCount }, async (_, i) => {
+          const pageNum = i + 1;
+          const page: { index: number; url: string; width?: number; height?: number } = {
+            index: i,
+            url: storage.getPageUrl(mangaId, chapter.chapterId, pageNum),
+          };
+
+          try {
+            const filePath = await (storage as any).getPageFilePath(
+              mangaId,
+              chapter.chapterId,
+              pageNum,
+            );
+            if (filePath && existsSync(filePath)) {
+              // Only read dimensions for non-archive files
+              if (!filePath.endsWith(".cbz") && !filePath.endsWith(".zip")) {
+                const meta = await sharp(filePath).metadata();
+                if (meta.width && meta.height) {
+                  page.width = meta.width;
+                  page.height = meta.height;
+                }
+              }
+            }
+          } catch {
+            // silently continue without dimensions
+          }
+
+          return page;
+        });
+
+        const pages = await Promise.all(pagePromises);
         res.json(pages);
         return;
       }
@@ -304,11 +329,22 @@ router.get(
       }
 
       // Download chapter pages using the source
-      const pages: Array<{ index: number; url: string }> = [];
+      const pages: Array<{ index: number; url: string; width?: number; height?: number }> = [];
 
       for await (const pageData of source.downloadChapter(
         sourceChapter.sourceChapterId,
       )) {
+        // Get image dimensions before storing
+        let width: number | undefined;
+        let height: number | undefined;
+        try {
+          const meta = await sharp(pageData.data).metadata();
+          width = meta.width;
+          height = meta.height;
+        } catch {
+          // silently continue without dimensions
+        }
+
         // Store page in storage backend
         await storage.writeChapterPage(
           mangaId,
@@ -325,6 +361,8 @@ router.get(
             chapter.chapterId,
             pageData.pageNumber,
           ),
+          width,
+          height,
         });
       }
 

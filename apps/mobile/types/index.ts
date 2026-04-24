@@ -90,6 +90,8 @@ export interface QueueStats {
 export interface PageInfo {
   index: number;
   url: string;
+  width?: number;
+  height?: number;
 }
 
 export type ReadingMode = "rtl" | "ltr" | "vertical";
