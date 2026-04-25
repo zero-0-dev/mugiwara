@@ -6,6 +6,8 @@ interface SearchResultCardProps {
 }
 
 export function SearchResultCard({ result, onClick }: SearchResultCardProps) {
+  const firstLetter = result.title.charAt(0).toUpperCase();
+
   return (
     <div
       className="add-manga-result-card"
@@ -19,12 +21,17 @@ export function SearchResultCard({ result, onClick }: SearchResultCardProps) {
         }
       }}
     >
-      {result.coverImageUrl && (
+      {result.coverImageUrl ? (
         <img
           src={result.coverImageUrl}
           alt={result.title}
           className="add-manga-result-cover"
+          loading="lazy"
         />
+      ) : (
+        <div className="add-manga-result-placeholder">
+          <span className="add-manga-result-placeholder-letter">{firstLetter}</span>
+        </div>
       )}
       <div className="add-manga-result-info">
         <span className="add-manga-result-title">{result.title}</span>

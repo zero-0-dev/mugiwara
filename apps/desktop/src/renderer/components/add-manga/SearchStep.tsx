@@ -1,106 +1,99 @@
-import type { Source, SearchResult } from "./types";
+import type { SearchResult } from "./types";
 import { SearchResultsGrid } from "./SearchResultsGrid";
 
 interface SearchStepProps {
-  sources: Source[];
-  selectedSource: string | null;
+  isLocal: boolean;
   searchQuery: string;
   searchResults: SearchResult[];
   isSearching: boolean;
   hasSearched: boolean;
-  onSelectSource: (id: string) => void;
-  onSearchQueryChange: (query: string) => void;
-  onSearch: (e: React.FormEvent) => void;
+  onQueryChange: (query: string) => void;
+  onSearchImmediate: () => void;
+  onClear: () => void;
+  onBrowse: () => void;
   onResultClick: (manga: SearchResult) => void;
 }
 
 export function SearchStep({
-  sources,
-  selectedSource,
+  isLocal,
   searchQuery,
   searchResults,
   isSearching,
   hasSearched,
-  onSelectSource,
-  onSearchQueryChange,
-  onSearch,
+  onQueryChange,
+  onSearchImmediate,
+  onClear,
+  onBrowse,
   onResultClick,
 }: SearchStepProps) {
-  const isLocal = selectedSource === "local";
-
-  async function handleBrowse() {
-    const folder = await window.electronAPI.selectFolder();
-    if (folder) {
-      onSearchQueryChange(folder);
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      onSearchImmediate();
+    }
+    if (e.key === "Escape") {
+      (e.target as HTMLInputElement).blur();
     }
   }
 
+  const placeholder = isLocal
+    ? "Enter folder path or browse..."
+    : "Search manga by title...";
+
+  const hasContent = searchQuery.trim().length > 0;
+
   return (
     <>
-      <div className="source-tabs">
-        {sources.map((source) => (
-          <button
-            key={source.id}
-            className={`source-tab${selectedSource === source.id ? " active" : ""}`}
-            onClick={() => onSelectSource(source.id)}
-          >
-            {source.name}
-          </button>
-        ))}
-      </div>
-
-      <form className="add-manga-search" onSubmit={onSearch}>
-        {isLocal ? (
-          <div className="add-manga-search-row">
+      <div className="add-manga-search">
+        <div className="add-manga-search-row">
+          <div className="add-manga-search-input-wrapper">
+            <span className="add-manga-search-icon">🔍</span>
             <input
               type="text"
               value={searchQuery}
-              readOnly
-              placeholder="Select a folder containing manga..."
+              readOnly={isLocal}
+              onChange={(e) => onQueryChange(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={placeholder}
               className="add-manga-search-input"
+              autoFocus
             />
-            <button type="button" className="btn btn-secondary" onClick={handleBrowse}>
-              Browse...
-            </button>
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={isSearching || !searchQuery.trim()}
-            >
-              {isSearching ? "Scanning..." : "Scan"}
-            </button>
+            {hasContent && (
+              <button
+                type="button"
+                className="add-manga-search-clear"
+                onClick={onClear}
+                aria-label="Clear search"
+              >
+                ×
+              </button>
+            )}
           </div>
-        ) : (
-          <div className="add-manga-search-row">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => onSearchQueryChange(e.target.value)}
-              placeholder="Enter manga title..."
-              className="add-manga-search-input"
-            />
+          {isLocal ? (
+            <button type="button" className="btn btn-secondary" onClick={onBrowse}>
+              Browse…
+            </button>
+          ) : (
             <button
-              type="submit"
+              type="button"
               className="btn btn-primary"
-              disabled={isSearching || !searchQuery.trim()}
+              onClick={onSearchImmediate}
+              disabled={isSearching || !hasContent}
             >
               {isSearching ? "Searching..." : "Search"}
             </button>
-          </div>
-        )}
-      </form>
+          )}
+        </div>
+        <p className="add-manga-search-hint">⌨ Enter to search</p>
+      </div>
 
       <SearchResultsGrid
         results={searchResults}
         isSearching={isSearching}
+        hasSearched={hasSearched}
+        searchQuery={searchQuery}
         onSelect={onResultClick}
       />
-
-      {!isSearching && searchResults.length === 0 && hasSearched && (
-        <div className="add-manga-empty">
-          <p>No manga found for "{searchQuery}". Try a different query.</p>
-        </div>
-      )}
     </>
   );
 }

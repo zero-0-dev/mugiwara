@@ -1,9 +1,11 @@
 import { useReducer, useEffect } from "react";
 import type { AddMangaState, Action, SearchResult } from "./add-manga/types";
+import { useDebounce } from "../hooks/useDebounce";
 import { AddMangaHeader } from "./add-manga/AddMangaHeader";
 import { ChapterSelect } from "./add-manga/ChapterSelect";
 import { ImportProgress } from "./add-manga/ImportProgress";
 import { SearchStep } from "./add-manga/SearchStep";
+import { SourceSelector } from "./add-manga/SourceSelector";
 import { SuccessView } from "./add-manga/SuccessView";
 
 interface AddMangaModalProps {
@@ -100,10 +102,30 @@ export function AddMangaModal({
   onSuccess,
 }: AddMangaModalProps) {
   const [state, dispatch] = useReducer(reducer, initialState);
+  const debouncedQuery = useDebounce(state.searchQuery, 300);
 
   useEffect(() => {
     loadSources();
   }, []);
+
+  useEffect(() => {
+    if (state.step !== "search") return;
+    if (!state.selectedSource) return;
+    if (debouncedQuery.length < 2) return;
+    performSearch(debouncedQuery);
+  }, [debouncedQuery, state.selectedSource]);
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape" && !state.isImporting) {
+        const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+        if (tag === "input" || tag === "textarea" || tag === "select") return;
+        onClose();
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose, state.isImporting]);
 
   async function loadSources() {
     try {
@@ -122,15 +144,14 @@ export function AddMangaModal({
     }
   }
 
-  async function handleSearch(e: React.FormEvent) {
-    e.preventDefault();
-    if (!state.selectedSource || !state.searchQuery.trim()) return;
+  async function performSearch(query: string) {
+    if (!state.selectedSource) return;
 
     dispatch({ type: "SEARCH_START" });
 
     try {
       const response = await fetch(
-        `${apiBaseUrl}/api/library/sources/${state.selectedSource}/search?q=${encodeURIComponent(state.searchQuery)}`,
+        `${apiBaseUrl}/api/library/sources/${state.selectedSource}/search?q=${encodeURIComponent(query)}`,
       );
       if (!response.ok) throw new Error("Search failed");
       const data = await response.json();
@@ -140,6 +161,38 @@ export function AddMangaModal({
         type: "SEARCH_ERROR",
         error: err instanceof Error ? err.message : "Search failed",
       });
+    }
+  }
+
+  function handleSearchImmediate() {
+    if (!state.searchQuery.trim()) return;
+    performSearch(state.searchQuery);
+  }
+
+  function handleClear() {
+    dispatch({ type: "SET_SEARCH_QUERY", query: "" });
+    dispatch({ type: "CLEAR_ERROR" });
+  }
+
+  async function handleBrowse() {
+    const folder = await window.electronAPI.selectFolder();
+    if (folder) {
+      dispatch({ type: "SET_SEARCH_QUERY", query: folder });
+      dispatch({ type: "SEARCH_START" });
+
+      try {
+        const response = await fetch(
+          `${apiBaseUrl}/api/library/sources/local/search?q=${encodeURIComponent(folder)}`,
+        );
+        if (!response.ok) throw new Error("Scan failed");
+        const data = await response.json();
+        dispatch({ type: "SEARCH_SUCCESS", results: data });
+      } catch (err) {
+        dispatch({
+          type: "SEARCH_ERROR",
+          error: err instanceof Error ? err.message : "Scan failed",
+        });
+      }
     }
   }
 
@@ -209,6 +262,8 @@ export function AddMangaModal({
           ? "Add Manga — Importing"
           : "Add Manga";
 
+  const isLocal = state.selectedSource === "local";
+
   return (
     <div className="add-manga-overlay" onClick={handleClose}>
       <div className="add-manga-modal" onClick={(e) => e.stopPropagation()}>
@@ -228,18 +283,26 @@ export function AddMangaModal({
           )}
 
           {state.step === "search" && (
-            <SearchStep
-              sources={state.sources}
-              selectedSource={state.selectedSource}
-              searchQuery={state.searchQuery}
-              searchResults={state.searchResults}
-              isSearching={state.isSearching}
-              hasSearched={state.hasSearched}
-              onSelectSource={(id) => dispatch({ type: "SELECT_SOURCE", sourceId: id })}
-              onSearchQueryChange={(query) => dispatch({ type: "SET_SEARCH_QUERY", query })}
-              onSearch={handleSearch}
-              onResultClick={handleSelectManga}
-            />
+            <>
+              <SourceSelector
+                sources={state.sources}
+                selectedSource={state.selectedSource}
+                onSelect={(id) => dispatch({ type: "SELECT_SOURCE", sourceId: id })}
+                isLoading={state.isLoadingSources}
+              />
+              <SearchStep
+                isLocal={isLocal}
+                searchQuery={state.searchQuery}
+                searchResults={state.searchResults}
+                isSearching={state.isSearching}
+                hasSearched={state.hasSearched}
+                onQueryChange={(query) => dispatch({ type: "SET_SEARCH_QUERY", query })}
+                onSearchImmediate={handleSearchImmediate}
+                onClear={handleClear}
+                onBrowse={handleBrowse}
+                onResultClick={handleSelectManga}
+              />
+            </>
           )}
 
           {state.step === "select" && (
