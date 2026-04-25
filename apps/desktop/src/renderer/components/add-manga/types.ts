@@ -19,6 +19,8 @@ export interface MangaDetails {
     chapterId: string;
     title?: string;
     sortOrder: number;
+    language?: string;
+    scanlationGroup?: string;
   }>;
 }
 
@@ -60,6 +62,7 @@ export type Action =
   | { type: "SELECT_MANGA_SUCCESS"; manga: SearchResult; details: MangaDetails }
   | { type: "SELECT_MANGA_ERROR"; error: string }
   | { type: "TOGGLE_CHAPTER"; chapterId: string }
+  | { type: "SET_SELECTED_CHAPTERS"; selected: Set<string> }
   | { type: "IMPORT_START" }
   | { type: "IMPORT_SUCCESS" }
   | { type: "IMPORT_ERROR"; error: string }

@@ -2478,14 +2478,65 @@ body {
   border-radius: 2px;
 }
 
+/* Chapter select container */
+.add-manga-chapters-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* Controls bar */
+.add-manga-chapter-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 0;
+  flex-wrap: wrap;
+}
+
+.add-manga-chapter-select-all {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.add-manga-chapter-filter,
+.add-manga-chapter-quick-select {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--bg-tertiary);
+  border-radius: 6px;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.add-manga-chapter-sort {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--bg-tertiary);
+  border-radius: 6px;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.add-manga-chapter-sort:hover {
+  background: var(--bg-secondary);
+}
+
 /* Chapter list */
 .add-manga-chapters {
-  max-height: 300px;
+  max-height: 400px;
   overflow-y: auto;
   background: var(--bg-primary);
   border-radius: 8px;
-  padding: 1rem;
-  margin-bottom: 1.5rem;
+  padding: 0.5rem;
 }
 
 .add-manga-chapters-title {
@@ -2499,19 +2550,24 @@ body {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.5rem 0;
+  padding: 0.5rem 0.5rem;
   border-bottom: 1px solid var(--bg-tertiary);
   font-size: 0.875rem;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: background 0.15s, border-color 0.15s;
+  border-left: 3px solid transparent;
+}
+
+.add-manga-chapter-item.selected {
+  border-left-color: var(--accent);
 }
 
 .add-manga-chapter-item:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--bg-tertiary);
 }
 
 .add-manga-chapter-item:focus-within {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--bg-tertiary);
 }
 
 .add-manga-chapter-item:last-child {
@@ -2521,15 +2577,82 @@ body {
 .add-manga-chapter-checkbox {
   accent-color: var(--accent);
   cursor: pointer;
+  flex-shrink: 0;
 }
 
 .add-manga-chapter-number {
   color: var(--text-primary);
   font-weight: 500;
+  flex-shrink: 0;
 }
 
 .add-manga-chapter-title {
   color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.add-manga-chapter-spacer {
+  flex: 1;
+  min-width: 0.5rem;
+}
+
+/* Badges */
+.add-manga-chapter-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  line-height: 1.4;
+  flex-shrink: 0;
+}
+
+.add-manga-chapter-badge-lang {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.add-manga-chapter-badge-group {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Empty state */
+.add-manga-chapters-empty {
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  padding: 2rem 0;
+}
+
+/* Sticky footer */
+.add-manga-chapter-footer {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--bg-tertiary);
+  padding: 1rem;
+  margin-top: 1rem;
+  border-radius: 0 0 8px 8px;
+  gap: 1rem;
+}
+
+.add-manga-chapter-footer-count {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
 }
 
 /* Actions row */

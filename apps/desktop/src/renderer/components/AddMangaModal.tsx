@@ -77,6 +77,8 @@ function reducer(state: AddMangaState, action: Action): AddMangaState {
       }
       return { ...state, selectedChapters: next };
     }
+    case "SET_SELECTED_CHAPTERS":
+      return { ...state, selectedChapters: action.selected };
     case "IMPORT_START":
       return { ...state, isImporting: true, step: "importing", error: null };
     case "IMPORT_SUCCESS":
@@ -226,7 +228,9 @@ export function AddMangaModal({
         body: JSON.stringify({
           sourceId: state.selectedSource,
           sourceMangaId: state.selectedManga.sourceMangaId,
-          chapters: state.mangaDetails.chapters,
+          chapters: state.mangaDetails.chapters.filter((ch) =>
+            state.selectedChapters.has(ch.chapterId)
+          ),
         }),
       });
 
@@ -301,6 +305,7 @@ export function AddMangaModal({
                 onClear={handleClear}
                 onBrowse={handleBrowse}
                 onResultClick={handleSelectManga}
+                isLoadingDetails={state.isLoadingDetails}
               />
             </>
           )}
@@ -338,23 +343,12 @@ export function AddMangaModal({
                 <ChapterSelect
                   mangaDetails={state.mangaDetails}
                   selectedChapters={state.selectedChapters}
-                  onToggle={(chapterId) =>
-                    dispatch({ type: "TOGGLE_CHAPTER", chapterId })
+                  onSelectionChange={(selected) =>
+                    dispatch({ type: "SET_SELECTED_CHAPTERS", selected })
                   }
+                  onImport={handleImport}
                 />
               )}
-
-              <div className="add-manga-actions">
-                <button
-                  className="btn btn-primary"
-                  onClick={handleImport}
-                  disabled={state.isImporting}
-                >
-                  {state.isImporting
-                    ? "Importing..."
-                    : `Import ${state.mangaDetails?.chapters.length ?? 0} Chapters`}
-                </button>
-              </div>
             </>
           )}
 

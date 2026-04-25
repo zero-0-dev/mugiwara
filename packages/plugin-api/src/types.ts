@@ -51,6 +51,8 @@ export interface SourceChapter {
   sortOrder: number; // For ordering chapters
   publishedAt?: string; // ISO date
   pageCount?: number; // Optional: number of pages (for archives like CBZ)
+  language?: string; // Language code (e.g., "en", "jp")
+  scanlationGroup?: string; // Scanlation group name (e.g., "Viz", "TCB Scans")
 }
 
 // Page data returned when downloading a chapter

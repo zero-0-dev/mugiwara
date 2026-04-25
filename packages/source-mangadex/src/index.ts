@@ -388,6 +388,9 @@ class MangaDexSource extends BaseSource {
     const mappedChapters: SourceChapter[] = chapters.map((chapter, index) => {
       const chAttributes = chapter.attributes;
       const chapterId = chAttributes.chapter || `extra-${index}`;
+      const scanlationGroup = chapter.relationships.find(
+        (r) => r.type === "scanlation_group",
+      );
 
       return {
         sourceChapterId: chapter.id,
@@ -400,6 +403,9 @@ class MangaDexSource extends BaseSource {
         sortOrder: this.chapterToSortOrder(chapterId),
         publishedAt: chAttributes.publishAt,
         pageCount: chAttributes.pages,
+        language: chAttributes.translatedLanguage,
+        scanlationGroup:
+          scanlationGroup?.attributes?.name || undefined,
       };
     });
 

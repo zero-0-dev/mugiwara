@@ -12,6 +12,7 @@ interface SearchStepProps {
   onClear: () => void;
   onBrowse: () => void;
   onResultClick: (manga: SearchResult) => void;
+  isLoadingDetails?: boolean;
 }
 
 export function SearchStep({
@@ -25,6 +26,7 @@ export function SearchStep({
   onClear,
   onBrowse,
   onResultClick,
+  isLoadingDetails,
 }: SearchStepProps) {
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === "Enter") {
@@ -93,6 +95,7 @@ export function SearchStep({
         hasSearched={hasSearched}
         searchQuery={searchQuery}
         onSelect={onResultClick}
+        isLoadingDetails={isLoadingDetails}
       />
     </>
   );

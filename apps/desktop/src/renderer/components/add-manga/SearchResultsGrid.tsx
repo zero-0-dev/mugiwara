@@ -8,10 +8,11 @@ interface SearchResultsGridProps {
   hasSearched: boolean;
   searchQuery: string;
   onSelect: (manga: SearchResult) => void;
+  isLoadingDetails?: boolean;
 }
 
-export function SearchResultsGrid({ results, isSearching, hasSearched, searchQuery, onSelect }: SearchResultsGridProps) {
-  if (isSearching) {
+export function SearchResultsGrid({ results, isSearching, hasSearched, searchQuery, onSelect, isLoadingDetails }: SearchResultsGridProps) {
+  if (isSearching || isLoadingDetails) {
     return (
       <div className="add-manga-results">
         <div className="add-manga-results-grid">
