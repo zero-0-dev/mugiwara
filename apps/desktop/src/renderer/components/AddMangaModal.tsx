@@ -1,5 +1,5 @@
 import { useReducer, useEffect } from "react";
-import type { AddMangaState, Action, SearchResult } from "./add-manga/types";
+import type { AddMangaState, Action, SearchResult, ImportProgressResponse } from "./add-manga/types";
 import { useDebounce } from "../hooks/useDebounce";
 import { AddMangaHeader } from "./add-manga/AddMangaHeader";
 import { ChapterSelect } from "./add-manga/ChapterSelect";
@@ -12,6 +12,7 @@ interface AddMangaModalProps {
   apiBaseUrl: string;
   onClose: () => void;
   onSuccess: () => void;
+  onViewManga: (mangaId: string) => void;
 }
 
 const initialState: AddMangaState = {
@@ -23,6 +24,7 @@ const initialState: AddMangaState = {
   hasSearched: false,
   selectedManga: null,
   mangaDetails: null,
+  mangaId: null,
   selectedChapters: new Set(),
   importProgress: null,
   error: null,
@@ -80,7 +82,9 @@ function reducer(state: AddMangaState, action: Action): AddMangaState {
     case "SET_SELECTED_CHAPTERS":
       return { ...state, selectedChapters: action.selected };
     case "IMPORT_START":
-      return { ...state, isImporting: true, step: "importing", error: null };
+      return { ...state, mangaId: action.mangaId, isImporting: true, step: "importing", error: null };
+    case "UPDATE_IMPORT_PROGRESS":
+      return { ...state, importProgress: action.progress };
     case "IMPORT_SUCCESS":
       return { ...state, isImporting: false, step: "success" };
     case "IMPORT_ERROR":
@@ -91,7 +95,9 @@ function reducer(state: AddMangaState, action: Action): AddMangaState {
         step: "search",
         selectedManga: null,
         mangaDetails: null,
+        mangaId: null,
         selectedChapters: new Set(),
+        importProgress: null,
       };
     case "CLEAR_ERROR":
       return { ...state, error: null };
@@ -102,6 +108,7 @@ export function AddMangaModal({
   apiBaseUrl,
   onClose,
   onSuccess,
+  onViewManga,
 }: AddMangaModalProps) {
   const [state, dispatch] = useReducer(reducer, initialState);
   const debouncedQuery = useDebounce(state.searchQuery, 300);
@@ -219,8 +226,6 @@ export function AddMangaModal({
   async function handleImport() {
     if (!state.selectedManga || !state.mangaDetails) return;
 
-    dispatch({ type: "IMPORT_START" });
-
     try {
       const response = await fetch(`${apiBaseUrl}/api/library/import`, {
         method: "POST",
@@ -229,7 +234,7 @@ export function AddMangaModal({
           sourceId: state.selectedSource,
           sourceMangaId: state.selectedManga.sourceMangaId,
           chapters: state.mangaDetails.chapters.filter((ch) =>
-            state.selectedChapters.has(ch.chapterId)
+            state.selectedChapters.has(ch.chapterId),
           ),
         }),
       });
@@ -241,7 +246,8 @@ export function AddMangaModal({
         throw new Error(errorData.error);
       }
 
-      dispatch({ type: "IMPORT_SUCCESS" });
+      const data = await response.json();
+      dispatch({ type: "IMPORT_START", mangaId: data.mangaId });
       onSuccess();
     } catch (err) {
       dispatch({
@@ -257,13 +263,31 @@ export function AddMangaModal({
     }
   }
 
+  function handleImportComplete(progress: ImportProgressResponse) {
+    dispatch({ type: "UPDATE_IMPORT_PROGRESS", progress });
+    dispatch({ type: "IMPORT_SUCCESS" });
+  }
+
+  function handleImportCancelled() {
+    dispatch({ type: "IMPORT_SUCCESS" });
+  }
+
+  function handleViewInLibrary(mangaId: string) {
+    onViewManga(mangaId);
+    onClose();
+  }
+
+  function handleAddAnother() {
+    dispatch({ type: "BACK" });
+  }
+
   const headerTitle =
     state.step === "search"
-      ? "Add Manga — Search"
+      ? "Add Manga \u2014 Search"
       : state.step === "select"
-        ? "Add Manga — Select Chapters"
+        ? "Add Manga \u2014 Select Chapters"
         : state.step === "importing"
-          ? "Add Manga — Importing"
+          ? "Add Manga \u2014 Importing"
           : "Add Manga";
 
   const isLocal = state.selectedSource === "local";
@@ -279,9 +303,9 @@ export function AddMangaModal({
         <div className="add-manga-body">
           {state.error && (
             <div className="error-message">
-              <span>⚠ {state.error}</span>
+              <span>{"\u26A0"} {state.error}</span>
               <button onClick={() => dispatch({ type: "CLEAR_ERROR" })}>
-                ×
+                {"\u00D7"}
               </button>
             </div>
           )}
@@ -316,7 +340,7 @@ export function AddMangaModal({
                 className="add-manga-back-btn"
                 onClick={() => dispatch({ type: "BACK" })}
               >
-                ← Back to Search
+                {"\u2190"} Back to Search
               </button>
 
               <div className="add-manga-detail">
@@ -352,12 +376,24 @@ export function AddMangaModal({
             </>
           )}
 
-          {state.step === "importing" && (
-            <ImportProgress progress={state.importProgress} />
+          {state.step === "importing" && state.mangaId && (
+            <ImportProgress
+              apiBaseUrl={apiBaseUrl}
+              mangaId={state.mangaId}
+              mangaTitle={state.mangaDetails?.title || ""}
+              onComplete={handleImportComplete}
+              onCancel={handleImportCancelled}
+            />
           )}
 
-          {state.step === "success" && (
-            <SuccessView onClose={handleClose} />
+          {state.step === "success" && state.mangaDetails && state.importProgress && (
+            <SuccessView
+              mangaDetails={state.mangaDetails}
+              mangaId={state.mangaId || state.mangaDetails.sourceMangaId}
+              progress={state.importProgress}
+              onViewInLibrary={handleViewInLibrary}
+              onAddAnother={handleAddAnother}
+            />
           )}
         </div>
       </div>

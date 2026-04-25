@@ -152,6 +152,9 @@ export class ImportQueueProcessor extends EventEmitter {
       throw new Error(`Chapter not found: ${task.chapterId}`);
     }
 
+    // Mark chapter as downloading
+    await chapterRepository.update(chapter.id, { importStatus: "downloading" });
+
     // Get the source
     const source = global.pluginManager.getSource(task.sourceId);
     if (!source) {
@@ -188,6 +191,10 @@ export class ImportQueueProcessor extends EventEmitter {
       // Update progress
       await this.repository.updateProgress(task.id, pageCount, pageCount + 5); // Estimate total
 
+      // Sync progress to chapters table
+      const progressPercent = Math.round((pageCount / (pageCount + 5)) * 100);
+      await chapterRepository.update(chapter.id, { importProgress: progressPercent });
+
       // Emit progress event
       this.emit("taskProgress", {
         taskId: task.id,
@@ -200,6 +207,7 @@ export class ImportQueueProcessor extends EventEmitter {
     // Update chapter with actual page count (only if not already set, e.g., for archives)
     await chapterRepository.update(chapter.id, {
       pagesCount: chapter.pagesCount > 0 ? chapter.pagesCount : pageCount,
+      importProgress: 100,
       importStatus: "complete",
     });
 

@@ -2661,56 +2661,207 @@ body {
   justify-content: flex-end;
 }
 
-/* Progress */
-.add-manga-progress {
-  text-align: center;
-  padding: 2rem;
+/* ========== Import Progress View ========== */
+.import-progress {
+  padding: 1.5rem;
 }
 
-.add-manga-progress-bar {
+.import-progress-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 1rem 0;
+  text-align: center;
+}
+
+.import-progress-card {
+  text-align: center;
+  margin-bottom: 1rem;
+}
+
+.import-progress-bar {
   width: 100%;
   height: 8px;
   background: var(--bg-tertiary);
   border-radius: 4px;
   overflow: hidden;
-  margin: 1rem 0;
+  margin-bottom: 0.75rem;
 }
 
-.add-manga-progress-fill {
+.import-progress-bar-fill {
   height: 100%;
-  background: var(--accent);
+  background: linear-gradient(90deg, var(--accent), var(--accent-hover));
   border-radius: 4px;
   transition: width 0.3s ease;
 }
 
-/* Success */
-.add-manga-success {
-  text-align: center;
-  padding: 2.5rem;
+.import-progress-pct {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 0.25rem;
 }
 
-.add-manga-success-icon {
+.import-progress-count {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.25rem;
+}
+
+.import-progress-errors {
+  font-size: 0.875rem;
+  color: var(--error);
+  font-weight: 500;
+}
+
+/* Chapter status list */
+.import-progress-chapters {
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid var(--bg-tertiary);
+  border-radius: 6px;
+  margin-bottom: 1rem;
+}
+
+.import-chapter-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.8125rem;
+  border-bottom: 1px solid var(--bg-tertiary);
+}
+
+.import-chapter-row:last-child {
+  border-bottom: none;
+}
+
+.import-chapter-icon {
+  flex-shrink: 0;
+  width: 1.2rem;
+  text-align: center;
+  font-size: 0.875rem;
+}
+
+.import-chapter-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary);
+}
+
+.import-chapter-pages {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.import-chapter-error {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  color: var(--error);
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Status row icon colors */
+.status-complete .import-chapter-icon {
+  color: var(--success);
+}
+
+.status-downloading .import-chapter-icon {
+  color: var(--accent);
+}
+
+.status-queued .import-chapter-icon {
+  color: var(--text-secondary);
+  opacity: 0.5;
+}
+
+.status-error .import-chapter-icon {
+  color: var(--error);
+}
+
+/* Footer bar */
+.import-progress-footer {
+  display: flex;
+  justify-content: center;
+  gap: 0.75rem;
+  padding-top: 0.5rem;
+}
+
+/* ========== Success View ========== */
+.success-view {
+  padding: 2rem;
+  text-align: center;
+}
+
+.success-view-icon {
   font-size: 3rem;
   color: var(--success);
-  margin-bottom: 1rem;
+  margin-bottom: 0.75rem;
   line-height: 1;
 }
 
-.add-manga-success-title {
+.success-view-title {
   font-size: 1.25rem;
   font-weight: 600;
   color: var(--text-primary);
-  margin: 0 0 0.75rem 0;
+  margin: 0 0 1.25rem 0;
 }
 
-.add-manga-success-text {
+.success-view-body {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  text-align: left;
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+}
+
+.success-view-cover {
+  width: 64px;
+  height: 96px;
+  object-fit: cover;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.success-view-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.success-view-desc {
   font-size: 0.875rem;
-  color: var(--text-secondary);
+  color: var(--text-primary);
   margin: 0 0 0.5rem 0;
 }
 
-.add-manga-success .btn {
-  margin-top: 1rem;
+.success-view-count {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  margin: 0 0 0.25rem 0;
+}
+
+.success-view-errors {
+  font-size: 0.8125rem;
+  color: var(--error);
+  margin: 0;
+  font-weight: 500;
+}
+
+.success-view-footer {
+  display: flex;
+  justify-content: center;
+  gap: 0.75rem;
 }
 
 /* Animations */

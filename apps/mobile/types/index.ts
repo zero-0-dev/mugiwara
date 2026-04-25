@@ -29,7 +29,7 @@ export interface Chapter {
   title?: string;
   pagesCount: number;
   sortOrder: number;
-  importStatus: "pending" | "downloading" | "complete" | "error";
+  importStatus: "pending" | "downloading" | "complete" | "error" | "cancelled";
   importProgress: number;
   publishedAt?: string;
   createdAt: string;

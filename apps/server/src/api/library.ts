@@ -245,6 +245,120 @@ router.post("/import", async (req: Request, res: Response) => {
   }
 });
 
+// GET /api/library/import/:mangaId/progress - Get live import progress
+router.get(
+  "/import/:mangaId/progress",
+  async (req: Request, res: Response) => {
+    try {
+      const mangaId = req.params.mangaId;
+      if (!mangaId) {
+        res.status(400).json({ error: "mangaId is required" });
+        return;
+      }
+      const { chapterRepository } = await import("../database");
+      const chapters = await chapterRepository.findByMangaId(mangaId);
+
+      const total = chapters.length;
+      const completed = chapters.filter(
+        (c: any) => c.importStatus === "complete",
+      ).length;
+      const errored = chapters.filter(
+        (c: any) => c.importStatus === "error",
+      ).length;
+      const downloading = chapters.filter(
+        (c: any) => c.importStatus === "downloading",
+      ).length;
+      const queued = chapters.filter(
+        (c: any) => c.importStatus === "pending",
+      ).length;
+
+      let totalProgress = 0;
+      for (const ch of chapters as any[]) {
+        if (ch.importStatus === "complete") totalProgress += 100;
+        else if (ch.importStatus === "error") totalProgress += 100;
+        else totalProgress += ch.importProgress || 0;
+      }
+
+      const overallProgress =
+        total > 0 ? Math.round(totalProgress / total) : 0;
+      const isComplete = completed + errored >= total;
+
+      const chapterList = (chapters as any[])
+        .sort((a: any, b: any) => b.sortOrder - a.sortOrder)
+        .map((ch: any) => ({
+          chapterId: ch.chapterId,
+          title: ch.title,
+          sortOrder: ch.sortOrder,
+          status:
+            ch.importStatus === "pending" ? "queued" : ch.importStatus,
+          totalPages: ch.pagesCount,
+          completedPages:
+            ch.pagesCount && ch.importProgress
+              ? Math.round((ch.pagesCount * ch.importProgress) / 100)
+              : undefined,
+          errorMessage:
+            ch.importStatus === "error" ? "Import failed" : undefined,
+        }));
+
+      res.json({
+        mangaId,
+        totalChapters: total,
+        completedChapters: completed,
+        erroredChapters: errored,
+        downloadingChapters: downloading,
+        queuedChapters: queued,
+        overallProgress,
+        isComplete,
+        chapters: chapterList,
+      });
+    } catch (error) {
+      console.error("Error fetching import progress:", error);
+      res.status(500).json({ error: "Failed to fetch import progress" });
+    }
+  },
+);
+
+// POST /api/library/import/:mangaId/cancel - Cancel pending chapters
+router.post(
+  "/import/:mangaId/cancel",
+  async (req: Request, res: Response) => {
+    try {
+      const mangaId = req.params.mangaId;
+      if (!mangaId) {
+        res.status(400).json({ error: "mangaId is required" });
+        return;
+      }
+      const { chapterRepository } = await import("../database");
+      const chapters = await chapterRepository.findByMangaId(mangaId);
+
+      for (const ch of chapters as any[]) {
+        if (ch.importStatus === "pending" || ch.importStatus === "downloading") {
+          await chapterRepository.update(ch.id, {
+            importStatus: "cancelled",
+          });
+        }
+      }
+
+      // Cancel all pending/running import tasks for this manga
+      const tasks = await global.taskRepository.getByManga(mangaId);
+      for (const task of tasks) {
+        if (task.status === "pending" || task.status === "running") {
+          await global.taskRepository.cancel(task.id);
+          // Also abort running tasks in the processor
+          if (global.queueProcessor) {
+            await global.queueProcessor.cancelTask(task.id);
+          }
+        }
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error cancelling import:", error);
+      res.status(500).json({ error: "Failed to cancel import" });
+    }
+  },
+);
+
 // POST /api/library/scan - Scan all configured sources
 router.post("/scan", async (_req: Request, res: Response): Promise<void> => {
   try {

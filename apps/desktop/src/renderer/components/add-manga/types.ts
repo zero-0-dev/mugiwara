@@ -24,10 +24,26 @@ export interface MangaDetails {
   }>;
 }
 
-export interface ImportProgress {
-  current: number;
-  total: number;
-  currentChapter?: string;
+export interface ImportChapterProgress {
+  chapterId: string;
+  title?: string;
+  sortOrder: number;
+  status: "queued" | "downloading" | "complete" | "error";
+  totalPages?: number;
+  completedPages?: number;
+  errorMessage?: string;
+}
+
+export interface ImportProgressResponse {
+  mangaId: string;
+  totalChapters: number;
+  completedChapters: number;
+  erroredChapters: number;
+  downloadingChapters: number;
+  queuedChapters: number;
+  overallProgress: number;
+  isComplete: boolean;
+  chapters: ImportChapterProgress[];
 }
 
 export type Step = "search" | "select" | "importing" | "success";
@@ -41,8 +57,9 @@ export interface AddMangaState {
   hasSearched: boolean;
   selectedManga: SearchResult | null;
   mangaDetails: MangaDetails | null;
+  mangaId: string | null;
   selectedChapters: Set<string>;
-  importProgress: ImportProgress | null;
+  importProgress: ImportProgressResponse | null;
   error: string | null;
   isLoadingSources: boolean;
   isSearching: boolean;
@@ -63,7 +80,8 @@ export type Action =
   | { type: "SELECT_MANGA_ERROR"; error: string }
   | { type: "TOGGLE_CHAPTER"; chapterId: string }
   | { type: "SET_SELECTED_CHAPTERS"; selected: Set<string> }
-  | { type: "IMPORT_START" }
+  | { type: "IMPORT_START"; mangaId: string }
+  | { type: "UPDATE_IMPORT_PROGRESS"; progress: ImportProgressResponse }
   | { type: "IMPORT_SUCCESS" }
   | { type: "IMPORT_ERROR"; error: string }
   | { type: "BACK" }

@@ -418,6 +418,7 @@ export function Library({ apiBaseUrl, onMangaSelect }: LibraryProps) {
             setShowAddManga(false);
             fetchManga();
           }}
+          onViewManga={onMangaSelect}
         />
       )}
     </div>

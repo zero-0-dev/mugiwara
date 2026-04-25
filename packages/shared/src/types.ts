@@ -59,7 +59,7 @@ export interface Chapter {
   // Sort order for displaying chapters in correct sequence
   sortOrder: number;
   // Import status for tracking background downloads
-  importStatus?: "pending" | "downloading" | "complete" | "error";
+  importStatus?: "pending" | "downloading" | "complete" | "error" | "cancelled";
   importProgress?: number; // percentage
   publishedAt?: string;
   createdAt: string;
