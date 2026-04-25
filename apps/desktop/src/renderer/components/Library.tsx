@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
+import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
 import { Manga } from "@mugiwara/types";
 import { AddMangaModal } from "./AddMangaModal";
 
@@ -45,6 +46,15 @@ export function Library({ apiBaseUrl, onMangaSelect }: LibraryProps) {
   );
   const [showFilters, setShowFilters] = useState(false);
   const [showAddManga, setShowAddManga] = useState(false);
+
+  useKeyboardShortcuts([
+    {
+      key: "k",
+      ctrl: true,
+      action: () => setShowAddManga(true),
+      enabled: !showAddManga,
+    },
+  ]);
 
   useEffect(() => {
     fetchManga();

@@ -1,3 +1,4 @@
+import { useState, useEffect, useRef, useCallback } from "react";
 import type { SearchResult } from "./types";
 import { SearchResultCard } from "./SearchResultCard";
 import { SkeletonCard } from "./SkeletonCard";
@@ -11,7 +12,44 @@ interface SearchResultsGridProps {
   isLoadingDetails?: boolean;
 }
 
-export function SearchResultsGrid({ results, isSearching, hasSearched, searchQuery, onSelect, isLoadingDetails }: SearchResultsGridProps) {
+export function SearchResultsGrid({
+  results,
+  isSearching,
+  hasSearched,
+  searchQuery,
+  onSelect,
+  isLoadingDetails,
+}: SearchResultsGridProps) {
+  const [focusIndex, setFocusIndex] = useState(-1);
+  const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+  useEffect(() => {
+    cardRefs.current = cardRefs.current.slice(0, results.length);
+  }, [results]);
+
+  useEffect(() => {
+    if (results.length > 0 && focusIndex === -1) {
+      setFocusIndex(0);
+    }
+  }, [results]);
+
+  useEffect(() => {
+    cardRefs.current[focusIndex]?.focus();
+  }, [focusIndex]);
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setFocusIndex((i) => Math.min(i + 1, results.length - 1));
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setFocusIndex((i) => Math.max(i - 1, 0));
+      }
+    },
+    [results.length],
+  );
+
   if (isSearching || isLoadingDetails) {
     return (
       <div className="add-manga-results">
@@ -39,9 +77,18 @@ export function SearchResultsGrid({ results, isSearching, hasSearched, searchQue
       <p className="add-manga-results-count">
         {results.length} manga found{searchQuery ? ` for "${searchQuery}"` : ""}
       </p>
-      <div className="add-manga-results-grid">
-        {results.map((result) => (
-          <SearchResultCard key={result.sourceMangaId} result={result} onClick={onSelect} />
+      <div className="add-manga-results-grid" onKeyDown={handleKeyDown}>
+        {results.map((result, i) => (
+          <SearchResultCard
+            key={result.sourceMangaId}
+            result={result}
+            onClick={onSelect}
+            isFocused={focusIndex === i}
+            cardRef={(el) => {
+              cardRefs.current[i] = el;
+            }}
+            onFocus={() => setFocusIndex(i)}
+          />
         ))}
       </div>
     </div>

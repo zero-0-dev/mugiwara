@@ -1,19 +1,31 @@
+import type { RefCallback } from "react";
 import type { SearchResult } from "./types";
 
 interface SearchResultCardProps {
   result: SearchResult;
   onClick: (manga: SearchResult) => void;
+  isFocused: boolean;
+  cardRef: RefCallback<HTMLDivElement>;
+  onFocus: () => void;
 }
 
-export function SearchResultCard({ result, onClick }: SearchResultCardProps) {
+export function SearchResultCard({
+  result,
+  onClick,
+  isFocused,
+  cardRef,
+  onFocus,
+}: SearchResultCardProps) {
   const firstLetter = result.title.charAt(0).toUpperCase();
 
   return (
     <div
-      className="add-manga-result-card"
+      className={`add-manga-result-card${isFocused ? " focused" : ""}`}
+      ref={cardRef}
       onClick={() => onClick(result)}
       role="button"
-      tabIndex={0}
+      tabIndex={-1}
+      onFocus={onFocus}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();

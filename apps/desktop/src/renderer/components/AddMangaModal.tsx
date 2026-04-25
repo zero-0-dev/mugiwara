@@ -126,15 +126,21 @@ export function AddMangaModal({
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape" && !state.isImporting) {
-        const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
-        if (tag === "input" || tag === "textarea" || tag === "select") return;
+      if (e.key !== "Escape") return;
+      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select") return;
+      e.preventDefault();
+      if (state.step === "select" || state.step === "importing") {
+        if (!state.isImporting) {
+          dispatch({ type: "BACK" });
+        }
+      } else {
         onClose();
       }
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose, state.isImporting]);
+  }, [onClose, state.step, state.isImporting]);
 
   async function loadSources() {
     try {

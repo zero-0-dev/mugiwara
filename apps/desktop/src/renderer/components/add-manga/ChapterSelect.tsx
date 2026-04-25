@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import type { MangaDetails } from "./types";
 import { ChapterItem } from "./ChapterItem";
+import { useKeyboardShortcuts } from "../../hooks/useKeyboardShortcuts";
 
 interface ChapterSelectProps {
   mangaDetails: MangaDetails | null;
@@ -18,6 +19,47 @@ export function ChapterSelect({
   const [languageFilter, setLanguageFilter] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const selectAllRef = useRef<HTMLInputElement>(null);
+
+  useKeyboardShortcuts([
+    {
+      key: "a",
+      ctrl: true,
+      action: () => {
+        if (mangaDetails) {
+          const sorted = [...mangaDetails.chapters].sort((a, b) =>
+            sortOrder === "asc"
+              ? a.sortOrder - b.sortOrder
+              : b.sortOrder - a.sortOrder,
+          );
+          const visible = languageFilter
+            ? sorted.filter((ch) => ch.language === languageFilter)
+            : sorted;
+          const ids = new Set(visible.map((ch) => ch.chapterId));
+          const prev = new Set(selectedChapters);
+          const merged = new Set([...prev, ...ids]);
+          onSelectionChange(merged);
+        }
+      },
+    },
+    {
+      key: "d",
+      ctrl: true,
+      action: () => {
+        if (mangaDetails) {
+          const allChapterIds = new Set(mangaDetails.chapters.map((ch) => ch.chapterId));
+          const deselected = new Set(selectedChapters);
+          for (const id of allChapterIds) {
+            deselected.delete(id);
+          }
+          onSelectionChange(deselected);
+        }
+      },
+    },
+  ]);
+
+  useEffect(() => {
+    selectAllRef.current?.focus();
+  }, []);
 
   if (!mangaDetails) return null;
   const details = mangaDetails;

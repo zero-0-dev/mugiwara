@@ -11,12 +11,22 @@ export function ChapterItem({ chapter, isSelected, onToggle }: ChapterItemProps)
     <div
       className={`add-manga-chapter-item${isSelected ? " selected" : ""}`}
       onClick={() => onToggle(chapter.chapterId)}
+      role="checkbox"
+      aria-checked={isSelected}
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === " ") {
+          e.preventDefault();
+          onToggle(chapter.chapterId);
+        }
+      }}
     >
       <input
         type="checkbox"
         className="add-manga-chapter-checkbox"
         checked={isSelected}
         onChange={() => onToggle(chapter.chapterId)}
+        tabIndex={-1}
       />
       <span className="add-manga-chapter-number">
         Ch. {chapter.chapterId}

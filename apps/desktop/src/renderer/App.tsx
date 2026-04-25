@@ -4,6 +4,7 @@ import { MangaDetail } from "./components/MangaDetail";
 import { Reader } from "./components/Reader";
 import { SettingsPage } from "./components/SettingsPage";
 import { Manga, Chapter } from "@mugiwara/types";
+import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 
 type View = "library" | "manga-detail" | "reader" | "settings";
 
@@ -19,6 +20,14 @@ function App() {
   );
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [initialPage, setInitialPage] = useState<number | undefined>(undefined);
+
+  useKeyboardShortcuts([
+    {
+      key: ",",
+      ctrl: true,
+      action: () => setCurrentView("settings"),
+    },
+  ]);
 
   useEffect(() => {
     async function init() {
