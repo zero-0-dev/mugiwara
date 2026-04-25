@@ -513,7 +513,7 @@ export function MangaDetail({
     if (downloadingChapters.has(chapter.chapterId)) {
       return "downloading";
     }
-    if (chapter.importStatus === "complete" || chapter.pagesCount > 0) {
+    if (chapter.importStatus === "complete") {
       return "complete";
     }
     if (chapter.importStatus === "error") {
