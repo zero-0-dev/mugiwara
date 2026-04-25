@@ -1,4 +1,4 @@
-import { StorageBackend, PluginConfig } from "@mugiwara/plugin-api";
+import { StorageBackend, PluginConfig } from "@mugiwara-manga/plugin-api";
 import { StorageBackendConfig } from "./types";
 
 // Registry of storage backend factories

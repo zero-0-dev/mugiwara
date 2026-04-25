@@ -2,7 +2,7 @@ import {
   MangaSource,
   StorageBackend,
   PluginConfig,
-} from "@mugiwara/plugin-api";
+} from "@mugiwara-manga/plugin-api";
 import { InstalledPluginRecord, LoadedPlugin } from "./types";
 import { getSourceFactory, getStorageFactory } from "./registry";
 import { eq } from "drizzle-orm";
@@ -105,7 +105,7 @@ export class PluginManager {
 
     const loadedPlugin: LoadedPlugin = {
       record: {
-        id: `@mugiwara/source-${builtIn.id}`,
+        id: `@mugiwara-manga/source-${builtIn.id}`,
         type: "source",
         version: "1.0.0",
         isBuiltin: true,
@@ -140,7 +140,7 @@ export class PluginManager {
 
     const loadedPlugin: LoadedPlugin = {
       record: {
-        id: `@mugiwara/storage-${builtIn.id}`,
+        id: `@mugiwara-manga/storage-${builtIn.id}`,
         type: "storage",
         version: "1.0.0",
         isBuiltin: true,

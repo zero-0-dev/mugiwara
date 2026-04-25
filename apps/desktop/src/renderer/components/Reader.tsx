@@ -5,7 +5,7 @@ import React, {
   useRef,
   useLayoutEffect,
 } from "react";
-import { PageInfo, ReadingProgress, Manga } from "@mugiwara/types";
+import { PageInfo, ReadingProgress, Manga } from "@mugiwara-manga/types";
 
 interface ReaderProps {
   apiBaseUrl: string;

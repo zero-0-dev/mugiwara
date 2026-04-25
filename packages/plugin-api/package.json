@@ -1,5 +1,8 @@
 {
-  "name": "@mugiwara/plugin-api",
+  "name": "@mugiwara-manga/plugin-api",
+  "publishConfig": {
+    "access": "public"
+  },
   "version": "1.0.0",
   "description": "Plugin API for Mugiwara manga reader - interfaces for sources and storage backends",
   "main": "dist/index.js",

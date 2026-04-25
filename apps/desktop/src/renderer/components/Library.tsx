@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
-import { Manga } from "@mugiwara/types";
+import { Manga } from "@mugiwara-manga/types";
 import { AddMangaModal } from "./AddMangaModal";
 
 interface MangaWithCount extends Manga {

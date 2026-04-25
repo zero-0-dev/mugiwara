@@ -2,7 +2,7 @@ import {
   BaseStorage,
   PluginMetadata,
   PluginConfig,
-} from "@mugiwara/plugin-api";
+} from "@mugiwara-manga/plugin-api";
 import * as fs from "fs/promises";
 import { Dirent } from "fs";
 import * as path from "path";

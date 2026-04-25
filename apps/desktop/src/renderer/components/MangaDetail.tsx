@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Manga, Chapter, ReadingProgress } from "@mugiwara/types";
+import { Manga, Chapter, ReadingProgress } from "@mugiwara-manga/types";
 
 interface MangaDetailProps {
   apiBaseUrl: string;

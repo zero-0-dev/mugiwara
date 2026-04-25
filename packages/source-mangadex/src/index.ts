@@ -6,7 +6,7 @@ import {
   SourceManga,
   SourceChapter,
   PageData,
-} from "@mugiwara/plugin-api";
+} from "@mugiwara-manga/plugin-api";
 
 // MangaDex API Types
 interface MangaDexManga {

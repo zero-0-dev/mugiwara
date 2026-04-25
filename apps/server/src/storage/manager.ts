@@ -1,4 +1,4 @@
-import { StorageBackend } from "@mugiwara/plugin-api";
+import { StorageBackend } from "@mugiwara-manga/plugin-api";
 import { getStorageFactory } from "../plugins/registry";
 import * as schema from "../database/schema";
 

@@ -2,7 +2,7 @@ import {
   MangaSource,
   StorageBackend,
   PluginMetadata,
-} from "@mugiwara/plugin-api";
+} from "@mugiwara-manga/plugin-api";
 
 export interface InstalledPluginRecord {
   id: string; // npm package name

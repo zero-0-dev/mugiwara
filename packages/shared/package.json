@@ -1,5 +1,5 @@
 {
-  "name": "@mugiwara/types",
+  "name": "@mugiwara-manga/types",
   "version": "0.1.0",
   "private": true,
   "main": "./dist/index.js",
@@ -10,7 +10,7 @@
     "clean": "rm -rf dist"
   },
   "devDependencies": {
-    "@mugiwara/tsconfig": "workspace:*",
+    "@mugiwara-manga/tsconfig": "workspace:*",
     "typescript": "^5.3.3"
   }
 }

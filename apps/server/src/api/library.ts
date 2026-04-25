@@ -4,7 +4,7 @@ import {
   setLibraryDirectories,
 } from "../services/settings";
 import { scanLibrary } from "../services/library-scan";
-import { LocalSource } from "@mugiwara/source-local";
+import { LocalSource } from "@mugiwara-manga/source-local";
 import { getRegisteredSourceIds } from "../plugins/registry";
 import { anilistService } from "../services/anilist";
 import axios from "axios";

@@ -36,8 +36,8 @@ export class PluginInstallationService {
 
   // Built-in plugin IDs that cannot be installed/overridden
   private readonly BUILT_IN_PLUGINS = [
-    "@mugiwara/source-local",
-    "@mugiwara/storage-local",
+    "@mugiwara-manga/source-local",
+    "@mugiwara-manga/storage-local",
   ];
 
   async install(
@@ -54,7 +54,7 @@ export class PluginInstallationService {
     // Validate package name
     if (!this.isValidPluginName(packageName)) {
       throw new Error(
-        `Invalid plugin name: ${packageName}. Must start with "mugiwara-plugin-" or "@mugiwara/"`,
+        `Invalid plugin name: ${packageName}. Must start with "mugiwara-plugin-" or "@mugiwara-manga/"`,
       );
     }
 
@@ -191,7 +191,7 @@ export class PluginInstallationService {
   }
 
   private isValidPluginName(name: string): boolean {
-    return name.startsWith("mugiwara-plugin-") || name.startsWith("@mugiwara/");
+    return name.startsWith("mugiwara-plugin-") || name.startsWith("@mugiwara-manga/");
   }
 
   private runNpm(args: string[], options: { cwd: string }): Promise<void> {

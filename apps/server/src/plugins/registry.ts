@@ -2,7 +2,7 @@ import {
   MangaSource,
   StorageBackend,
   PluginConfig,
-} from "@mugiwara/plugin-api";
+} from "@mugiwara-manga/plugin-api";
 
 // Registry of plugin factories
 type SourceFactory = (config: PluginConfig) => MangaSource;

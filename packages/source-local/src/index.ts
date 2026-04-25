@@ -5,7 +5,7 @@ import {
   SearchResult,
   SourceManga,
   PageData,
-} from "@mugiwara/plugin-api";
+} from "@mugiwara-manga/plugin-api";
 import * as fs from "fs/promises";
 import * as path from "path";
 

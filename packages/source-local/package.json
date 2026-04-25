@@ -1,5 +1,5 @@
 {
-  "name": "@mugiwara/source-local",
+  "name": "@mugiwara-manga/source-local",
   "version": "1.0.0",
   "description": "Local file source for Mugiwara manga reader - imports manga from local directories",
   "main": "dist/index.js",
@@ -22,7 +22,7 @@
   "author": "Mugiwara Team",
   "license": "MIT",
   "dependencies": {
-    "@mugiwara/plugin-api": "workspace:*",
+    "@mugiwara-manga/plugin-api": "workspace:*",
     "yauzl": "^3.0.0"
   },
   "devDependencies": {

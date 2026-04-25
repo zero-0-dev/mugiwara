@@ -3,7 +3,7 @@ import { Library } from "./components/Library";
 import { MangaDetail } from "./components/MangaDetail";
 import { Reader } from "./components/Reader";
 import { SettingsPage } from "./components/SettingsPage";
-import { Manga, Chapter } from "@mugiwara/types";
+import { Manga, Chapter } from "@mugiwara-manga/types";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 
 type View = "library" | "manga-detail" | "reader" | "settings";

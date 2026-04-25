@@ -1,4 +1,4 @@
-import { StorageBackend } from "@mugiwara/plugin-api";
+import { StorageBackend } from "@mugiwara-manga/plugin-api";
 
 export interface StorageBackendConfig {
   id: string;

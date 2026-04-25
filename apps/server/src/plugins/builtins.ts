@@ -1,9 +1,9 @@
 // Register built-in plugins
 import { registerSource, registerStorage } from "./registry";
-import createLocalSource from "@mugiwara/source-local";
-import createLocalStorage from "@mugiwara/storage-local";
-import createMangaDexSource from "@mugiwara/source-mangadex";
-import { PluginConfig } from "@mugiwara/plugin-api";
+import createLocalSource from "@mugiwara-manga/source-local";
+import createLocalStorage from "@mugiwara-manga/storage-local";
+import createMangaDexSource from "@mugiwara-manga/source-mangadex";
+import { PluginConfig } from "@mugiwara-manga/plugin-api";
 
 export function registerBuiltInPlugins(): void {
   // Register built-in source

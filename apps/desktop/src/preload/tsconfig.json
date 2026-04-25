@@ -1,5 +1,5 @@
 {
-  "extends": "@mugiwara/tsconfig/node",
+  "extends": "@mugiwara-manga/tsconfig/node",
   "compilerOptions": {
     "outDir": "../../dist/preload",
     "rootDir": ".",

@@ -1,4 +1,4 @@
-// Main entry point for @mugiwara/plugin-api
+// Main entry point for @mugiwara-manga/plugin-api
 
 // Types
 export {

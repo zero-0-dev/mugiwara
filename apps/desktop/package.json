@@ -1,5 +1,5 @@
 {
-  "name": "@mugiwara/desktop",
+  "name": "@mugiwara-manga/desktop",
   "version": "0.1.0",
   "private": true,
   "main": "./dist/main/index.js",
@@ -15,10 +15,10 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@mugiwara/types": "workspace:*"
+    "@mugiwara-manga/types": "workspace:*"
   },
   "devDependencies": {
-    "@mugiwara/tsconfig": "workspace:*",
+    "@mugiwara-manga/tsconfig": "workspace:*",
     "@types/node": "^20.10.5",
     "@vitejs/plugin-react": "^4.2.1",
     "concurrently": "^8.2.2",

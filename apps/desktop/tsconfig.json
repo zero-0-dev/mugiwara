@@ -1,5 +1,5 @@
 {
-  "extends": "@mugiwara/tsconfig/react",
+  "extends": "@mugiwara-manga/tsconfig/react",
   "compilerOptions": {
     "outDir": "./dist",
     "rootDir": "."

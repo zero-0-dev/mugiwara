@@ -1,5 +1,5 @@
 {
-  "name": "@mugiwara/storage-local",
+  "name": "@mugiwara-manga/storage-local",
   "version": "1.0.0",
   "description": "Local filesystem storage backend for Mugiwara manga reader",
   "main": "dist/index.js",
@@ -22,7 +22,7 @@
   "author": "Mugiwara Team",
   "license": "MIT",
   "dependencies": {
-    "@mugiwara/plugin-api": "workspace:*",
+    "@mugiwara-manga/plugin-api": "workspace:*",
     "yauzl": "^3.0.0"
   },
   "devDependencies": {

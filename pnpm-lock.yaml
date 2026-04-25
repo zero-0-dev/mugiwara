@@ -20,11 +20,11 @@ importers:
 
   apps/desktop:
     dependencies:
-      '@mugiwara/types':
+      '@mugiwara-manga/types':
         specifier: workspace:*
         version: link:../../packages/shared
     devDependencies:
-      '@mugiwara/tsconfig':
+      '@mugiwara-manga/tsconfig':
         specifier: workspace:*
         version: link:../../packages/config
       '@types/node':
@@ -172,19 +172,19 @@ importers:
 
   apps/server:
     dependencies:
-      '@mugiwara/plugin-api':
+      '@mugiwara-manga/plugin-api':
         specifier: workspace:*
         version: link:../../packages/plugin-api
-      '@mugiwara/source-local':
+      '@mugiwara-manga/source-local':
         specifier: workspace:*
         version: link:../../packages/source-local
-      '@mugiwara/source-mangadex':
+      '@mugiwara-manga/source-mangadex':
         specifier: workspace:*
         version: link:../../packages/source-mangadex
-      '@mugiwara/storage-local':
+      '@mugiwara-manga/storage-local':
         specifier: workspace:*
         version: link:../../packages/storage-local
-      '@mugiwara/types':
+      '@mugiwara-manga/types':
         specifier: workspace:*
         version: link:../../packages/shared
       axios:
@@ -224,7 +224,7 @@ importers:
         specifier: ^2.10.0
         version: 2.10.0
     devDependencies:
-      '@mugiwara/tsconfig':
+      '@mugiwara-manga/tsconfig':
         specifier: workspace:*
         version: link:../../packages/config
       '@types/better-sqlite3':
@@ -271,7 +271,7 @@ importers:
 
   packages/shared:
     devDependencies:
-      '@mugiwara/tsconfig':
+      '@mugiwara-manga/tsconfig':
         specifier: workspace:*
         version: link:../config
       typescript:
@@ -280,7 +280,7 @@ importers:
 
   packages/source-local:
     dependencies:
-      '@mugiwara/plugin-api':
+      '@mugiwara-manga/plugin-api':
         specifier: workspace:*
         version: link:../plugin-api
       yauzl:
@@ -299,7 +299,7 @@ importers:
 
   packages/source-mangadex:
     dependencies:
-      '@mugiwara/plugin-api':
+      '@mugiwara-manga/plugin-api':
         specifier: workspace:*
         version: link:../plugin-api
     devDependencies:
@@ -312,7 +312,7 @@ importers:
 
   packages/storage-local:
     dependencies:
-      '@mugiwara/plugin-api':
+      '@mugiwara-manga/plugin-api':
         specifier: workspace:*
         version: link:../plugin-api
       yauzl:
