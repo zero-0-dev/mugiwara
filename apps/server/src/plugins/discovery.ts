@@ -61,6 +61,6 @@ export class PluginDiscoveryService {
   }
 
   private isValidPluginName(name: string): boolean {
-    return name.startsWith("mugiwara-plugin-") || name.startsWith("@mugiwara-manga/");
+    return name.startsWith("mugiwara-plugin-");
   }
 }

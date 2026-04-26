@@ -15,11 +15,6 @@ const BUILT_IN_SOURCES: Array<{
   config: PluginConfig;
 }> = [
   { id: "local", name: "Local Files", config: { directories: [] } },
-  {
-    id: "mangadex",
-    name: "MangaDex",
-    config: { preferredLanguages: ["en"], dataSaver: false },
-  },
 ];
 
 const BUILT_IN_STORAGE: Array<{

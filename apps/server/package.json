@@ -19,7 +19,6 @@
   "dependencies": {
     "@mugiwara-manga/plugin-api": "workspace:*",
     "@mugiwara-manga/source-local": "workspace:*",
-    "@mugiwara-manga/source-mangadex": "workspace:*",
     "@mugiwara-manga/storage-local": "workspace:*",
     "@mugiwara-manga/types": "workspace:*",
     "axios": "^1.14.0",
