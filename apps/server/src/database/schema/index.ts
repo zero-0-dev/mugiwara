@@ -34,7 +34,7 @@ export const installedPlugins = sqliteTable("installed_plugins", {
   version: text("version").notNull(),
   isBuiltin: integer("is_builtin", { mode: "boolean" }).default(false),
   isEnabled: integer("is_enabled", { mode: "boolean" }).default(true),
-  config: text("config").notNull().default("{}"), // JSON configuration
+  config: text("config", { mode: "json" }).notNull().default("{}"), // JSON configuration
   installedAt: text("installed_at")
     .notNull()
     .default(sql`(current_timestamp)`),

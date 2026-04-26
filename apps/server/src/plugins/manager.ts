@@ -233,7 +233,7 @@ export class PluginManager {
   ): Promise<void> {
     await this.db
       .update(schema.installedPlugins)
-      .set({ config: JSON.stringify(config) })
+      .set({ config })
       .where(eq(schema.installedPlugins.id, packageName));
 
     // Reload the plugin
