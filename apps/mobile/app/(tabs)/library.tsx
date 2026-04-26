@@ -14,6 +14,7 @@ import {
   Text,
   ActivityIndicator,
   IconButton,
+  FAB,
 } from "react-native-paper";
 import { useLibrary, useFilterOptions } from "@/api/hooks";
 import { MangaCard } from "@/components/MangaCard";
@@ -33,6 +34,10 @@ export default function LibraryScreen() {
   const [mediaType, setMediaType] = useState<string | undefined>();
   const [filterMenuVisible, setFilterMenuVisible] = useState(false);
   const [sortMenuVisible, setSortMenuVisible] = useState(false);
+
+  const handleAddManga = () => {
+    router.push("/add-manga" as any);
+  };
 
   const {
     data: manga,
@@ -195,6 +200,12 @@ export default function LibraryScreen() {
             </View>
           }
         />
+        <FAB
+          icon="plus"
+          color="#fff"
+          style={styles.fab}
+          onPress={handleAddManga}
+        />
       </SafeAreaView>
     </SafeAreaProvider>
   );
@@ -244,5 +255,11 @@ const styles = StyleSheet.create({
   emptyText: {
     color: "#6b7280",
     fontSize: 16,
+  },
+  fab: {
+    position: "absolute",
+    right: 16,
+    bottom: 16,
+    backgroundColor: "#6366f1",
   },
 });

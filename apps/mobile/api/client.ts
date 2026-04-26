@@ -11,6 +11,9 @@ import {
   QueueStats,
   PageInfo,
   ReadingMode,
+  SourceMangaChapter,
+  SourceMangaDetails,
+  ImportProgressResponse,
 } from "../types";
 
 const SERVER_URL_KEY = "@mugiwara/server_url";
@@ -289,11 +292,38 @@ class ApiClient {
     return response.data;
   }
 
-  async importManga(sourceId: string, sourceMangaId: string): Promise<void> {
-    await this.getClient().post("/library/import", {
+  async getSourceManga(
+    sourceId: string,
+    sourceMangaId: string,
+  ): Promise<SourceMangaDetails> {
+    const response = await this.getClient().get(
+      `/library/sources/${sourceId}/manga/${sourceMangaId}`,
+    );
+    return response.data;
+  }
+
+  async importManga(
+    sourceId: string,
+    sourceMangaId: string,
+    chapters?: SourceMangaChapter[],
+  ): Promise<{ mangaId: string }> {
+    const response = await this.getClient().post("/library/import", {
       sourceId,
       sourceMangaId,
+      chapters,
     });
+    return response.data;
+  }
+
+  async getImportProgress(mangaId: string): Promise<ImportProgressResponse> {
+    const response = await this.getClient().get(
+      `/library/import/${mangaId}/progress`,
+    );
+    return response.data;
+  }
+
+  async cancelImport(mangaId: string): Promise<void> {
+    await this.getClient().post(`/library/import/${mangaId}/cancel`);
   }
 
   // Queue

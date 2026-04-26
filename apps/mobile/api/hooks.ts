@@ -9,6 +9,9 @@ import {
   PageInfo,
   ReadingMode,
   ReadingProgress,
+  SourceMangaChapter,
+  SourceMangaDetails,
+  ImportProgressResponse,
 } from "../types";
 
 // Library
@@ -334,19 +337,49 @@ export function useSearchSource(sourceId: string, query: string) {
   });
 }
 
+export function useSourceManga(sourceId: string, sourceMangaId: string) {
+  return useQuery<SourceMangaDetails>({
+    queryKey: ["sourceManga", sourceId, sourceMangaId],
+    queryFn: () => apiClient.getSourceManga(sourceId, sourceMangaId),
+    enabled: !!sourceId && !!sourceMangaId,
+  });
+}
+
 export function useImportManga() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({
       sourceId,
       sourceMangaId,
+      chapters,
     }: {
       sourceId: string;
       sourceMangaId: string;
-    }) => apiClient.importManga(sourceId, sourceMangaId),
+      chapters?: SourceMangaChapter[];
+    }) => apiClient.importManga(sourceId, sourceMangaId, chapters),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["library"] });
       queryClient.invalidateQueries({ queryKey: ["queue"] });
+    },
+  });
+}
+
+export function useImportProgress(mangaId: string) {
+  return useQuery<ImportProgressResponse>({
+    queryKey: ["importProgress", mangaId],
+    queryFn: () => apiClient.getImportProgress(mangaId),
+    refetchInterval: 2000,
+    enabled: !!mangaId,
+  });
+}
+
+export function useCancelImport() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (mangaId: string) => apiClient.cancelImport(mangaId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["queueTasks"] });
+      queryClient.invalidateQueries({ queryKey: ["queueStats"] });
     },
   });
 }

@@ -78,6 +78,13 @@ export default function RootLayout() {
                   fullScreenGestureEnabled: false,
                 }}
               />
+              <Stack.Screen
+                name="add-manga"
+                options={{
+                  presentation: "modal",
+                  headerShown: false,
+                }}
+              />
             </Stack>
             <StatusBar style="auto" />
           </PaperProvider>

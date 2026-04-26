@@ -95,3 +95,41 @@ export interface PageInfo {
 }
 
 export type ReadingMode = "rtl" | "ltr" | "vertical";
+
+export interface SourceMangaChapter {
+  sourceChapterId: string;
+  chapterId: string;
+  title?: string;
+  sortOrder: number;
+  language?: string;
+  scanlationGroup?: string;
+}
+
+export interface SourceMangaDetails {
+  sourceMangaId: string;
+  title: string;
+  coverImageUrl?: string;
+  chapters: SourceMangaChapter[];
+}
+
+export interface ImportChapterProgress {
+  chapterId: string;
+  title?: string;
+  sortOrder: number;
+  status: "queued" | "downloading" | "complete" | "error";
+  totalPages?: number;
+  completedPages?: number;
+  errorMessage?: string;
+}
+
+export interface ImportProgressResponse {
+  mangaId: string;
+  totalChapters: number;
+  completedChapters: number;
+  erroredChapters: number;
+  downloadingChapters: number;
+  queuedChapters: number;
+  overallProgress: number;
+  isComplete: boolean;
+  chapters: ImportChapterProgress[];
+}
