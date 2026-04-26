@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { StorageSection } from "./settings/StorageSection";
 import { PluginsSection } from "./settings/PluginsSection";
 import { QueueSection } from "./settings/QueueSection";
+import pkg from "../../../package.json";
 
 interface SettingsPageProps {
   apiBaseUrl: string;
@@ -210,7 +211,7 @@ export function SettingsPage({ apiBaseUrl, onBack }: SettingsPageProps) {
               <p>
                 <strong>Mugiwara Manga Reader</strong>
               </p>
-              <p>Version 2.0.0</p>
+              <p>Version {pkg.version}</p>
               <p>
                 A cross-platform manga reader with extensible plugin
                 architecture.
