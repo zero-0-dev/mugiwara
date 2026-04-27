@@ -1,5 +1,8 @@
 import React, { useState } from "react";
+import { HardDrive, X } from "lucide-react";
+import { useToast } from "../Toast";
 import { useStorageBackends, useStorageTypes, useCreateStorageBackend, useUpdateStorageBackend, useDeleteStorageBackend, useScanStorage } from "../../api/hooks";
+import { Select } from "../Select";
 
 const DEFAULT_CONFIGS: Record<string, Record<string, unknown>> = {
   local: { basePath: "./data/manga" },
@@ -13,6 +16,7 @@ const BACKEND_TYPE_NAMES: Record<string, string> = {
 };
 
 export function StorageSection() {
+  const toast = useToast();
   const { data: backends = [], isLoading: loading } = useStorageBackends();
   const { data: availableTypes = [] } = useStorageTypes();
   const createBackend = useCreateStorageBackend();
@@ -20,7 +24,6 @@ export function StorageSection() {
   const deleteBackend = useDeleteStorageBackend();
   const scanStorage = useScanStorage();
 
-  const [error, setError] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingBackend, setEditingBackend] = useState<{ id: string; type: string; name: string; config: Record<string, unknown>; isDefault: boolean } | null>(null);
   const [configJson, setConfigJson] = useState("");
@@ -61,7 +64,7 @@ export function StorageSection() {
     if (!config) return;
     createBackend.mutate({ ...newBackend, config } as { type: string; name: string; config: Record<string, unknown> }, {
       onSuccess: () => resetForm(),
-      onError: (err) => setError(err.message),
+      onError: (err) => toast.error(err.message),
     });
   }
 
@@ -72,21 +75,20 @@ export function StorageSection() {
     if (!config) return;
     updateBackend.mutate({ id: editingBackend.id, config: { ...config, isDefault: editIsDefault } as unknown as Record<string, unknown> }, {
       onSuccess: () => resetForm(),
-      onError: (err) => setError(err.message),
+      onError: (err) => toast.error(err.message),
     });
   }
 
   async function handleDeleteBackend(id: string) {
     if (!confirm("Delete this storage backend?")) return;
-    deleteBackend.mutate(id, { onError: (err) => setError(err.message) });
+    deleteBackend.mutate(id, { onError: (err) => toast.error(err.message) });
   }
 
   async function handleScan() {
     setScanResults(null);
-    setError(null);
     scanStorage.mutate(undefined, {
       onSuccess: (data) => setScanResults(data as unknown as { added: number; updated: number; errors: string[] }),
-      onError: (err) => setError(err.message),
+      onError: (err) => toast.error(err.message),
     });
   }
 
@@ -129,13 +131,6 @@ export function StorageSection() {
         <p style={styles.subtitle}>Configure where your manga files are stored</p>
       </div>
 
-      {error && (
-        <div style={styles.errorBanner}>
-          <span>{error}</span>
-          <button onClick={() => setError(null)} style={styles.errorClose}>×</button>
-        </div>
-      )}
-
       <div style={styles.cardsContainer}>
         {backends.map((backend) => (
           <div key={backend.id} style={{ ...styles.card, ...(backend.isDefault ? styles.cardDefault : {}) }}>
@@ -169,7 +164,7 @@ export function StorageSection() {
 
       {backends.length === 0 && (
         <div style={styles.emptyState}>
-          <div style={styles.emptyIcon}>💾</div>
+          <div style={styles.emptyIcon}><HardDrive size={48} /></div>
           <p>No storage backends configured</p>
         </div>
       )}
@@ -214,7 +209,7 @@ export function StorageSection() {
           <div style={styles.modal}>
             <div style={styles.modalHeader}>
               <h3 style={styles.modalTitle}>Add Storage Backend</h3>
-              <button onClick={resetForm} style={styles.modalClose}>×</button>
+              <button onClick={resetForm} style={styles.modalClose}><X size={20} /></button>
             </div>
             <form onSubmit={handleAddBackend} style={styles.form}>
               <div style={styles.formGroup}>
@@ -223,12 +218,10 @@ export function StorageSection() {
               </div>
               <div style={styles.formGroup}>
                 <label style={styles.label}>Type *</label>
-                <select value={newBackend.type} onChange={(e) => setNewBackend({ ...newBackend, type: e.target.value, config: DEFAULT_CONFIGS[e.target.value] || {} })} style={styles.select} required>
-                  {(Array.isArray(availableTypes) ? availableTypes : []).map((type) => {
-                    const typeId = typeof type === "string" ? type : type.id;
-                    return <option key={typeId} value={typeId}>{getTypeName(typeId)}</option>;
-                  })}
-                </select>
+                <Select value={newBackend.type} onChange={(v) => setNewBackend({ ...newBackend, type: v, config: DEFAULT_CONFIGS[v] || {} })} options={(Array.isArray(availableTypes) ? availableTypes : []).map((type) => {
+                  const typeId = typeof type === "string" ? type : type.id;
+                  return { value: typeId, label: getTypeName(typeId) };
+                })} />
               </div>
               <div style={styles.formGroup}>
                 <label style={styles.label}>Configuration (JSON) *</label>
@@ -253,7 +246,7 @@ export function StorageSection() {
           <div style={styles.modal}>
             <div style={styles.modalHeader}>
               <h3 style={styles.modalTitle}>Edit {editingBackend.name}</h3>
-              <button onClick={resetForm} style={styles.modalClose}>×</button>
+              <button onClick={resetForm} style={styles.modalClose}><X size={20} /></button>
             </div>
             <form onSubmit={handleUpdateBackend} style={styles.form}>
               <div style={{ ...styles.formGroup, ...styles.readOnlyGroup }}>
@@ -286,50 +279,50 @@ export function StorageSection() {
 const styles: Record<string, React.CSSProperties> = {
   container: { padding: "24px", maxWidth: "800px" },
   header: { marginBottom: "24px" },
-  title: { fontSize: "24px", fontWeight: 600, margin: "0 0 8px 0", color: "#fff" },
-  subtitle: { fontSize: "14px", color: "#9ca3af", margin: 0 },
-  loading: { padding: "40px", textAlign: "center", color: "#9ca3af" },
+  title: { fontSize: "24px", fontWeight: 600, margin: "0 0 8px 0", color: "var(--text-primary)" },
+  subtitle: { fontSize: "14px", color: "var(--text-secondary)", margin: 0 },
+  loading: { padding: "40px", textAlign: "center", color: "var(--text-secondary)" },
   errorBanner: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", backgroundColor: "rgba(239, 68, 68, 0.1)", border: "1px solid rgba(239, 68, 68, 0.3)", borderRadius: "8px", marginBottom: "20px", color: "#fca5a5" },
   errorClose: { background: "none", border: "none", color: "#fca5a5", fontSize: "20px", cursor: "pointer", padding: "0 4px" },
   cardsContainer: { display: "flex", flexDirection: "column", gap: "12px", marginBottom: "24px" },
-  card: { backgroundColor: "#1f2937", borderRadius: "12px", padding: "20px", border: "1px solid #374151" },
+  card: { backgroundColor: "var(--bg-secondary)", borderRadius: "12px", padding: "20px", border: "1px solid var(--bg-tertiary)" },
   cardDefault: { border: "1px solid #6366f1", backgroundColor: "rgba(99, 102, 241, 0.05)" },
   cardHeader: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "12px" },
   cardTitleRow: { display: "flex", alignItems: "center", gap: "12px" },
-  cardTitle: { fontSize: "18px", fontWeight: 600, margin: 0, color: "#fff" },
+  cardTitle: { fontSize: "18px", fontWeight: 600, margin: 0, color: "var(--text-primary)" },
   defaultBadge: { backgroundColor: "#6366f1", color: "#fff", fontSize: "10px", fontWeight: 600, padding: "4px 8px", borderRadius: "4px", letterSpacing: "0.5px" },
-  typeBadge: { backgroundColor: "#374151", color: "#d1d5db", fontSize: "12px", padding: "4px 10px", borderRadius: "6px", textTransform: "uppercase" },
+  typeBadge: { backgroundColor: "var(--bg-tertiary)", color: "var(--text-secondary)", fontSize: "12px", padding: "4px 10px", borderRadius: "6px", textTransform: "uppercase" },
   cardBody: { marginBottom: "16px" },
   metaRow: { display: "flex", gap: "8px", marginBottom: "6px", fontSize: "14px" },
-  metaLabel: { color: "#6b7280", minWidth: "50px" },
-  metaValue: { color: "#9ca3af", fontFamily: "monospace", fontSize: "13px" },
-  configPreview: { color: "#9ca3af", fontStyle: "italic" },
+  metaLabel: { color: "var(--text-secondary)", minWidth: "50px" },
+  metaValue: { color: "var(--text-secondary)", fontFamily: "monospace", fontSize: "13px" },
+  configPreview: { color: "var(--text-secondary)", fontStyle: "italic" },
   cardFooter: { display: "flex", gap: "10px" },
   btnPrimary: { backgroundColor: "#6366f1", color: "#fff", border: "none", padding: "10px 20px", borderRadius: "8px", fontSize: "14px", fontWeight: 500, cursor: "pointer" },
   btnFolder: { backgroundColor: "#10b981", color: "#fff", border: "none", padding: "8px 16px", borderRadius: "6px", fontSize: "13px", cursor: "pointer" },
-  btnSecondary: { backgroundColor: "#374151", color: "#d1d5db", border: "none", padding: "8px 16px", borderRadius: "6px", fontSize: "13px", cursor: "pointer" },
+  btnSecondary: { backgroundColor: "var(--bg-tertiary)", color: "var(--text-primary)", border: "none", padding: "8px 16px", borderRadius: "6px", fontSize: "13px", cursor: "pointer" },
   btnDanger: { backgroundColor: "transparent", color: "#ef4444", border: "1px solid #ef4444", padding: "8px 16px", borderRadius: "6px", fontSize: "13px", cursor: "pointer" },
-  emptyState: { textAlign: "center", padding: "60px 20px", color: "#6b7280" },
+  emptyState: { textAlign: "center", padding: "60px 20px", color: "var(--text-secondary)" },
   emptyIcon: { fontSize: "48px", marginBottom: "16px", opacity: 0.5 },
   warningBox: { backgroundColor: "rgba(245, 158, 11, 0.1)", border: "1px solid rgba(245, 158, 11, 0.3)", borderRadius: "8px", padding: "16px", marginBottom: "20px", color: "#fbbf24" },
   warningSubtext: { fontSize: "13px", color: "#d97706", margin: "8px 0 0 0" },
-  infoNote: { fontSize: "12px", color: "#6b7280", fontStyle: "italic" },
+  infoNote: { fontSize: "12px", color: "var(--text-secondary)", fontStyle: "italic" },
   modalOverlay: { position: "fixed", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0, 0, 0, 0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "20px" },
-  modal: { backgroundColor: "#1f2937", borderRadius: "16px", width: "100%", maxWidth: "500px", maxHeight: "90vh", overflow: "auto", border: "1px solid #374151" },
-  modalHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "20px 24px", borderBottom: "1px solid #374151" },
-  modalTitle: { fontSize: "18px", fontWeight: 600, margin: 0, color: "#fff" },
-  modalClose: { background: "none", border: "none", color: "#6b7280", fontSize: "24px", cursor: "pointer", padding: "0", width: "32px", height: "32px", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "6px" },
+  modal: { backgroundColor: "var(--bg-secondary)", borderRadius: "16px", width: "100%", maxWidth: "500px", maxHeight: "90vh", overflow: "auto", border: "1px solid var(--bg-tertiary)" },
+  modalHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "20px 24px", borderBottom: "1px solid var(--bg-tertiary)" },
+  modalTitle: { fontSize: "18px", fontWeight: 600, margin: 0, color: "var(--text-primary)" },
+  modalClose: { background: "none", border: "none", color: "var(--text-secondary)", fontSize: "24px", cursor: "pointer", padding: "0", width: "32px", height: "32px", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "6px" },
   form: { padding: "24px" },
   formGroup: { marginBottom: "20px" },
-  label: { display: "block", fontSize: "14px", fontWeight: 500, color: "#d1d5db", marginBottom: "8px" },
-  input: { width: "100%", padding: "10px 14px", backgroundColor: "#111827", border: "1px solid #374151", borderRadius: "8px", color: "#fff", fontSize: "14px", boxSizing: "border-box" },
-  inputDisabled: { width: "100%", padding: "10px 14px", backgroundColor: "#374151", border: "1px solid #4b5563", borderRadius: "8px", color: "#9ca3af", fontSize: "14px", boxSizing: "border-box", cursor: "not-allowed" },
-  select: { width: "100%", padding: "10px 14px", backgroundColor: "#111827", border: "1px solid #374151", borderRadius: "8px", color: "#fff", fontSize: "14px", boxSizing: "border-box", cursor: "pointer" },
-  textarea: { width: "100%", padding: "12px 14px", backgroundColor: "#111827", border: "1px solid #374151", borderRadius: "8px", color: "#fff", fontSize: "13px", fontFamily: "monospace", boxSizing: "border-box", resize: "vertical" },
+  label: { display: "block", fontSize: "14px", fontWeight: 500, color: "var(--text-primary)", marginBottom: "8px" },
+  input: { width: "100%", padding: "10px 14px", backgroundColor: "var(--bg-primary)", border: "1px solid var(--bg-tertiary)", borderRadius: "8px", color: "var(--text-primary)", fontSize: "14px", boxSizing: "border-box" },
+  inputDisabled: { width: "100%", padding: "10px 14px", backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--bg-tertiary)", borderRadius: "8px", color: "var(--text-secondary)", fontSize: "14px", boxSizing: "border-box", cursor: "not-allowed" },
+  select: { width: "100%", padding: "10px 14px", backgroundColor: "var(--bg-primary)", border: "1px solid var(--bg-tertiary)", borderRadius: "8px", color: "var(--text-primary)", fontSize: "14px", boxSizing: "border-box", cursor: "pointer" },
+  textarea: { width: "100%", padding: "12px 14px", backgroundColor: "var(--bg-primary)", border: "1px solid var(--bg-tertiary)", borderRadius: "8px", color: "var(--text-primary)", fontSize: "13px", fontFamily: "monospace", boxSizing: "border-box", resize: "vertical" },
   textareaError: { border: "1px solid #ef4444" },
-  hint: { display: "block", fontSize: "12px", color: "#6b7280", marginTop: "6px" },
+  hint: { display: "block", fontSize: "12px", color: "var(--text-secondary)", marginTop: "6px" },
   errorText: { display: "block", fontSize: "12px", color: "#ef4444", marginTop: "6px" },
-  checkboxLabel: { display: "flex", alignItems: "center", gap: "10px", fontSize: "14px", color: "#d1d5db", marginBottom: "24px", cursor: "pointer" },
+  checkboxLabel: { display: "flex", alignItems: "center", gap: "10px", fontSize: "14px", color: "var(--text-primary)", marginBottom: "24px", cursor: "pointer" },
   checkbox: { width: "18px", height: "18px", cursor: "pointer" },
   formActions: { display: "flex", gap: "12px", justifyContent: "flex-end" },
   readOnlyGroup: { opacity: 0.7 },

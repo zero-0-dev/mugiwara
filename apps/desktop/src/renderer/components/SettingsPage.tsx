@@ -1,9 +1,12 @@
 import React from "react";
+import { ArrowLeft } from "lucide-react";
+import { useToast } from "./Toast";
 import { StorageSection } from "./settings/StorageSection";
 import { PluginsSection } from "./settings/PluginsSection";
 import { QueueSection } from "./settings/QueueSection";
 import { useSettings, useSaveSetting } from "../api/hooks";
 import pkg from "../../../package.json";
+import { Select } from "./Select";
 
 interface SettingsPageProps {
   onBack: () => void;
@@ -68,8 +71,8 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
   const [activeTab, setActiveTab] = React.useState<string>("reading");
   const { data: serverSettings, isLoading } = useSettings();
   const saveSetting = useSaveSetting();
+  const toast = useToast();
   const [saveSuccess, setSaveSuccess] = React.useState<string | null>(null);
-  const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     if (saveSuccess) {
@@ -85,7 +88,7 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
       { key, value },
       {
         onSuccess: () => setSaveSuccess("Saved"),
-        onError: (err) => setError(err instanceof Error ? err.message : "Failed to save"),
+        onError: (err) => toast.error(err instanceof Error ? err.message : "Failed to save"),
       },
     );
   }
@@ -99,21 +102,38 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
 
             <div className="setting-item">
               <div className="setting-info">
+                <label>Theme</label>
+                <p>Choose between dark and light appearance</p>
+              </div>
+              <div className="setting-control">
+                <Select
+                  value={settings["ui.theme"]}
+                  onChange={(v) => updateSetting("ui.theme", v)}
+                  disabled={saveSetting.isPending}
+                  options={[
+                    { value: "dark", label: "Dark" },
+                    { value: "light", label: "Light" },
+                  ]}
+                />
+                {saveSetting.isPending && <span className="saving-indicator">Saving...</span>}
+              </div>
+            </div>
+
+            <div className="setting-item">
+              <div className="setting-info">
                 <label>Default Reading Mode</label>
                 <p>Used when no specific mode is set for a media type</p>
               </div>
               <div className="setting-control">
-                <select
+                <Select
                   value={settings["reading.defaultMode"]}
-                  onChange={(e) => updateSetting("reading.defaultMode", e.target.value)}
+                  onChange={(v) => updateSetting("reading.defaultMode", v)}
                   disabled={saveSetting.isPending}
-                >
-                  {readingModes.map((mode) => (
-                    <option key={mode.value} value={mode.value}>
-                      {mode.label}
-                    </option>
-                  ))}
-                </select>
+                  options={readingModes.map((mode) => ({
+                    value: mode.value,
+                    label: mode.label,
+                  }))}
+                />
                 {saveSetting.isPending && <span className="saving-indicator">Saving...</span>}
               </div>
             </div>
@@ -132,17 +152,15 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
                     <p>{description}</p>
                   </div>
                   <div className="setting-control">
-                    <select
+                    <Select
                       value={settings[settingKey]}
-                      onChange={(e) => updateSetting(settingKey, e.target.value)}
+                      onChange={(v) => updateSetting(settingKey, v)}
                       disabled={saveSetting.isPending}
-                    >
-                      {readingModes.map((mode) => (
-                        <option key={mode.value} value={mode.value}>
-                          {mode.label}
-                        </option>
-                      ))}
-                    </select>
+                      options={readingModes.map((mode) => ({
+                        value: mode.value,
+                        label: mode.label,
+                      }))}
+                    />
                     {saveSetting.isPending && <span className="saving-indicator">Saving...</span>}
                   </div>
                 </div>
@@ -192,20 +210,13 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
     <div className="settings-page">
       <div className="settings-header">
         <button onClick={onBack} className="btn btn-secondary back-btn">
-          ← Back
+          <ArrowLeft size={16} /> Back
         </button>
         <h1>Settings</h1>
         <div className="header-actions">
           {saveSuccess && <span className="save-indicator">{saveSuccess}</span>}
         </div>
       </div>
-
-      {error && (
-        <div className="error-banner">
-          {error}
-          <button onClick={() => setError(null)}>Dismiss</button>
-        </div>
-      )}
 
       <div className="settings-layout">
         <nav className="settings-nav">

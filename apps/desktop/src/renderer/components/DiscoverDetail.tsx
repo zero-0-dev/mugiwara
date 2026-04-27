@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { ArrowLeft, ChevronDown, ChevronUp } from "lucide-react";
 import { AddMangaModal } from "./AddMangaModal";
 import { useDiscoverManga, useSources, useSearchSource } from "../api/hooks";
 
@@ -86,44 +87,44 @@ export function DiscoverDetail({ anilistId, onBack }: DiscoverDetailProps) {
         .discover-detail-header-section { display: flex; gap: 24px; margin-bottom: 24px; }
         .discover-detail-cover { width: 240px; flex-shrink: 0; }
         .discover-detail-cover img { width: 100%; border-radius: 12px; }
-        .discover-detail-cover-placeholder { width: 100%; aspect-ratio: 3/4; background: #333; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: #6b7280; font-size: 48px; font-weight: bold; }
+        .discover-detail-cover-placeholder { width: 100%; aspect-ratio: 3/4; background: var(--bg-tertiary); border-radius: 12px; display: flex; align-items: center; justify-content: center; color: var(--text-secondary); font-size: 48px; font-weight: bold; }
         .discover-detail-info { flex: 1; }
-        .discover-detail-title { font-size: 24px; font-weight: bold; color: #fff; margin: 0 0 4px 0; }
-        .discover-detail-native-title { color: #6b7280; font-size: 14px; margin: 0 0 12px 0; }
+        .discover-detail-title { font-size: 24px; font-weight: bold; color: var(--text-primary); margin: 0 0 4px 0; }
+        .discover-detail-native-title { color: var(--text-secondary); font-size: 14px; margin: 0 0 12px 0; }
         .discover-detail-meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
         .discover-detail-score { background: rgba(99, 102, 241, 0.2); color: #818cf8; padding: 2px 8px; border-radius: 6px; font-size: 13px; font-weight: bold; }
-        .discover-detail-meta-text { color: #9ca3af; font-size: 13px; text-transform: capitalize; }
-        .discover-detail-meta-divider { color: #4b5563; }
+        .discover-detail-meta-text { color: var(--text-secondary); font-size: 13px; text-transform: capitalize; }
+        .discover-detail-meta-divider { color: var(--text-secondary); }
         .discover-detail-genres { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
         .discover-detail-genre-tag { background: rgba(99, 102, 241, 0.15); color: #818cf8; padding: 2px 10px; border-radius: 12px; font-size: 12px; }
-        .discover-detail-info-line { color: #d1d5db; font-size: 14px; margin: 4px 0; }
-        .discover-detail-info-label { color: #6b7280; }
-        .discover-detail-description { color: #d1d5db; font-size: 14px; line-height: 1.6; margin-bottom: 8px; }
+        .discover-detail-info-line { color: var(--text-primary); font-size: 14px; margin: 4px 0; }
+        .discover-detail-info-label { color: var(--text-secondary); }
+        .discover-detail-description { color: var(--text-primary); font-size: 14px; line-height: 1.6; margin-bottom: 8px; }
         .discover-detail-show-more { background: none; border: none; color: #6366f1; cursor: pointer; font-size: 13px; padding: 0; }
         .discover-detail-tags-section { margin-top: 20px; }
-        .discover-detail-tags-section h3 { color: #fff; font-size: 16px; margin: 0 0 8px 0; }
+        .discover-detail-tags-section h3 { color: var(--text-primary); font-size: 16px; margin: 0 0 8px 0; }
         .discover-detail-tags { display: flex; gap: 6px; flex-wrap: wrap; }
-        .discover-detail-tag { background: #252525; color: #9ca3af; padding: 2px 8px; border-radius: 8px; font-size: 11px; }
-        .discover-detail-add-section { margin-top: 32px; padding-top: 24px; border-top: 1px solid #333; }
-        .discover-detail-add-section h3 { color: #fff; font-size: 16px; margin: 0 0 4px 0; }
-        .discover-detail-add-subtitle { color: #6b7280; font-size: 13px; margin: 0 0 12px 0; }
+        .discover-detail-tag { background: var(--bg-secondary); color: var(--text-secondary); padding: 2px 8px; border-radius: 8px; font-size: 11px; }
+        .discover-detail-add-section { margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--bg-tertiary); }
+        .discover-detail-add-section h3 { color: var(--text-primary); font-size: 16px; margin: 0 0 4px 0; }
+        .discover-detail-add-subtitle { color: var(--text-secondary); font-size: 13px; margin: 0 0 12px 0; }
         .discover-detail-sources { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
-        .discover-detail-source-btn { padding: 6px 14px; background: #252525; border: none; border-radius: 16px; color: #9ca3af; cursor: pointer; font-size: 13px; transition: all 0.2s; }
+        .discover-detail-source-btn { padding: 6px 14px; background: var(--bg-secondary); border: none; border-radius: 16px; color: var(--text-secondary); cursor: pointer; font-size: 13px; transition: all 0.2s; }
         .discover-detail-source-btn.active { background: #6366f1; color: #fff; }
-        .discover-detail-source-btn:hover:not(.active) { background: #333; color: #e5e7eb; }
+        .discover-detail-source-btn:hover:not(.active) { background: var(--bg-hover); color: var(--text-primary); }
         .discover-detail-source-results { display: flex; flex-direction: column; gap: 8px; }
-        .discover-detail-source-result { display: flex; align-items: center; gap: 12px; padding: 8px; background: #252525; border-radius: 8px; cursor: pointer; transition: background 0.2s; }
-        .discover-detail-source-result:hover { background: #333; }
-        .discover-detail-source-result-cover { width: 40px; height: 56px; object-fit: cover; border-radius: 4px; background: #333; }
-        .discover-detail-source-result-cover-placeholder { width: 40px; height: 56px; border-radius: 4px; background: #333; display: flex; align-items: center; justify-content: center; color: #6b7280; font-size: 16px; font-weight: bold; flex-shrink: 0; }
+        .discover-detail-source-result { display: flex; align-items: center; gap: 12px; padding: 8px; background: var(--bg-secondary); border-radius: 8px; cursor: pointer; transition: background 0.2s; }
+        .discover-detail-source-result:hover { background: var(--bg-hover); }
+        .discover-detail-source-result-cover { width: 40px; height: 56px; object-fit: cover; border-radius: 4px; background: var(--bg-tertiary); }
+        .discover-detail-source-result-cover-placeholder { width: 40px; height: 56px; border-radius: 4px; background: var(--bg-tertiary); display: flex; align-items: center; justify-content: center; color: var(--text-secondary); font-size: 16px; font-weight: bold; flex-shrink: 0; }
         .discover-detail-source-result-info { flex: 1; }
-        .discover-detail-source-result-title { color: #fff; font-size: 14px; font-weight: 500; }
-        .discover-detail-source-result-author { color: #6b7280; font-size: 12px; margin-top: 2px; }
+        .discover-detail-source-result-title { color: var(--text-primary); font-size: 14px; font-weight: 500; }
+        .discover-detail-source-result-author { color: var(--text-secondary); font-size: 12px; margin-top: 2px; }
         .discover-detail-no-results { color: #6b7280; font-size: 13px; text-align: center; padding: 16px; }
       `}</style>
 
       <div className="manga-detail-header">
-        <button onClick={onBack} className="btn btn-secondary back-btn">← Back to Discover</button>
+        <button onClick={onBack} className="btn btn-secondary back-btn"><ArrowLeft size={16} /> Back to Discover</button>
       </div>
 
       <div className="discover-detail-content">
@@ -161,7 +162,7 @@ export function DiscoverDetail({ anilistId, onBack }: DiscoverDetailProps) {
                   {manga.description.replace(/<[^>]*>/g, "")}
                 </div>
                 <button className="discover-detail-show-more" onClick={() => setShowDescription(!showDescription)}>
-                  {showDescription ? "Show less ↑" : "Show more ↓"}
+                  {showDescription ? <>Show less <ChevronUp size={14} /></> : <>Show more <ChevronDown size={14} /></>}
                 </button>
               </div>
             )}

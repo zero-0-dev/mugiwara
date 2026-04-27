@@ -1,4 +1,6 @@
 import { useReducer, useEffect, useRef, useState } from "react";
+import { ArrowLeft } from "lucide-react";
+import { useToast } from "./Toast";
 import type { ImportProgressResponse } from "./add-manga/types";
 import { useDebounce } from "../hooks/useDebounce";
 import { AddMangaHeader } from "./add-manga/AddMangaHeader";
@@ -32,7 +34,6 @@ interface LocalState {
   hasSearched: boolean;
   selectedManga: SearchResult | null;
   selectedChapters: Set<string>;
-  error: string | null;
 }
 
 const initialLocal: LocalState = {
@@ -42,7 +43,6 @@ const initialLocal: LocalState = {
   hasSearched: false,
   selectedManga: null,
   selectedChapters: new Set(),
-  error: null,
 };
 
 function localReducer(state: LocalState, action: any): LocalState {
@@ -64,15 +64,11 @@ function localReducer(state: LocalState, action: any): LocalState {
     case "SET_SELECTED_CHAPTERS":
       return { ...state, selectedChapters: action.selected };
     case "IMPORT_START":
-      return { ...state, step: "importing", error: null };
+      return { ...state, step: "importing" };
     case "IMPORT_SUCCESS":
       return { ...state, step: "success" };
-    case "IMPORT_ERROR":
-      return { ...state, error: action.error };
     case "BACK":
-      return { ...state, step: "search", selectedManga: null, selectedChapters: new Set(), error: null };
-    case "CLEAR_ERROR":
-      return { ...state, error: null };
+      return { ...state, step: "search", selectedManga: null, selectedChapters: new Set() };
     default:
       return state;
   }
@@ -87,6 +83,7 @@ export function AddMangaModal({
   initialSearchResult,
 }: AddMangaModalProps) {
   const [local, dispatch] = useReducer(localReducer, initialLocal);
+  const toast = useToast();
   const debouncedQuery = useDebounce(local.searchQuery, 300);
   const autoSelectRan = useRef(false);
   const [detailSourceMangaId, setDetailSourceMangaId] = useState<string | null>(null);
@@ -144,7 +141,7 @@ export function AddMangaModal({
         sourceMangaId: mangaDetails.sourceMangaId,
         chapters: mangaDetails.chapters.filter((ch) => local.selectedChapters.has(ch.chapterId)),
       },
-      { onError: (err) => dispatch({ type: "IMPORT_ERROR", error: err.message }) },
+      { onError: (err) => toast.error(err.message) },
     );
   }
 
@@ -204,13 +201,6 @@ export function AddMangaModal({
       <div className="add-manga-modal" onClick={(e) => e.stopPropagation()}>
         <AddMangaHeader title={headerTitle} onClose={handleClose} canClose={!importMutation.isPending} />
         <div className="add-manga-body">
-          {local.error && (
-            <div className="error-message">
-              <span>{"\u26A0"} {local.error}</span>
-              <button onClick={() => dispatch({ type: "CLEAR_ERROR" })}>{"\u00D7"}</button>
-            </div>
-          )}
-
           {local.step === "search" && (
             <>
               <SourceSelector
@@ -240,7 +230,7 @@ export function AddMangaModal({
           {local.step === "select" && displayDetails && (
             <>
               <button className="add-manga-back-btn" onClick={() => { dispatch({ type: "BACK" }); setDetailSourceMangaId(null); }}>
-                {"\u2190"} Back to Search
+                <ArrowLeft size={16} /> Back to Search
               </button>
               <div className="add-manga-detail">
                 {displayDetails.coverImageUrl && <img src={displayDetails.coverImageUrl} alt={displayDetails.title} className="add-manga-detail-cover" />}

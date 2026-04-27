@@ -1,3 +1,4 @@
+import { Check, Circle, Loader, X } from "lucide-react";
 import { useImportProgress, useCancelImport } from "../../api/hooks";
 import type { ImportChapterProgress } from "./types";
 
@@ -70,28 +71,28 @@ export function ImportProgress({ mangaId, mangaTitle, onComplete, onCancel: _onC
 }
 
 function ChapterRow({ chapter }: { chapter: ImportChapterProgress }) {
-  let icon: string;
+  let icon: React.ReactNode;
   let iconClass: string;
   let extra: React.ReactNode = null;
 
   switch (chapter.status) {
     case "complete":
-      icon = "\u2713";
+      icon = <Check size={14} />;
       iconClass = "status-complete";
       break;
     case "downloading":
-      icon = "\u23F3";
+      icon = <Loader size={14} />;
       iconClass = "status-downloading";
       if (chapter.completedPages !== undefined && chapter.totalPages) {
         extra = <span className="import-chapter-pages">{chapter.completedPages} / {chapter.totalPages} pages</span>;
       }
       break;
     case "queued":
-      icon = "\u25CB";
+      icon = <Circle size={14} />;
       iconClass = "status-queued";
       break;
     default:
-      icon = "\u2717";
+      icon = <X size={14} />;
       iconClass = "status-error";
       extra = chapter.errorMessage ? <span className="import-chapter-error">{chapter.errorMessage}</span> : null;
       break;

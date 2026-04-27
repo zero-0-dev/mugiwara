@@ -1,8 +1,11 @@
 import React, { useState } from "react";
+import { ArrowDown, ArrowUp, Circle, X } from "lucide-react";
+import { useToast } from "./Toast";
 import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
 import { AddMangaModal } from "./AddMangaModal";
 import { useLibrary, useFilterOptions, useDeleteManga } from "../api/hooks";
 import { useApiClient } from "../api/context";
+import { Select } from "./Select";
 
 interface LibraryProps {
   onMangaSelect: (mangaId: string) => void;
@@ -10,6 +13,7 @@ interface LibraryProps {
 
 export function Library({ onMangaSelect }: LibraryProps) {
   const api = useApiClient();
+  const toast = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [filters, setFilters] = useState({
     status: "",
@@ -50,7 +54,9 @@ export function Library({ onMangaSelect }: LibraryProps) {
   async function handleDeleteManga(mangaId: string, title: string, event: React.MouseEvent) {
     event.stopPropagation();
     if (!confirm(`Are you sure you want to remove "${title}" from your library?`)) return;
-    deleteManga.mutate(mangaId);
+    deleteManga.mutate(mangaId, {
+      onError: (err) => toast.error((err as Error).message),
+    });
   }
 
   function clearFilters() {
@@ -74,21 +80,21 @@ export function Library({ onMangaSelect }: LibraryProps) {
       <div className="search-filter-section">
         <div className="search-bar">
           <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search by title, author, or artist..." className="search-input" />
-          {searchQuery && <button onClick={() => setSearchQuery("")} className="search-clear">×</button>}
+          {searchQuery && <button onClick={() => setSearchQuery("")} className="search-clear"><X size={16} /></button>}
         </div>
         <div className="filter-controls">
           <button onClick={() => setShowFilters(!showFilters)} className={`btn btn-secondary ${showFilters ? "active" : ""}`}>
-            Filters {hasActiveFilters && "•"}
+            Filters {hasActiveFilters && <Circle size={8} fill="currentColor" />}
           </button>
-          <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="sort-select">
-            <option value="lastRead">Last Read</option>
-            <option value="title">Title</option>
-            <option value="dateAdded">Date Added</option>
-            <option value="progress">Progress</option>
-            <option value="chapterCount">Chapter Count</option>
-          </select>
+          <Select value={sortBy} onChange={setSortBy} options={[
+            { value: "lastRead", label: "Last Read" },
+            { value: "title", label: "Title" },
+            { value: "dateAdded", label: "Date Added" },
+            { value: "progress", label: "Progress" },
+            { value: "chapterCount", label: "Chapter Count" },
+          ]} />
           <button onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")} className="btn btn-icon" title={sortOrder === "asc" ? "Ascending" : "Descending"}>
-            {sortOrder === "asc" ? "↑" : "↓"}
+            {sortOrder === "asc" ? <ArrowUp size={16} /> : <ArrowDown size={16} />}
           </button>
         </div>
       </div>
@@ -98,59 +104,60 @@ export function Library({ onMangaSelect }: LibraryProps) {
           <div className="filter-row">
             <div className="filter-group">
               <label>Status</label>
-              <select value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })}>
-                <option value="">All</option>
-                <option value="ongoing">Ongoing</option>
-                <option value="completed">Completed</option>
-                <option value="hiatus">Hiatus</option>
-                <option value="cancelled">Cancelled</option>
-              </select>
+              <Select value={filters.status} onChange={(v) => setFilters({ ...filters, status: v })} options={[
+                { value: "", label: "All" },
+                { value: "ongoing", label: "Ongoing" },
+                { value: "completed", label: "Completed" },
+                { value: "hiatus", label: "Hiatus" },
+                { value: "cancelled", label: "Cancelled" },
+              ]} />
             </div>
             <div className="filter-group">
               <label>Type</label>
-              <select value={filters.mediaType} onChange={(e) => setFilters({ ...filters, mediaType: e.target.value })}>
-                <option value="">All</option>
-                <option value="manga">Manga</option>
-                <option value="manhwa">Manhwa</option>
-                <option value="manhua">Manhua</option>
-                <option value="webtoon">Webtoon</option>
-              </select>
+              <Select value={filters.mediaType} onChange={(v) => setFilters({ ...filters, mediaType: v })} options={[
+                { value: "", label: "All" },
+                { value: "manga", label: "Manga" },
+                { value: "manhwa", label: "Manhwa" },
+                { value: "manhua", label: "Manhua" },
+                { value: "webtoon", label: "Webtoon" },
+              ]} />
             </div>
             <div className="filter-group">
               <label>Reading Status</label>
-              <select value={filters.readingStatus} onChange={(e) => setFilters({ ...filters, readingStatus: e.target.value })}>
-                <option value="all">All</option>
-                <option value="reading">Reading</option>
-                <option value="completed">Completed</option>
-                <option value="not-started">Not Started</option>
-              </select>
+              <Select value={filters.readingStatus} onChange={(v) => setFilters({ ...filters, readingStatus: v })} options={[
+                { value: "all", label: "All" },
+                { value: "reading", label: "Reading" },
+                { value: "completed", label: "Completed" },
+                { value: "not-started", label: "Not Started" },
+              ]} />
             </div>
             <div className="filter-group">
               <label>Genre</label>
-              <select value={filters.genre} onChange={(e) => setFilters({ ...filters, genre: e.target.value })}>
-                <option value="">All Genres</option>
-                <option value="Action">Action</option>
-                <option value="Adventure">Adventure</option>
-                <option value="Comedy">Comedy</option>
-                <option value="Drama">Drama</option>
-                <option value="Fantasy">Fantasy</option>
-                <option value="Horror">Horror</option>
-                <option value="Mystery">Mystery</option>
-                <option value="Romance">Romance</option>
-                <option value="Sci-Fi">Sci-Fi</option>
-                <option value="Slice of Life">Slice of Life</option>
-                <option value="Sports">Sports</option>
-                <option value="Thriller">Thriller</option>
-              </select>
+              <Select value={filters.genre} onChange={(v) => setFilters({ ...filters, genre: v })} options={[
+                { value: "", label: "All Genres" },
+                { value: "Action", label: "Action" },
+                { value: "Adventure", label: "Adventure" },
+                { value: "Comedy", label: "Comedy" },
+                { value: "Drama", label: "Drama" },
+                { value: "Fantasy", label: "Fantasy" },
+                { value: "Horror", label: "Horror" },
+                { value: "Mystery", label: "Mystery" },
+                { value: "Romance", label: "Romance" },
+                { value: "Sci-Fi", label: "Sci-Fi" },
+                { value: "Slice of Life", label: "Slice of Life" },
+                { value: "Sports", label: "Sports" },
+                { value: "Thriller", label: "Thriller" },
+              ]} />
             </div>
             <div className="filter-group">
               <label>Category</label>
-              <select value={filters.category} onChange={(e) => setFilters({ ...filters, category: e.target.value })}>
-                <option value="">All Categories</option>
-                {filterOptions?.categories?.map((cat: { id: string; name: string }) => (
-                  <option key={cat.id} value={cat.id}>{cat.name}</option>
-                ))}
-              </select>
+              <Select value={filters.category} onChange={(v) => setFilters({ ...filters, category: v })} options={[
+                { value: "", label: "All Categories" },
+                ...(filterOptions?.categories?.map((cat: { id: string; name: string }) => ({
+                  value: cat.id,
+                  label: cat.name,
+                })) || []),
+              ]} />
             </div>
           </div>
           {hasActiveFilters && <button onClick={clearFilters} className="btn btn-text clear-filters">Clear all filters</button>}
@@ -158,8 +165,6 @@ export function Library({ onMangaSelect }: LibraryProps) {
       )}
 
       <div className="results-info">{manga.length} manga {hasActiveFilters && "(filtered)"}</div>
-
-      {deleteManga.isError && <div className="error-message"><span>{(deleteManga.error as Error)?.message}</span><button onClick={() => deleteManga.reset()}>Dismiss</button></div>}
 
       {manga.length === 0 ? (
         <div className="empty-library">
@@ -183,7 +188,7 @@ export function Library({ onMangaSelect }: LibraryProps) {
                   </div>
                 )}
                 <button className="delete-manga-btn" onClick={(e) => handleDeleteManga(m.id, m.title, e)} disabled={deleteManga.isPending} title="Remove from library">
-                  {deleteManga.isPending ? "..." : "×"}
+                  {deleteManga.isPending ? "..." : <X size={16} />}
                 </button>
               </div>
               <div className="manga-info">

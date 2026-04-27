@@ -1,3 +1,4 @@
+import { Search, X } from "lucide-react";
 import type { SearchResult } from "./types";
 import { SearchResultsGrid } from "./SearchResultsGrid";
 
@@ -49,7 +50,7 @@ export function SearchStep({
       <div className="add-manga-search">
         <div className="add-manga-search-row">
           <div className="add-manga-search-input-wrapper">
-            <span className="add-manga-search-icon">🔍</span>
+            <span className="add-manga-search-icon"><Search size={16} /></span>
             <input
               type="text"
               value={searchQuery}
@@ -67,7 +68,7 @@ export function SearchStep({
                 onClick={onClear}
                 aria-label="Clear search"
               >
-                ×
+                <X size={16} />
               </button>
             )}
           </div>

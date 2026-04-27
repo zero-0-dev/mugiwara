@@ -1,3 +1,4 @@
+import { Check } from "lucide-react";
 import type { MangaDetails, ImportProgressResponse } from "./types";
 
 interface SuccessViewProps {
@@ -23,7 +24,7 @@ export function SuccessView({
 
   return (
     <div className="success-view">
-      <div className="success-view-icon">{"\u2713"}</div>
+      <div className="success-view-icon"><Check size={48} /></div>
       <h4 className="success-view-title">
         {isCancelled ? "Import Cancelled" : "Import Complete!"}
       </h4>

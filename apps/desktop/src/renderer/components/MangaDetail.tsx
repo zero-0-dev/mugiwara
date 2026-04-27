@@ -1,7 +1,12 @@
 import React, { useEffect, useRef, useState, useMemo } from "react";
 import { createPortal } from "react-dom";
+import {
+  AlertCircle, ArrowLeft, Check, CheckCheck, ChevronDown, ChevronUp,
+  Circle, Clock, Download, EllipsisVertical, Loader, Pencil, Play, X,
+} from "lucide-react";
 import { Manga, Chapter, ReadingProgress } from "@mugiwara-manga/types";
 import { useApiClient } from "../api/context";
+import { useToast } from "./Toast";
 import {
   useManga,
   useChapters,
@@ -54,12 +59,12 @@ function ChapterMenu({ chapter, isActive, position, menuRef, onMarkComplete, onM
   if (!isActive) return null;
 
   const menuContent = (
-    <div ref={menuRef} className="chapter-menu" style={{ position: "fixed", top: position?.y || 0, left: position?.x || 0, backgroundColor: "#1f2937", borderRadius: "8px", boxShadow: "0 4px 6px rgba(0, 0, 0, 0.3)", zIndex: 1000, minWidth: "200px", padding: "8px 0" }} onClick={(e) => e.stopPropagation()}>
-      {!chapter.isRead && <button className="chapter-menu-item" onClick={() => onMarkComplete(chapter.id)}><span className="menu-icon">✓</span>Mark as Read</button>}
-      {chapter.isRead && <button className="chapter-menu-item" onClick={() => onMarkIncomplete(chapter.id)}><span className="menu-icon">○</span>Mark as Unread</button>}
-      <div className="chapter-menu-divider" />
-      <button className="chapter-menu-item" onClick={() => onMarkComplete(chapter.id, true)}><span className="menu-icon">✓✓</span>Mark All Previous as Read</button>
-      {chapter.isRead && <button className="chapter-menu-item" onClick={() => onMarkIncomplete(chapter.id, true)}><span className="menu-icon">○○</span>Mark All Following as Unread</button>}
+    <div ref={menuRef} className="dropdown-menu" style={{ top: position?.y || 0, left: position?.x || 0 }} onClick={(e) => e.stopPropagation()}>
+      {!chapter.isRead && <button className="dropdown-menu-item" onClick={() => onMarkComplete(chapter.id)}><span className="menu-icon"><Check size={14} /></span>Mark as Read</button>}
+      {chapter.isRead && <button className="dropdown-menu-item" onClick={() => onMarkIncomplete(chapter.id)}><span className="menu-icon"><Circle size={14} /></span>Mark as Unread</button>}
+      <div className="dropdown-menu-divider" />
+      <button className="dropdown-menu-item" onClick={() => onMarkComplete(chapter.id, true)}><span className="menu-icon"><CheckCheck size={14} /></span>Mark All Previous as Read</button>
+      {chapter.isRead && <button className="dropdown-menu-item" onClick={() => onMarkIncomplete(chapter.id, true)}><span className="menu-icon"><Circle size={14} /></span>Mark All Following as Unread</button>}
     </div>
   );
   return createPortal(menuContent, document.body);
@@ -67,6 +72,7 @@ function ChapterMenu({ chapter, isActive, position, menuRef, onMarkComplete, onM
 
 export function MangaDetail({ mangaId, onBack, onReadChapter }: MangaDetailProps) {
   const api = useApiClient();
+  const toast = useToast();
 
   const { data: manga, isLoading, error: fetchError } = useManga(mangaId);
   const { data: chapters = [] } = useChapters(mangaId);
@@ -90,7 +96,6 @@ export function MangaDetail({ mangaId, onBack, onReadChapter }: MangaDetailProps
   const [showSearch, setShowSearch] = useState(false);
   const [imageCacheBuster, setImageCacheBuster] = useState(Date.now());
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [activeChapterMenu, setActiveChapterMenu] = useState<string | null>(null);
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -136,14 +141,14 @@ export function MangaDetail({ mangaId, onBack, onReadChapter }: MangaDetailProps
     if (!manga || !editedTitle.trim()) return;
     updateTitle.mutate(editedTitle.trim(), {
       onSuccess: () => setIsEditingTitle(false),
-      onError: (err) => setError(err.message),
+      onError: (err) => toast.error(err.message),
     });
   };
 
   const handleAutoFetch = async () => {
     fetchMetadata.mutate(undefined, {
       onSuccess: () => setImageCacheBuster(Date.now()),
-      onError: (err) => setError(err.message),
+      onError: (err) => toast.error(err.message),
     });
   };
 
@@ -155,45 +160,45 @@ export function MangaDetail({ mangaId, onBack, onReadChapter }: MangaDetailProps
       setSearchResults(data.results);
       setShowSearch(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unknown error");
+      toast.error(err instanceof Error ? err.message : "Unknown error");
     }
   };
 
   const handleApplyMetadata = async (anilistId: number) => {
     applyMetadata.mutate({ anilistId }, {
       onSuccess: () => { setShowSearch(false); setImageCacheBuster(Date.now()); },
-      onError: (err) => setError(err.message),
+      onError: (err) => toast.error(err.message),
     });
   };
 
   const handleMarkChapterComplete = (chapterId: string, markPrevious?: boolean) => {
     markComplete.mutate({ chapterId, markPrevious }, {
       onSuccess: () => setActiveChapterMenu(null),
-      onError: (err) => setError(err.message),
+      onError: (err) => toast.error(err.message),
     });
   };
 
   const handleMarkChapterIncomplete = (chapterId: string, markFollowing?: boolean) => {
     markIncomplete.mutate({ chapterId, markFollowing }, {
       onSuccess: () => setActiveChapterMenu(null),
-      onError: (err) => setError(err.message),
+      onError: (err) => toast.error(err.message),
     });
   };
 
   const handleDownloadChapter = (chapterId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     downloadChapter.mutate(chapterId, {
-      onError: (err) => setError(err.message),
+      onError: (err) => toast.error(err.message),
     });
   };
 
   const handleAddToCategory = (categoryId: string) => {
-    addToCategory.mutate(categoryId, { onError: (err) => setError(err.message) });
+    addToCategory.mutate(categoryId, { onError: (err) => toast.error(err.message) });
     setShowCategoryDropdown(false);
   };
 
   const handleRemoveFromCategory = (categoryId: string) => {
-    removeFromCategory.mutate(categoryId, { onError: (err) => setError(err.message) });
+    removeFromCategory.mutate(categoryId, { onError: (err) => toast.error(err.message) });
   };
 
   const handleChapterMenuClick = (e: React.MouseEvent, chapterId: string) => {
@@ -228,9 +233,8 @@ export function MangaDetail({ mangaId, onBack, onReadChapter }: MangaDetailProps
     return <div className="manga-detail-loading"><div className="loading-spinner"></div><p>Loading manga details...</p></div>;
   }
 
-  const displayError = error || (fetchError ? (fetchError as Error).message : null);
-  if (displayError || !manga) {
-    return <div className="manga-detail-error"><p>{displayError || "Manga not found"}</p><button onClick={onBack} className="btn btn-primary">Go Back</button></div>;
+  if (fetchError || !manga) {
+    return <div className="manga-detail-error"><p>{(fetchError as Error)?.message || "Manga not found"}</p><button onClick={onBack} className="btn btn-primary">Go Back</button></div>;
   }
 
   const getChapterDownloadStatus = (chapter: ChapterWithProgress) => {
@@ -243,21 +247,18 @@ export function MangaDetail({ mangaId, onBack, onReadChapter }: MangaDetailProps
   return (
     <div className="manga-detail">
       <style>{`
-        .chapter-menu-item { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 16px; background: none; border: none; color: #d1d5db; cursor: pointer; font-size: 14px; text-align: left; transition: background-color 0.2s; }
-        .chapter-menu-item:hover { background-color: #374151; }
-        .chapter-menu-divider { height: 1px; background-color: #374151; margin: 8px 0; }
-        .menu-icon { font-size: 12px; width: 20px; text-align: center; }
+        .menu-icon { width: 20px; display: flex; align-items: center; justify-content: center; }
         .chapter-actions { position: relative; }
-        .chapter-menu-btn { background: none; border: none; color: #9ca3af; cursor: pointer; padding: 4px 8px; font-size: 16px; border-radius: 4px; transition: background-color 0.2s, color 0.2s; }
-        .chapter-menu-btn:hover { background-color: #374151; color: #fff; }
+        .chapter-menu-btn { background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 6px; font-size: 16px; border-radius: 8px; transition: background-color 0.2s, color 0.2s; display: flex; align-items: center; justify-content: center; }
+        .chapter-menu-btn:hover { background-color: var(--bg-tertiary); color: var(--text-primary); }
         .chapter-progress-indicator { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-        .chapter-progress-indicator.unread { border: 2px solid rgba(255, 255, 255, 0.2); }
-        .chapter-progress-indicator.read { background-color: #22c55e; color: white; }
-        .chapter-progress-indicator.in-progress { background: conic-gradient(#6366f1 var(--progress, 0%), transparent 0%); border: 2px solid #6366f1; }
+        .chapter-progress-indicator.unread { border: 2px solid var(--bg-tertiary); }
+        .chapter-progress-indicator.read { background-color: var(--success); color: white; }
+        .chapter-progress-indicator.in-progress { background: conic-gradient(var(--accent) var(--progress, 0%), transparent 0%); border: 2px solid var(--accent); }
       `}</style>
 
       <div className="manga-detail-header">
-        <button onClick={onBack} className="btn btn-secondary back-btn">← Back to Library</button>
+        <button onClick={onBack} className="btn btn-secondary back-btn"><ArrowLeft size={16} /> Back to Library</button>
       </div>
 
       <div className="manga-detail-content">
@@ -284,7 +285,7 @@ export function MangaDetail({ mangaId, onBack, onReadChapter }: MangaDetailProps
                 ) : (
                   <div className="title-display-mode">
                     <h1 className="manga-title-large">{manga.title}</h1>
-                    <button onClick={handleEditTitle} className="btn btn-icon" title="Edit title">✏️</button>
+                    <button onClick={handleEditTitle} className="btn btn-icon" title="Edit title"><Pencil size={16} /></button>
                   </div>
                 )}
               </div>
@@ -312,7 +313,7 @@ export function MangaDetail({ mangaId, onBack, onReadChapter }: MangaDetailProps
                 <div className="categories-header">
                   <strong>Categories:</strong>
                   <div className="category-dropdown-container">
-                    <button onClick={() => setShowCategoryDropdown(!showCategoryDropdown)} className="btn btn-small btn-secondary">+ Add to Category</button>
+                    <button onClick={() => setShowCategoryDropdown(!showCategoryDropdown)} className="category-add-btn">+ Add to Category</button>
                     {showCategoryDropdown && (
                       <div className="category-dropdown">
                         {categories.filter((cat) => !mangaCategories.some((mc) => mc.id === cat.id)).map((category) => (
@@ -329,7 +330,7 @@ export function MangaDetail({ mangaId, onBack, onReadChapter }: MangaDetailProps
                   {mangaCategories.map((category) => (
                     <span key={category.id} className="category-tag" style={{ backgroundColor: category.color ? `${category.color}33` : "rgba(99, 102, 241, 0.2)", borderColor: category.color || "#6366f1", color: category.color || "#818cf8" }}>
                       {category.name}
-                      <button onClick={() => handleRemoveFromCategory(category.id)} className="category-remove-btn" title="Remove from category">×</button>
+                      <button onClick={() => handleRemoveFromCategory(category.id)} className="category-remove-btn" title="Remove from category"><X size={12} /></button>
                     </span>
                   ))}
                   {mangaCategories.length === 0 && <span className="no-categories">Not in any category</span>}
@@ -338,7 +339,7 @@ export function MangaDetail({ mangaId, onBack, onReadChapter }: MangaDetailProps
               {manga.description && <div className="manga-description"><strong>Description:</strong><div className="description-content" dangerouslySetInnerHTML={{ __html: manga.description }} /></div>}
             </div>
 
-            <button onClick={() => setShowMore(!showMore)} className="btn btn-text show-more-btn">{showMore ? "Show less ↑" : "Show more ↓"}</button>
+            <button onClick={() => setShowMore(!showMore)} className="btn btn-text show-more-btn">{showMore ? <>Show less <ChevronUp size={14} /></> : <>Show more <ChevronDown size={14} /></>}</button>
 
             {showSearch && (
               <div className="search-results-overlay">
@@ -369,7 +370,7 @@ export function MangaDetail({ mangaId, onBack, onReadChapter }: MangaDetailProps
           {enrichedChapters.length > 0 && (
             <div className="continue-reading-section">
               <button onClick={handleContinueReading} className="btn btn-primary continue-reading-btn">
-                <span className="continue-icon">▶</span>{getContinueReadingText()}
+                <span className="continue-icon"><Play size={18} /></span>{getContinueReadingText()}
               </button>
               {readChaptersCount > 0 && (
                 <div className="reading-stats">
@@ -382,8 +383,6 @@ export function MangaDetail({ mangaId, onBack, onReadChapter }: MangaDetailProps
             </div>
           )}
 
-          {error && <div className="error-message"><span>{error}</span><button onClick={() => setError(null)}>Dismiss</button></div>}
-
           {enrichedChapters.length === 0 ? (
             <p className="no-chapters">No chapters available</p>
           ) : (
@@ -393,7 +392,7 @@ export function MangaDetail({ mangaId, onBack, onReadChapter }: MangaDetailProps
                 return (
                   <div key={chapter.id} className={`chapter-item ${chapter.isRead ? "read" : ""} ${chapter.isCurrent ? "current" : ""}`} onClick={() => onReadChapter(chapter.id, chapters)}>
                     <div className="chapter-status-icon">
-                      {chapter.isRead ? <span className="status-read">✓</span> : chapter.isCurrent ? <span className="status-current">▶</span> : <span className="status-unread">○</span>}
+                      {chapter.isRead ? <span className="status-read"><Check size={14} /></span> : chapter.isCurrent ? <span className="status-current"><Play size={14} /></span> : <span className="status-unread"><Circle size={14} /></span>}
                     </div>
                     <div className="chapter-info">
                       <span className="chapter-title">{chapter.title || `Chapter ${chapter.chapterId}`}</span>
@@ -409,12 +408,12 @@ export function MangaDetail({ mangaId, onBack, onReadChapter }: MangaDetailProps
                       <span className="chapter-pages">{chapter.pagesCount > 0 ? `${chapter.pagesCount} pages` : "Not downloaded"}</span>
 
                       <div className="chapter-actions">
-                        <button className="chapter-menu-btn" onClick={(e) => handleChapterMenuClick(e, chapter.id)} title="Chapter options">⋯</button>
+                        <button className="chapter-menu-btn" onClick={(e) => handleChapterMenuClick(e, chapter.id)} title="Chapter options"><EllipsisVertical size={16} /></button>
                         <ChapterMenu chapter={chapter} isActive={activeChapterMenu === chapter.id} position={menuPosition} menuRef={menuRef} onMarkComplete={handleMarkChapterComplete} onMarkIncomplete={handleMarkChapterIncomplete} />
                       </div>
 
                       <button className={`chapter-download-btn ${downloadStatus}`} onClick={(e) => handleDownloadChapter(chapter.chapterId, e)} disabled={downloadStatus === "downloading" || downloadStatus === "pending"} title={downloadStatus === "complete" ? "Downloaded" : downloadStatus === "downloading" ? "Downloading..." : downloadStatus === "error" ? "Download failed" : downloadStatus === "pending" ? "Queued" : "Download chapter"}>
-                        {downloadStatus === "complete" ? <span className="download-icon complete">✓</span> : downloadStatus === "downloading" ? <span className="download-icon downloading">◌</span> : downloadStatus === "error" ? <span className="download-icon error">!</span> : downloadStatus === "pending" ? <span className="download-icon pending">◷</span> : <span className="download-icon">↓</span>}
+                        {downloadStatus === "complete" ? <span className="download-icon complete"><Check size={14} /></span> : downloadStatus === "downloading" ? <span className="download-icon downloading"><Loader size={14} /></span> : downloadStatus === "error" ? <span className="download-icon error"><AlertCircle size={14} /></span> : downloadStatus === "pending" ? <span className="download-icon pending"><Clock size={14} /></span> : <span className="download-icon"><Download size={14} /></span>}
                       </button>
                     </div>
                   </div>

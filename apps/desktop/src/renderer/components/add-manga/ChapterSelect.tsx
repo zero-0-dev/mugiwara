@@ -1,7 +1,9 @@
 import { useState, useEffect, useMemo, useRef } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import type { MangaDetails } from "./types";
 import { ChapterItem } from "./ChapterItem";
 import { useKeyboardShortcuts } from "../../hooks/useKeyboardShortcuts";
+import { Select } from "../Select";
 
 interface ChapterSelectProps {
   mangaDetails: MangaDetails | null;
@@ -147,34 +149,27 @@ export function ChapterSelect({
           {" "}Select All
         </label>
 
-        <select
-          className="add-manga-chapter-filter"
+        <Select
           value={languageFilter ?? ""}
-          onChange={(e) => setLanguageFilter(e.target.value || null)}
-        >
-          <option value="">All Languages</option>
-          {languages.map((lang) => (
-            <option key={lang} value={lang}>
-              {lang.toUpperCase()}
-            </option>
-          ))}
-        </select>
+          onChange={(v) => setLanguageFilter(v || null)}
+          options={[
+            { value: "", label: "All Languages" },
+            ...languages.map((lang) => ({ value: lang, label: lang.toUpperCase() })),
+          ]}
+        />
 
         <button
           className="add-manga-chapter-sort"
           onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
           title={sortOrder === "asc" ? "Ascending" : "Descending"}
         >
-          Chapter # {sortOrder === "asc" ? "▲" : "▼"}
+          Chapter # {sortOrder === "asc" ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
         </button>
 
-        <select
-          className="add-manga-chapter-quick-select"
-          defaultValue=""
-          onChange={(e) => {
-            const value = e.target.value;
-            e.target.value = "";
-            switch (value) {
+        <Select
+          value=""
+          onChange={(v) => {
+            switch (v) {
               case "select-all":
                 onSelectionChange(new Set(visibleChapters.map((ch) => ch.chapterId)));
                 break;
@@ -192,16 +187,15 @@ export function ChapterSelect({
                 break;
             }
           }}
-        >
-          <option value="" disabled>
-            Quick Select...
-          </option>
-          <option value="select-all">Select All</option>
-          <option value="deselect-all">Deselect All</option>
-          <option value="latest-10">Select Latest 10</option>
-          <option value="latest-50">Select Latest 50</option>
-          <option value="first-10">Select First 10</option>
-        </select>
+          placeholder="Quick Select..."
+          options={[
+            { value: "select-all", label: "Select All" },
+            { value: "deselect-all", label: "Deselect All" },
+            { value: "latest-10", label: "Select Latest 10" },
+            { value: "latest-50", label: "Select Latest 50" },
+            { value: "first-10", label: "Select First 10" },
+          ]}
+        />
       </div>
 
       <div className="add-manga-chapters">

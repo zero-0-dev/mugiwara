@@ -1,3 +1,5 @@
+import { X } from "lucide-react";
+
 interface AddMangaHeaderProps {
   title: string;
   onClose: () => void;
@@ -14,7 +16,7 @@ export function AddMangaHeader({ title, onClose, canClose }: AddMangaHeaderProps
         disabled={!canClose}
         aria-label="Close"
       >
-        ×
+        <X size={20} />
       </button>
     </div>
   );
