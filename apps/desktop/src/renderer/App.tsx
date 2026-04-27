@@ -3,10 +3,12 @@ import { Library } from "./components/Library";
 import { MangaDetail } from "./components/MangaDetail";
 import { Reader } from "./components/Reader";
 import { SettingsPage } from "./components/SettingsPage";
+import { Discover } from "./components/Discover";
+import { DiscoverDetail } from "./components/DiscoverDetail";
 import { Manga, Chapter } from "@mugiwara-manga/types";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 
-type View = "library" | "manga-detail" | "reader" | "settings";
+type View = "library" | "manga-detail" | "reader" | "settings" | "discover" | "discover-detail";
 
 function App() {
   const [serverPort, setServerPort] = useState<number | null>(null);
@@ -15,6 +17,7 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<View>("library");
   const [selectedMangaId, setSelectedMangaId] = useState<string | null>(null);
+  const [selectedAnilistId, setSelectedAnilistId] = useState<number | null>(null);
   const [selectedChapterId, setSelectedChapterId] = useState<string | null>(
     null,
   );
@@ -97,6 +100,25 @@ function App() {
     setSelectedChapterId(null);
   };
 
+  const handleOpenDiscover = () => {
+    setCurrentView("discover");
+  };
+
+  const handleDiscoverMangaSelect = (anilistId: number) => {
+    setSelectedAnilistId(anilistId);
+    setCurrentView("discover-detail");
+  };
+
+  const handleBackFromDiscover = () => {
+    setCurrentView("discover");
+    setSelectedAnilistId(null);
+  };
+
+  const handleBackFromDiscoverToLibrary = () => {
+    setCurrentView("library");
+    setSelectedAnilistId(null);
+  };
+
   const handleOpenSettings = () => {
     setCurrentView("settings");
   };
@@ -129,6 +151,21 @@ function App() {
         return (
           <Library apiBaseUrl={apiBaseUrl} onMangaSelect={handleMangaSelect} />
         );
+      case "discover":
+        return (
+          <Discover
+            apiBaseUrl={apiBaseUrl}
+            onMangaSelect={handleDiscoverMangaSelect}
+          />
+        );
+      case "discover-detail":
+        return selectedAnilistId ? (
+          <DiscoverDetail
+            apiBaseUrl={apiBaseUrl}
+            anilistId={selectedAnilistId}
+            onBack={handleBackFromDiscover}
+          />
+        ) : null;
       case "manga-detail":
         return selectedMangaId ? (
           <MangaDetail
@@ -167,6 +204,20 @@ function App() {
           Mugiwara
         </h1>
         <div className="header-actions">
+          <button
+            onClick={handleBackToLibrary}
+            className="btn btn-secondary btn-sm"
+            style={{ marginRight: 8 }}
+          >
+            Library
+          </button>
+          <button
+            onClick={handleOpenDiscover}
+            className="btn btn-secondary btn-sm"
+            style={{ marginRight: 8 }}
+          >
+            Discover
+          </button>
           <button
             onClick={handleOpenSettings}
             className="btn btn-icon"

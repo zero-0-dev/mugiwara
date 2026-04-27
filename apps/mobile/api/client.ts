@@ -14,6 +14,9 @@ import {
   SourceMangaChapter,
   SourceMangaDetails,
   ImportProgressResponse,
+  DiscoverManga,
+  DiscoverBrowseResult,
+  DiscoverFilters,
 } from "../types";
 
 const SERVER_URL_KEY = "@mugiwara/server_url";
@@ -343,6 +346,28 @@ class ApiClient {
 
   async retryTask(taskId: string): Promise<void> {
     await this.getClient().post(`/queue/tasks/${taskId}/retry`);
+  }
+
+  // Discover
+  async browseDiscover(filters: DiscoverFilters): Promise<DiscoverBrowseResult> {
+    const params = new URLSearchParams();
+    if (filters.sort) params.append("sort", filters.sort.join(","));
+    if (filters.genre) params.append("genre", filters.genre);
+    if (filters.format) params.append("format", filters.format);
+    if (filters.status) params.append("status", filters.status);
+    if (filters.country) params.append("country", filters.country);
+    if (filters.search) params.append("search", filters.search);
+    if (filters.page) params.append("page", String(filters.page));
+    if (filters.perPage) params.append("perPage", String(filters.perPage));
+    const response = await this.getClient().get(
+      `/discover/browse?${params.toString()}`,
+    );
+    return response.data;
+  }
+
+  async getDiscoverManga(anilistId: number): Promise<DiscoverManga> {
+    const response = await this.getClient().get(`/discover/manga/${anilistId}`);
+    return response.data;
   }
 
   // Settings

@@ -122,6 +122,59 @@ export interface ImportChapterProgress {
   errorMessage?: string;
 }
 
+export interface DiscoverManga {
+  id: number;
+  title: {
+    romaji: string;
+    english: string | null;
+    native: string | null;
+  };
+  description: string | null;
+  coverImage: {
+    large: string;
+    medium: string;
+  } | null;
+  bannerImage: string | null;
+  author: string | null;
+  artist: string | null;
+  status: string;
+  genres: string[];
+  mediaType: string;
+  tags: { name: string }[];
+  startDate: {
+    year: number | null;
+    month: number | null;
+    day: number | null;
+  };
+  chapters: number | null;
+  volumes: number | null;
+  synonyms: string[];
+  averageScore?: number;
+  meanScore?: number;
+  popularity?: number;
+  favourites?: number;
+}
+
+export interface DiscoverBrowseResult {
+  manga: DiscoverManga[];
+  pageInfo: {
+    currentPage: number;
+    hasNextPage: boolean;
+    total: number;
+  };
+}
+
+export interface DiscoverFilters {
+  sort?: string[];
+  genre?: string;
+  format?: string;
+  status?: string;
+  country?: string;
+  search?: string;
+  page?: number;
+  perPage?: number;
+}
+
 export interface ImportProgressResponse {
   mangaId: string;
   totalChapters: number;

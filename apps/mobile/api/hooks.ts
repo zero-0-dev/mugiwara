@@ -1,4 +1,9 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  useQuery,
+  useInfiniteQuery,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { apiClient } from "./client";
 import {
   Manga,
@@ -12,6 +17,9 @@ import {
   SourceMangaChapter,
   SourceMangaDetails,
   ImportProgressResponse,
+  DiscoverFilters,
+  DiscoverManga,
+  DiscoverBrowseResult,
 } from "../types";
 
 // Library
@@ -449,5 +457,27 @@ export function useSetReadingMode() {
         queryKey: ["readingMode", variables.mangaId],
       });
     },
+  });
+}
+
+// Discover
+export function useDiscoverBrowse(filters: Omit<DiscoverFilters, 'page'>) {
+  return useInfiniteQuery<DiscoverBrowseResult>({
+    queryKey: ["discover", "browse", filters],
+    queryFn: ({ pageParam }) =>
+      apiClient.browseDiscover({ ...filters, page: pageParam as number }),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) =>
+      lastPage.pageInfo.hasNextPage
+        ? lastPage.pageInfo.currentPage + 1
+        : undefined,
+  });
+}
+
+export function useDiscoverManga(anilistId: number | null) {
+  return useQuery<DiscoverManga>({
+    queryKey: ["discover", "manga", anilistId],
+    queryFn: () => apiClient.getDiscoverManga(anilistId!),
+    enabled: !!anilistId,
   });
 }

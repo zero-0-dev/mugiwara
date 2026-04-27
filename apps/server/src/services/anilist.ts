@@ -29,6 +29,10 @@ interface AniListManga {
   chapters: number | null;
   volumes: number | null;
   synonyms: string[];
+  averageScore?: number;
+  meanScore?: number;
+  popularity?: number;
+  favourites?: number;
 }
 
 const SEARCH_MANGA_QUERY = `
@@ -71,6 +75,77 @@ const SEARCH_MANGA_QUERY = `
         chapters
         volumes
         synonyms
+      }
+    }
+  }
+`;
+
+const BROWSE_QUERY = `
+  query BrowseManga(
+    $sort: [MediaSort],
+    $genre: String,
+    $format: MediaFormat,
+    $status: MediaStatus,
+    $countryOfOrigin: CountryCode,
+    $search: String,
+    $page: Int,
+    $perPage: Int
+  ) {
+    Page(page: $page, perPage: $perPage) {
+      pageInfo {
+        currentPage
+        hasNextPage
+        total
+      }
+      media(
+        sort: $sort,
+        genre: $genre,
+        format: $format,
+        status: $status,
+        countryOfOrigin: $countryOfOrigin,
+        search: $search,
+        type: MANGA
+      ) {
+        id
+        title {
+          romaji
+          english
+          native
+        }
+        description
+        coverImage {
+          large
+          medium
+        }
+        bannerImage
+        staff(sort: ROLE) {
+          edges {
+            node {
+              name {
+                full
+              }
+            }
+            role
+          }
+        }
+        status
+        genres
+        countryOfOrigin
+        tags {
+          name
+        }
+        startDate {
+          year
+          month
+          day
+        }
+        chapters
+        volumes
+        synonyms
+        averageScore
+        meanScore
+        popularity
+        favourites
       }
     }
   }
@@ -154,6 +229,40 @@ export class AniListService {
     return data.Page.media.map((media: any) => this.transformMedia(media));
   }
 
+  async browseManga(params: {
+    sort?: string[];
+    genre?: string;
+    format?: string;
+    status?: string;
+    countryOfOrigin?: string;
+    search?: string;
+    page?: number;
+    perPage?: number;
+  }): Promise<{
+    manga: AniListManga[];
+    pageInfo: { currentPage: number; hasNextPage: boolean; total: number };
+  }> {
+    const data = await this.request(BROWSE_QUERY, {
+      sort: params.sort || ['TRENDING_DESC'],
+      genre: params.genre || undefined,
+      format: params.format || undefined,
+      status: params.status || undefined,
+      countryOfOrigin: params.countryOfOrigin || undefined,
+      search: params.search || undefined,
+      page: params.page || 1,
+      perPage: params.perPage || 20,
+    });
+
+    if (!data || !data.Page) {
+      return { manga: [], pageInfo: { currentPage: 1, hasNextPage: false, total: 0 } };
+    }
+
+    return {
+      manga: (data.Page.media || []).map((media: any) => this.transformMedia(media)),
+      pageInfo: data.Page.pageInfo || { currentPage: 1, hasNextPage: false, total: 0 },
+    };
+  }
+
   async getMangaById(id: number): Promise<AniListManga | null> {
     const data = await this.request(GET_MANGA_QUERY, { id });
     
@@ -216,6 +325,10 @@ export class AniListService {
       chapters: media.chapters,
       volumes: media.volumes,
       synonyms: media.synonyms || [],
+      averageScore: media.averageScore ?? undefined,
+      meanScore: media.meanScore ?? undefined,
+      popularity: media.popularity ?? undefined,
+      favourites: media.favourites ?? undefined,
       mediaType: mediaType,
     };
   }

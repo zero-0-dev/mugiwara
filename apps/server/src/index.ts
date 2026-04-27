@@ -24,6 +24,7 @@ import categoriesRoutes from "./api/categories";
 import storageRoutes from "./api/storage";
 import pluginsRoutes from "./api/plugins";
 import queueRoutes from "./api/queue";
+import discoverRoutes from "./api/discover";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -64,6 +65,7 @@ app.use("/api/content", contentRoutes);
 app.use("/api/storage", storageRoutes);
 app.use("/api/plugins", pluginsRoutes);
 app.use("/api/queue", queueRoutes);
+app.use("/api/discover", discoverRoutes);
 
 // Health check
 app.get("/api/health", (_req: Request, res: Response) => {

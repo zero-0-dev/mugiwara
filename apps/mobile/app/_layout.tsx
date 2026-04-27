@@ -63,6 +63,13 @@ export default function RootLayout() {
               />
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
               <Stack.Screen
+                name="discover/[anilistId]"
+                options={{
+                  title: "Discover",
+                  headerShown: false,
+                }}
+              />
+              <Stack.Screen
                 name="manga/[id]"
                 options={{
                   title: "Manga Details",

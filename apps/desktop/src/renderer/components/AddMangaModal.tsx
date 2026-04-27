@@ -13,6 +13,7 @@ interface AddMangaModalProps {
   onClose: () => void;
   onSuccess: () => void;
   onViewManga: (mangaId: string) => void;
+  initialSearchQuery?: string;
 }
 
 const initialState: AddMangaState = {
@@ -109,6 +110,7 @@ export function AddMangaModal({
   onClose,
   onSuccess,
   onViewManga,
+  initialSearchQuery,
 }: AddMangaModalProps) {
   const [state, dispatch] = useReducer(reducer, initialState);
   const debouncedQuery = useDebounce(state.searchQuery, 300);
@@ -116,6 +118,12 @@ export function AddMangaModal({
   useEffect(() => {
     loadSources();
   }, []);
+
+  useEffect(() => {
+    if (initialSearchQuery && state.sources.length > 0 && state.selectedSource) {
+      dispatch({ type: "SET_SEARCH_QUERY", query: initialSearchQuery });
+    }
+  }, [initialSearchQuery, state.sources, state.selectedSource]);
 
   useEffect(() => {
     if (state.step !== "search") return;
