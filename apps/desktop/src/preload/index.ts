@@ -12,6 +12,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
   // File dialogs
   selectFolder: () => ipcRenderer.invoke("select-folder"),
 
+  // Folder operations
+  openFolder: (folderPath: string) => ipcRenderer.invoke("open-folder", folderPath),
+
   // Platform
   platform: process.platform,
 });
@@ -24,6 +27,7 @@ declare global {
       getApiUrl: (path: string) => Promise<string>;
       getAppVersion: () => Promise<string>;
       selectFolder: () => Promise<string | null>;
+      openFolder: (folderPath: string) => Promise<string>;
       platform: string;
     };
   }

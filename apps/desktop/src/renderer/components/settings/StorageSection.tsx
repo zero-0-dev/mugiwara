@@ -321,6 +321,18 @@ export function StorageSection({ apiBaseUrl }: StorageSectionProps) {
             </div>
 
             <div style={styles.cardFooter}>
+              {backend.type === "local" && (
+                <button
+                  onClick={() =>
+                    window.electronAPI.openFolder(
+                      (backend.config as Record<string, any>).basePath,
+                    )
+                  }
+                  style={styles.btnFolder}
+                >
+                  Open Folder
+                </button>
+              )}
               <button
                 onClick={() => startEdit(backend)}
                 style={styles.btnSecondary}
@@ -737,6 +749,16 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: "8px",
     fontSize: "14px",
     fontWeight: 500,
+    cursor: "pointer",
+    transition: "background-color 0.2s",
+  },
+  btnFolder: {
+    backgroundColor: "#10b981",
+    color: "#fff",
+    border: "none",
+    padding: "8px 16px",
+    borderRadius: "6px",
+    fontSize: "13px",
     cursor: "pointer",
     transition: "background-color 0.2s",
   },

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog } from "electron";
+import { app, BrowserWindow, ipcMain, dialog, shell } from "electron";
 import path from "path";
 import { ServerManager } from "./server-manager";
 
@@ -32,7 +32,6 @@ async function createWindow(serverPort: number) {
   // Load the app
   if (isDev) {
     await mainWindow.loadURL("http://localhost:5173");
-    mainWindow.webContents.openDevTools();
   } else {
     await mainWindow.loadFile(path.join(__dirname, "../renderer/index.html"));
   }
@@ -89,6 +88,14 @@ ipcMain.handle("get-api-url", (event, apiPath: string) => {
 
 ipcMain.handle("get-app-version", () => {
   return app.getVersion();
+});
+
+ipcMain.handle("open-folder", async (event, folderPath: string) => {
+  const resolvedPath = path.isAbsolute(folderPath)
+    ? folderPath
+    : path.resolve(path.join(process.cwd(), "../server"), folderPath);
+  console.log(`[Main] Opening folder: ${resolvedPath}`);
+  return shell.openPath(resolvedPath);
 });
 
 ipcMain.handle("select-folder", async () => {
