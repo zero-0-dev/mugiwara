@@ -47,7 +47,9 @@ export function DiscoverDetail({
   anilistId,
   onBack,
 }: DiscoverDetailProps) {
-  const abortRef = useRef<AbortController | null>(null);
+  const mangaAbortRef = useRef<AbortController | null>(null);
+  const sourcesAbortRef = useRef<AbortController | null>(null);
+  const searchAbortRef = useRef<AbortController | null>(null);
   const [manga, setManga] = useState<AniListManga | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -59,11 +61,15 @@ export function DiscoverDetail({
   const [searching, setSearching] = useState(false);
 
   const [showAddModal, setShowAddModal] = useState(false);
-  const [addModalSearch, setAddModalSearch] = useState("");
+  const [addModalResult, setAddModalResult] = useState<SearchResult | null>(null);
   const [addModalSource, setAddModalSource] = useState("");
 
   useEffect(() => {
-    return () => abortRef.current?.abort();
+    return () => {
+      mangaAbortRef.current?.abort();
+      sourcesAbortRef.current?.abort();
+      searchAbortRef.current?.abort();
+    };
   }, []);
 
   useEffect(() => {
@@ -79,9 +85,9 @@ export function DiscoverDetail({
   }, [selectedSource, manga]);
 
   async function fetchManga() {
-    abortRef.current?.abort();
+    mangaAbortRef.current?.abort();
     const controller = new AbortController();
-    abortRef.current = controller;
+    mangaAbortRef.current = controller;
     try {
       setLoading(true);
       const response = await fetch(
@@ -95,15 +101,15 @@ export function DiscoverDetail({
       if (err instanceof DOMException && err.name === "AbortError") return;
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
-      if (abortRef.current !== controller) return;
+      if (mangaAbortRef.current !== controller) return;
       setLoading(false);
     }
   }
 
   async function fetchSources() {
-    abortRef.current?.abort();
+    sourcesAbortRef.current?.abort();
     const controller = new AbortController();
-    abortRef.current = controller;
+    sourcesAbortRef.current = controller;
     try {
       const response = await fetch(`${apiBaseUrl}/api/library/sources`, {
         signal: controller.signal,
@@ -122,9 +128,9 @@ export function DiscoverDetail({
   }
 
   async function searchSource(sourceId: string, query: string) {
-    abortRef.current?.abort();
+    searchAbortRef.current?.abort();
     const controller = new AbortController();
-    abortRef.current = controller;
+    searchAbortRef.current = controller;
     try {
       setSearching(true);
       const response = await fetch(
@@ -139,14 +145,14 @@ export function DiscoverDetail({
       console.error("Search failed:", err);
       setSearchResults([]);
     } finally {
-      if (abortRef.current !== controller) return;
+      if (searchAbortRef.current !== controller) return;
       setSearching(false);
     }
   }
 
   function handleOpenAddModal(result: SearchResult) {
     setAddModalSource(selectedSource || "");
-    setAddModalSearch(`${result.title} (${selectedSource})`);
+    setAddModalResult(result);
     setShowAddModal(true);
   }
 
@@ -582,7 +588,7 @@ export function DiscoverDetail({
         </div>
       </div>
 
-      {showAddModal && (
+      {showAddModal && addModalResult && (
         <AddMangaModal
           apiBaseUrl={apiBaseUrl}
           onClose={() => setShowAddModal(false)}
@@ -590,7 +596,8 @@ export function DiscoverDetail({
           onViewManga={(mangaId) => {
             setShowAddModal(false);
           }}
-          initialSearchQuery={addModalSearch}
+          initialSourceId={addModalSource}
+          initialSearchResult={addModalResult}
         />
       )}
     </div>

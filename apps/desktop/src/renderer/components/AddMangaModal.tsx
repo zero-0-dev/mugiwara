@@ -1,5 +1,5 @@
-import { useReducer, useEffect } from "react";
-import type { AddMangaState, Action, SearchResult, ImportProgressResponse } from "./add-manga/types";
+import { useReducer, useEffect, useRef } from "react";
+import type { AddMangaState, Action, Source, SearchResult, ImportProgressResponse } from "./add-manga/types";
 import { useDebounce } from "../hooks/useDebounce";
 import { AddMangaHeader } from "./add-manga/AddMangaHeader";
 import { ChapterSelect } from "./add-manga/ChapterSelect";
@@ -14,6 +14,8 @@ interface AddMangaModalProps {
   onSuccess: () => void;
   onViewManga: (mangaId: string) => void;
   initialSearchQuery?: string;
+  initialSourceId?: string;
+  initialSearchResult?: SearchResult;
 }
 
 const initialState: AddMangaState = {
@@ -111,9 +113,12 @@ export function AddMangaModal({
   onSuccess,
   onViewManga,
   initialSearchQuery,
+  initialSourceId,
+  initialSearchResult,
 }: AddMangaModalProps) {
   const [state, dispatch] = useReducer(reducer, initialState);
   const debouncedQuery = useDebounce(state.searchQuery, 300);
+  const autoSelectRan = useRef(false);
 
   useEffect(() => {
     loadSources();
@@ -124,6 +129,14 @@ export function AddMangaModal({
       dispatch({ type: "SET_SEARCH_QUERY", query: initialSearchQuery });
     }
   }, [initialSearchQuery, state.sources, state.selectedSource]);
+
+  useEffect(() => {
+    if (!initialSearchResult) return;
+    if (state.sources.length === 0 || !state.selectedSource) return;
+    if (autoSelectRan.current) return;
+    autoSelectRan.current = true;
+    handleSelectManga(initialSearchResult);
+  }, [initialSearchResult, state.sources, state.selectedSource]);
 
   useEffect(() => {
     if (state.step !== "search") return;
@@ -156,8 +169,11 @@ export function AddMangaModal({
       if (!response.ok) throw new Error("Failed to load sources");
       const data = await response.json();
       dispatch({ type: "SET_SOURCES", sources: data });
-      if (data.length > 0) {
-        dispatch({ type: "SELECT_SOURCE", sourceId: data[0].id });
+      const targetId = initialSourceId && data.some((s: Source) => s.id === initialSourceId)
+        ? initialSourceId
+        : data[0]?.id;
+      if (targetId) {
+        dispatch({ type: "SELECT_SOURCE", sourceId: targetId });
       }
     } catch (err) {
       dispatch({

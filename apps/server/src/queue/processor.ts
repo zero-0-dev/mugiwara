@@ -173,6 +173,9 @@ export class ImportQueueProcessor extends EventEmitter {
     // Download chapter pages from source
     let pageCount = 0;
     for await (const pageData of source.downloadChapter(task.sourceChapterId)) {
+      console.log(
+        `📄 Downloaded page ${pageData.pageNumber} for task ${task.id}`,
+      );
       if (signal.aborted) {
         throw new Error("Task cancelled");
       }
@@ -193,7 +196,9 @@ export class ImportQueueProcessor extends EventEmitter {
 
       // Sync progress to chapters table
       const progressPercent = Math.round((pageCount / (pageCount + 5)) * 100);
-      await chapterRepository.update(chapter.id, { importProgress: progressPercent });
+      await chapterRepository.update(chapter.id, {
+        importProgress: progressPercent,
+      });
 
       // Emit progress event
       this.emit("taskProgress", {
