@@ -1,216 +1,81 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
+import { useQueueTasks, useQueueStats, useCancelTask, useRetryTask, useRetryAllFailed, useClearCompleted } from "../../api/hooks";
 
-interface ImportTask {
-  id: string;
-  status: "pending" | "running" | "paused" | "complete" | "error";
-  mangaId: string;
-  chapterId?: string;
-  progressPercent: number;
-  errorMessage?: string;
-}
-
-interface QueueStats {
-  pending: number;
-  running: number;
-  paused: number;
-  complete: number;
-  error: number;
-  total: number;
-}
-
-interface QueueSectionProps {
-  apiBaseUrl: string;
-}
-
-export function QueueSection({ apiBaseUrl }: QueueSectionProps) {
-  const [tasks, setTasks] = useState<ImportTask[]>([]);
-  const [stats, setStats] = useState<QueueStats | null>(null);
-  const [loading, setLoading] = useState(true);
+export function QueueSection() {
+  const { data: tasks = [], isLoading } = useQueueTasks();
+  const { data: stats } = useQueueStats();
+  const cancelTask = useCancelTask();
+  const retryTask = useRetryTask();
+  const retryAll = useRetryAllFailed();
+  const clearComplete = useClearCompleted();
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadQueueData();
-    const interval = setInterval(loadQueueData, 3000); // Poll every 3 seconds
-    return () => clearInterval(interval);
-  }, []);
-
-  async function loadQueueData() {
-    try {
-      const [tasksRes, statsRes] = await Promise.all([
-        fetch(`${apiBaseUrl}/api/queue/tasks?limit=50`),
-        fetch(`${apiBaseUrl}/api/queue/stats`),
-      ]);
-
-      if (!tasksRes.ok || !statsRes.ok)
-        throw new Error("Failed to load queue data");
-
-      setTasks(await tasksRes.json());
-      setStats(await statsRes.json());
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load queue");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleCancel(taskId: string) {
-    try {
-      const response = await fetch(
-        `${apiBaseUrl}/api/queue/tasks/${taskId}/cancel`,
-        {
-          method: "POST",
-        },
-      );
-      if (!response.ok) throw new Error("Failed to cancel task");
-      await loadQueueData();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to cancel task");
-    }
-  }
-
-  async function handleRetry(taskId: string) {
-    try {
-      const response = await fetch(
-        `${apiBaseUrl}/api/queue/tasks/${taskId}/retry`,
-        {
-          method: "POST",
-        },
-      );
-      if (!response.ok) throw new Error("Failed to retry task");
-      await loadQueueData();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to retry task");
-    }
-  }
-
-  async function handleRetryAll() {
-    try {
-      const response = await fetch(`${apiBaseUrl}/api/queue/retry-failed`, {
-        method: "POST",
-      });
-      if (!response.ok) throw new Error("Failed to retry failed tasks");
-      await loadQueueData();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to retry tasks");
-    }
-  }
-
-  async function handleClearComplete() {
-    try {
-      const response = await fetch(`${apiBaseUrl}/api/queue/clear-complete`, {
-        method: "POST",
-      });
-      if (!response.ok) throw new Error("Failed to clear completed tasks");
-      await loadQueueData();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to clear tasks");
-    }
-  }
-
-  if (loading) return <div className="loading">Loading import queue...</div>;
+  if (isLoading) return <div className="loading">Loading import queue...</div>;
 
   return (
     <div className="queue-section">
       <h3>Import Queue</h3>
-      <p className="section-description">
-        Monitor and manage background manga imports.
-      </p>
+      <p className="section-description">Monitor and manage background manga imports.</p>
 
       {error && <div className="error-message">{error}</div>}
 
-      {/* Stats */}
       {stats && (
         <div className="queue-stats">
           <div className="stat-card">
-            <span className="stat-value">{stats.pending}</span>
+            <span className="stat-value">{(stats as { pending?: number }).pending ?? 0}</span>
             <span className="stat-label">Pending</span>
           </div>
           <div className="stat-card running">
-            <span className="stat-value">{stats.running}</span>
+            <span className="stat-value">{(stats as { running?: number }).running ?? 0}</span>
             <span className="stat-label">Running</span>
           </div>
           <div className="stat-card complete">
-            <span className="stat-value">{stats.complete}</span>
+            <span className="stat-value">{(stats as { complete?: number }).complete ?? 0}</span>
             <span className="stat-label">Complete</span>
           </div>
           <div className="stat-card error">
-            <span className="stat-value">{stats.error}</span>
+            <span className="stat-value">{(stats as { error?: number }).error ?? 0}</span>
             <span className="stat-label">Error</span>
           </div>
         </div>
       )}
 
-      {/* Actions */}
       <div className="queue-actions">
-        {stats && stats.error > 0 && (
-          <button onClick={handleRetryAll} className="btn btn-secondary">
-            Retry All Failed
-          </button>
+        {stats && (stats as { error?: number }).error && (stats as { error: number }).error > 0 && (
+          <button onClick={() => retryAll.mutate(undefined, { onError: (err) => setError(err.message) })} className="btn btn-secondary">Retry All Failed</button>
         )}
-        {stats && stats.complete > 0 && (
-          <button onClick={handleClearComplete} className="btn btn-secondary">
-            Clear Completed
-          </button>
+        {stats && (stats as { complete?: number }).complete && (stats as { complete: number }).complete > 0 && (
+          <button onClick={() => clearComplete.mutate(undefined, { onError: (err) => setError(err.message) })} className="btn btn-secondary">Clear Completed</button>
         )}
-        <button onClick={loadQueueData} className="btn btn-secondary">
-          Refresh
-        </button>
       </div>
 
-      {/* Tasks List */}
       <div className="tasks-list">
         <h4>Recent Tasks</h4>
-        {tasks.length === 0 ? (
+        {(Array.isArray(tasks) ? tasks : []).length === 0 ? (
           <p>No import tasks.</p>
         ) : (
-          tasks.map((task) => (
+          (Array.isArray(tasks) ? tasks : []).map((task: { id: string; mangaId: string; chapterId?: string; status: string; progressPercent?: number; errorMessage?: string }) => (
             <div key={task.id} className={`task-card ${task.status}`}>
               <div className="task-info">
                 <div className="task-header">
-                  <span className="task-manga">
-                    {task.mangaId.substring(0, 8)}...
-                  </span>
-                  {task.chapterId && (
-                    <span className="task-chapter">Ch. {task.chapterId}</span>
-                  )}
-                  <span className={`task-status ${task.status}`}>
-                    {task.status}
-                  </span>
+                  <span className="task-manga">{task.mangaId.substring(0, 8)}...</span>
+                  {task.chapterId && <span className="task-chapter">Ch. {task.chapterId}</span>}
+                  <span className={`task-status ${task.status}`}>{task.status}</span>
                 </div>
-
                 {(task.status === "running" || task.status === "pending") && (
                   <div className="progress-bar-container">
-                    <div
-                      className="progress-bar"
-                      style={{ width: `${task.progressPercent}%` }}
-                    />
-                    <span className="progress-text">
-                      {task.progressPercent}%
-                    </span>
+                    <div className="progress-bar" style={{ width: `${task.progressPercent || 0}%` }} />
+                    <span className="progress-text">{task.progressPercent || 0}%</span>
                   </div>
                 )}
-
-                {task.errorMessage && (
-                  <div className="error-message">{task.errorMessage}</div>
-                )}
+                {task.errorMessage && <div className="error-message">{task.errorMessage}</div>}
               </div>
-
               <div className="task-actions">
                 {(task.status === "running" || task.status === "pending") && (
-                  <button
-                    onClick={() => handleCancel(task.id)}
-                    className="btn btn-danger btn-small"
-                  >
-                    Cancel
-                  </button>
+                  <button onClick={() => cancelTask.mutate(task.id, { onError: (err) => setError(err.message) })} className="btn btn-danger btn-small">Cancel</button>
                 )}
                 {task.status === "error" && (
-                  <button
-                    onClick={() => handleRetry(task.id)}
-                    className="btn btn-primary btn-small"
-                  >
-                    Retry
-                  </button>
+                  <button onClick={() => retryTask.mutate(task.id, { onError: (err) => setError(err.message) })} className="btn btn-primary btn-small">Retry</button>
                 )}
               </div>
             </div>

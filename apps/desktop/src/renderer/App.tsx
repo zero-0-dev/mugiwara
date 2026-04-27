@@ -7,6 +7,7 @@ import { Discover } from "./components/Discover";
 import { DiscoverDetail } from "./components/DiscoverDetail";
 import { Manga, Chapter } from "@mugiwara-manga/types";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
+import { ApiClientProvider } from "./api/context";
 
 type View = "library" | "manga-detail" | "reader" | "settings" | "discover" | "discover-detail";
 
@@ -148,20 +149,12 @@ function App() {
   const renderContent = () => {
     switch (currentView) {
       case "library":
-        return (
-          <Library apiBaseUrl={apiBaseUrl} onMangaSelect={handleMangaSelect} />
-        );
+        return <Library onMangaSelect={handleMangaSelect} />;
       case "discover":
-        return (
-          <Discover
-            apiBaseUrl={apiBaseUrl}
-            onMangaSelect={handleDiscoverMangaSelect}
-          />
-        );
+        return <Discover onMangaSelect={handleDiscoverMangaSelect} />;
       case "discover-detail":
         return selectedAnilistId ? (
           <DiscoverDetail
-            apiBaseUrl={apiBaseUrl}
             anilistId={selectedAnilistId}
             onBack={handleBackFromDiscover}
           />
@@ -169,7 +162,6 @@ function App() {
       case "manga-detail":
         return selectedMangaId ? (
           <MangaDetail
-            apiBaseUrl={apiBaseUrl}
             mangaId={selectedMangaId}
             onBack={handleBackToLibrary}
             onReadChapter={handleReadChapter}
@@ -178,7 +170,6 @@ function App() {
       case "reader":
         return selectedMangaId && selectedChapterId ? (
           <Reader
-            apiBaseUrl={apiBaseUrl}
             mangaId={selectedMangaId}
             chapterId={selectedChapterId}
             onBack={handleBackToDetail}
@@ -189,60 +180,60 @@ function App() {
           />
         ) : null;
       case "settings":
-        return (
-          <SettingsPage apiBaseUrl={apiBaseUrl} onBack={handleCloseSettings} />
-        );
+        return <SettingsPage onBack={handleCloseSettings} />;
       default:
         return null;
     }
   };
 
   return (
-    <div className="app">
-      <header className="app-header">
-        <h1 onClick={handleBackToLibrary} style={{ cursor: "pointer" }}>
-          Mugiwara
-        </h1>
-        <div className="header-actions">
-          <button
-            onClick={handleBackToLibrary}
-            className="btn btn-secondary btn-sm"
-            style={{ marginRight: 8 }}
-          >
-            Library
-          </button>
-          <button
-            onClick={handleOpenDiscover}
-            className="btn btn-secondary btn-sm"
-            style={{ marginRight: 8 }}
-          >
-            Discover
-          </button>
-          <button
-            onClick={handleOpenSettings}
-            className="btn btn-icon"
-            title="Settings"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+    <ApiClientProvider baseUrl={apiBaseUrl}>
+      <div className="app">
+        <header className="app-header">
+          <h1 onClick={handleBackToLibrary} style={{ cursor: "pointer" }}>
+            Mugiwara
+          </h1>
+          <div className="header-actions">
+            <button
+              onClick={handleBackToLibrary}
+              className="btn btn-secondary btn-sm"
+              style={{ marginRight: 8 }}
             >
-              <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
-              <circle cx="12" cy="12" r="3"></circle>
-            </svg>
-          </button>
-          <span className="server-status">Server: localhost:{serverPort}</span>
-        </div>
-      </header>
-      <main className="app-main">{renderContent()}</main>
-    </div>
+              Library
+            </button>
+            <button
+              onClick={handleOpenDiscover}
+              className="btn btn-secondary btn-sm"
+              style={{ marginRight: 8 }}
+            >
+              Discover
+            </button>
+            <button
+              onClick={handleOpenSettings}
+              className="btn btn-icon"
+              title="Settings"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+            </button>
+            <span className="server-status">Server: localhost:{serverPort}</span>
+          </div>
+        </header>
+        <main className="app-main">{renderContent()}</main>
+      </div>
+    </ApiClientProvider>
   );
 }
 

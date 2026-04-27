@@ -1,11 +1,11 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React from "react";
 import { StorageSection } from "./settings/StorageSection";
 import { PluginsSection } from "./settings/PluginsSection";
 import { QueueSection } from "./settings/QueueSection";
+import { useSettings, useSaveSetting } from "../api/hooks";
 import pkg from "../../../package.json";
 
 interface SettingsPageProps {
-  apiBaseUrl: string;
   onBack: () => void;
 }
 
@@ -64,65 +64,30 @@ const mediaTypes = [
   },
 ];
 
-export function SettingsPage({ apiBaseUrl, onBack }: SettingsPageProps) {
-  const [activeTab, setActiveTab] = useState<string>("reading");
-  const [settings, setSettings] = useState<Settings>(defaultSettings);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState<Record<string, boolean>>({});
-  const [error, setError] = useState<string | null>(null);
-  const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
+export function SettingsPage({ onBack }: SettingsPageProps) {
+  const [activeTab, setActiveTab] = React.useState<string>("reading");
+  const { data: serverSettings, isLoading } = useSettings();
+  const saveSetting = useSaveSetting();
+  const [saveSuccess, setSaveSuccess] = React.useState<string | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
 
-  useEffect(() => {
-    loadSettings();
-  }, [apiBaseUrl]);
-
-  useEffect(() => {
+  React.useEffect(() => {
     if (saveSuccess) {
       const timer = setTimeout(() => setSaveSuccess(null), 2000);
       return () => clearTimeout(timer);
     }
   }, [saveSuccess]);
 
-  async function loadSettings() {
-    try {
-      setLoading(true);
-      const response = await fetch(`${apiBaseUrl}/api/settings`);
-      if (!response.ok) throw new Error("Failed to load settings");
-      const data = await response.json();
-      setSettings({ ...defaultSettings, ...data });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load settings");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  const saveSetting = useCallback(
-    async (key: keyof Settings, value: string) => {
-      try {
-        setSaving((prev) => ({ ...prev, [key]: true }));
-
-        const response = await fetch(`${apiBaseUrl}/api/settings/${key}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ value }),
-        });
-
-        if (!response.ok) throw new Error("Failed to save setting");
-
-        setSaveSuccess("Saved");
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to save setting");
-      } finally {
-        setSaving((prev) => ({ ...prev, [key]: false }));
-      }
-    },
-    [apiBaseUrl],
-  );
+  const settings: Settings = { ...defaultSettings, ...(serverSettings as Partial<Settings>) };
 
   function updateSetting(key: keyof Settings, value: string) {
-    setSettings((prev) => ({ ...prev, [key]: value }));
-    saveSetting(key, value);
+    saveSetting.mutate(
+      { key, value },
+      {
+        onSuccess: () => setSaveSuccess("Saved"),
+        onError: (err) => setError(err instanceof Error ? err.message : "Failed to save"),
+      },
+    );
   }
 
   const renderTabContent = () => {
@@ -130,7 +95,7 @@ export function SettingsPage({ apiBaseUrl, onBack }: SettingsPageProps) {
       case "reading":
         return (
           <section className="settings-section">
-            <h2>📖 Reading Preferences</h2>
+            <h2>Reading Preferences</h2>
 
             <div className="setting-item">
               <div className="setting-info">
@@ -140,10 +105,8 @@ export function SettingsPage({ apiBaseUrl, onBack }: SettingsPageProps) {
               <div className="setting-control">
                 <select
                   value={settings["reading.defaultMode"]}
-                  onChange={(e) =>
-                    updateSetting("reading.defaultMode", e.target.value)
-                  }
-                  disabled={saving["reading.defaultMode"]}
+                  onChange={(e) => updateSetting("reading.defaultMode", e.target.value)}
+                  disabled={saveSetting.isPending}
                 >
                   {readingModes.map((mode) => (
                     <option key={mode.value} value={mode.value}>
@@ -151,9 +114,7 @@ export function SettingsPage({ apiBaseUrl, onBack }: SettingsPageProps) {
                     </option>
                   ))}
                 </select>
-                {saving["reading.defaultMode"] && (
-                  <span className="saving-indicator">Saving...</span>
-                )}
+                {saveSetting.isPending && <span className="saving-indicator">Saving...</span>}
               </div>
             </div>
 
@@ -173,10 +134,8 @@ export function SettingsPage({ apiBaseUrl, onBack }: SettingsPageProps) {
                   <div className="setting-control">
                     <select
                       value={settings[settingKey]}
-                      onChange={(e) =>
-                        updateSetting(settingKey, e.target.value)
-                      }
-                      disabled={saving[settingKey]}
+                      onChange={(e) => updateSetting(settingKey, e.target.value)}
+                      disabled={saveSetting.isPending}
                     >
                       {readingModes.map((mode) => (
                         <option key={mode.value} value={mode.value}>
@@ -184,9 +143,7 @@ export function SettingsPage({ apiBaseUrl, onBack }: SettingsPageProps) {
                         </option>
                       ))}
                     </select>
-                    {saving[settingKey] && (
-                      <span className="saving-indicator">Saving...</span>
-                    )}
+                    {saveSetting.isPending && <span className="saving-indicator">Saving...</span>}
                   </div>
                 </div>
               );
@@ -195,27 +152,22 @@ export function SettingsPage({ apiBaseUrl, onBack }: SettingsPageProps) {
         );
 
       case "storage":
-        return <StorageSection apiBaseUrl={apiBaseUrl} />;
+        return <StorageSection />;
 
       case "plugins":
-        return <PluginsSection apiBaseUrl={apiBaseUrl} />;
+        return <PluginsSection />;
 
       case "queue":
-        return <QueueSection apiBaseUrl={apiBaseUrl} />;
+        return <QueueSection />;
 
       case "about":
         return (
           <section className="settings-section">
-            <h2>ℹ️ About</h2>
+            <h2>About</h2>
             <div className="about-info">
-              <p>
-                <strong>Mugiwara Manga Reader</strong>
-              </p>
+              <p><strong>Mugiwara Manga Reader</strong></p>
               <p>Version {pkg.version}</p>
-              <p>
-                A cross-platform manga reader with extensible plugin
-                architecture.
-              </p>
+              <p>A cross-platform manga reader with extensible plugin architecture.</p>
             </div>
           </section>
         );
@@ -225,7 +177,7 @@ export function SettingsPage({ apiBaseUrl, onBack }: SettingsPageProps) {
     }
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="settings-page">
         <div className="settings-loading">
@@ -256,41 +208,24 @@ export function SettingsPage({ apiBaseUrl, onBack }: SettingsPageProps) {
       )}
 
       <div className="settings-layout">
-        {/* Sidebar Navigation */}
         <nav className="settings-nav">
-          <button
-            className={`nav-item ${activeTab === "reading" ? "active" : ""}`}
-            onClick={() => setActiveTab("reading")}
-          >
-            📖 Reading
+          <button className={`nav-item ${activeTab === "reading" ? "active" : ""}`} onClick={() => setActiveTab("reading")}>
+            Reading
           </button>
-          <button
-            className={`nav-item ${activeTab === "storage" ? "active" : ""}`}
-            onClick={() => setActiveTab("storage")}
-          >
-            💾 Storage
+          <button className={`nav-item ${activeTab === "storage" ? "active" : ""}`} onClick={() => setActiveTab("storage")}>
+            Storage
           </button>
-          <button
-            className={`nav-item ${activeTab === "plugins" ? "active" : ""}`}
-            onClick={() => setActiveTab("plugins")}
-          >
-            🔌 Plugins
+          <button className={`nav-item ${activeTab === "plugins" ? "active" : ""}`} onClick={() => setActiveTab("plugins")}>
+            Plugins
           </button>
-          <button
-            className={`nav-item ${activeTab === "queue" ? "active" : ""}`}
-            onClick={() => setActiveTab("queue")}
-          >
-            📥 Queue
+          <button className={`nav-item ${activeTab === "queue" ? "active" : ""}`} onClick={() => setActiveTab("queue")}>
+            Queue
           </button>
-          <button
-            className={`nav-item ${activeTab === "about" ? "active" : ""}`}
-            onClick={() => setActiveTab("about")}
-          >
-            ℹ️ About
+          <button className={`nav-item ${activeTab === "about" ? "active" : ""}`} onClick={() => setActiveTab("about")}>
+            About
           </button>
         </nav>
 
-        {/* Main Content */}
         <div className="settings-content">{renderTabContent()}</div>
       </div>
     </div>

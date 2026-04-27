@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useMemo, useState } from "react";
+import { useDiscoverBrowse } from "../api/hooks";
 
 interface AniListManga {
   id: number;
@@ -10,11 +11,6 @@ interface AniListManga {
   averageScore?: number;
   chapters: number | null;
   startDate: { year: number | null; month: number | null; day: number | null };
-}
-
-interface BrowseResult {
-  manga: AniListManga[];
-  pageInfo: { currentPage: number; hasNextPage: boolean; total: number };
 }
 
 const CATEGORIES = [
@@ -34,340 +30,96 @@ const GENRES = [
 ];
 
 interface DiscoverProps {
-  apiBaseUrl: string;
   onMangaSelect: (anilistId: number) => void;
 }
 
-export function Discover({ apiBaseUrl, onMangaSelect }: DiscoverProps) {
-  const [manga, setManga] = useState<AniListManga[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [hasNextPage, setHasNextPage] = useState(false);
-  const [page, setPage] = useState(1);
-
-  const abortRef = useRef<AbortController | null>(null);
+export function Discover({ onMangaSelect }: DiscoverProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState(CATEGORIES[0]!);
   const [selectedGenre, setSelectedGenre] = useState("");
   const [showFilters, setShowFilters] = useState(false);
 
-  useEffect(() => {
-    return () => abortRef.current?.abort();
-  }, []);
+  const filters = {
+    sort: activeCategory.sort,
+    country: activeCategory.country,
+    search: searchQuery || undefined,
+    genre: selectedGenre || undefined,
+    perPage: 30,
+  };
 
-  useEffect(() => {
-    setPage(1);
-    setManga([]);
-    fetchBrowse(1, false);
-  }, [activeCategory, selectedGenre]);
+  const {
+    data,
+    isLoading,
+    isFetching,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useDiscoverBrowse(filters);
 
-  useEffect(() => {
-    if (page > 1) {
-      fetchBrowse(page, true);
-    }
-  }, [page]);
-
-  async function fetchBrowse(pageNum: number, append: boolean) {
-    abortRef.current?.abort();
-    const controller = new AbortController();
-    abortRef.current = controller;
-    try {
-      if (append) {
-        setLoadingMore(true);
-      } else {
-        setLoading(true);
-      }
-      setError(null);
-
-      const params = new URLSearchParams();
-      params.append("sort", activeCategory.sort);
-      if (activeCategory.country) params.append("country", activeCategory.country);
-      if (selectedGenre) params.append("genre", selectedGenre);
-      if (searchQuery) params.append("search", searchQuery);
-      params.append("page", String(pageNum));
-      params.append("perPage", "30");
-
-      const response = await fetch(
-        `${apiBaseUrl}/api/discover/browse?${params.toString()}`,
-        { signal: controller.signal },
-      );
-      if (!response.ok) throw new Error("Failed to fetch discover");
-
-      const data: BrowseResult = await response.json();
-      setManga((prev) => (append ? [...prev, ...(data.manga || [])] : data.manga || []));
-      setHasNextPage(data.pageInfo.hasNextPage);
-    } catch (err) {
-      if (err instanceof DOMException && err.name === "AbortError") return;
-      setError(err instanceof Error ? err.message : "Unknown error");
-    } finally {
-      if (abortRef.current !== controller) return;
-      setLoading(false);
-      setLoadingMore(false);
-    }
-  }
+  const allManga = useMemo(
+    () => data?.pages.flatMap((p) => p.manga) ?? [],
+    [data],
+  );
 
   function handleSearch() {
-    setPage(1);
-    setManga([]);
-    fetchBrowse(1, false);
-  }
-
-  function handleLoadMore() {
-    if (!loadingMore && hasNextPage) {
-      setPage((p) => p + 1);
-    }
+    // searchQuery is already in filters
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
-    if (e.key === "Enter") {
-      handleSearch();
-    }
+    if (e.key === "Enter") handleSearch();
   }
 
   return (
     <div className="discover">
       <style>{`
-        .discover {
-          padding: 16px;
-          color: #e5e7eb;
-          height: 100%;
-          overflow-y: auto;
-        }
-        .discover-search-row {
-          display: flex;
-          gap: 8px;
-          margin-bottom: 16px;
-        }
-        .discover-search-input {
-          flex: 1;
-          padding: 10px 14px;
-          background: #252525;
-          border: 1px solid #374151;
-          border-radius: 8px;
-          color: #fff;
-          font-size: 14px;
-          outline: none;
-        }
-        .discover-search-input:focus {
-          border-color: #6366f1;
-        }
-        .discover-search-btn {
-          padding: 10px 20px;
-          background: #6366f1;
-          color: white;
-          border: none;
-          border-radius: 8px;
-          cursor: pointer;
-          font-size: 14px;
-        }
-        .discover-search-btn:hover {
-          background: #4f46e5;
-        }
-        .discover-categories {
-          display: flex;
-          gap: 8px;
-          margin-bottom: 12px;
-          overflow-x: auto;
-          padding-bottom: 4px;
-        }
-        .category-btn {
-          padding: 6px 14px;
-          background: #252525;
-          border: none;
-          border-radius: 16px;
-          color: #9ca3af;
-          cursor: pointer;
-          font-size: 13px;
-          white-space: nowrap;
-          transition: all 0.2s;
-        }
-        .category-btn.active {
-          background: #6366f1;
-          color: #fff;
-        }
-        .category-btn:hover:not(.active) {
-          background: #333;
-          color: #e5e7eb;
-        }
-        .discover-filter-toggle {
-          background: none;
-          border: none;
-          color: #6366f1;
-          cursor: pointer;
-          font-size: 13px;
-          padding: 4px 0;
-          margin-bottom: 8px;
-        }
-        .discover-filters {
-          margin-bottom: 16px;
-          padding: 12px;
-          background: #1f2937;
-          border-radius: 8px;
-        }
-        .discover-filters label {
-          color: #9ca3af;
-          font-size: 12px;
-          display: block;
-          margin-bottom: 6px;
-        }
-        .discover-genres {
-          display: flex;
-          gap: 6px;
-          flex-wrap: wrap;
-          margin-bottom: 8px;
-        }
-        .genre-btn {
-          padding: 4px 10px;
-          background: #252525;
-          border: none;
-          border-radius: 12px;
-          color: #9ca3af;
-          cursor: pointer;
-          font-size: 12px;
-          transition: all 0.2s;
-        }
-        .genre-btn.active {
-          background: rgba(99, 102, 241, 0.2);
-          color: #818cf8;
-        }
-        .genre-btn:hover:not(.active) {
-          background: #333;
-        }
-        .discover-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-          gap: 12px;
-        }
-        .discover-card {
-          background: #252525;
-          border-radius: 12px;
-          overflow: hidden;
-          cursor: pointer;
-          transition: transform 0.2s, box-shadow 0.2s;
-          position: relative;
-        }
-        .discover-card:hover {
-          transform: translateY(-4px);
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-        }
-        .discover-card-cover {
-          width: 100%;
-          aspect-ratio: 3/4;
-          object-fit: cover;
-          background: #333;
-        }
-        .discover-card-placeholder {
-          width: 100%;
-          aspect-ratio: 3/4;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: #333;
-          color: #6b7280;
-          font-size: 32px;
-          font-weight: bold;
-        }
-        .discover-card-score {
-          position: absolute;
-          top: 6px;
-          right: 6px;
-          background: rgba(99, 102, 241, 0.9);
-          color: #fff;
-          padding: 2px 6px;
-          border-radius: 6px;
-          font-size: 11px;
-          font-weight: bold;
-        }
-        .discover-card-info {
-          padding: 8px;
-        }
-        .discover-card-title {
-          color: #fff;
-          font-size: 13px;
-          line-height: 1.3;
-          display: -webkit-box;
-          -webkit-line-clamp: 2;
-          -webkit-box-orient: vertical;
-          overflow: hidden;
-        }
-        .discover-card-subtitle {
-          color: #6b7280;
-          font-size: 11px;
-          margin-top: 4px;
-        }
-        .discover-error {
-          color: #ef4444;
-          text-align: center;
-          padding: 40px;
-        }
-        .discover-empty {
-          color: #6b7280;
-          text-align: center;
-          padding: 40px;
-        }
-        .discover-pagination {
-          grid-column: 1 / -1;
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          padding: 24px 0;
-          gap: 8px;
-        }
-        .discover-load-more {
-          padding: 10px 32px;
-          background: #6366f1;
-          color: white;
-          border: none;
-          border-radius: 8px;
-          cursor: pointer;
-          font-size: 14px;
-          font-weight: 500;
-          transition: background 0.2s;
-        }
-        .discover-load-more:hover {
-          background: #4f46e5;
-        }
-        .discover-pagination-text {
-          color: #6b7280;
-          font-size: 13px;
-          margin: 0;
-        }
+        .discover { padding: 16px; color: #e5e7eb; height: 100%; overflow-y: auto; }
+        .discover-search-row { display: flex; gap: 8px; margin-bottom: 16px; }
+        .discover-search-input { flex: 1; padding: 10px 14px; background: #252525; border: 1px solid #374151; border-radius: 8px; color: #fff; font-size: 14px; outline: none; }
+        .discover-search-input:focus { border-color: #6366f1; }
+        .discover-search-btn { padding: 10px 20px; background: #6366f1; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; }
+        .discover-search-btn:hover { background: #4f46e5; }
+        .discover-categories { display: flex; gap: 8px; margin-bottom: 12px; overflow-x: auto; padding-bottom: 4px; }
+        .category-btn { padding: 6px 14px; background: #252525; border: none; border-radius: 16px; color: #9ca3af; cursor: pointer; font-size: 13px; white-space: nowrap; transition: all 0.2s; }
+        .category-btn.active { background: #6366f1; color: #fff; }
+        .category-btn:hover:not(.active) { background: #333; color: #e5e7eb; }
+        .discover-filter-toggle { background: none; border: none; color: #6366f1; cursor: pointer; font-size: 13px; padding: 4px 0; margin-bottom: 8px; }
+        .discover-filters { margin-bottom: 16px; padding: 12px; background: #1f2937; border-radius: 8px; }
+        .discover-filters label { color: #9ca3af; font-size: 12px; display: block; margin-bottom: 6px; }
+        .discover-genres { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+        .genre-btn { padding: 4px 10px; background: #252525; border: none; border-radius: 12px; color: #9ca3af; cursor: pointer; font-size: 12px; transition: all 0.2s; }
+        .genre-btn.active { background: rgba(99, 102, 241, 0.2); color: #818cf8; }
+        .genre-btn:hover:not(.active) { background: #333; }
+        .discover-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+        .discover-card { background: #252525; border-radius: 12px; overflow: hidden; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; position: relative; }
+        .discover-card:hover { transform: translateY(-4px); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3); }
+        .discover-card-cover { width: 100%; aspect-ratio: 3/4; object-fit: cover; background: #333; }
+        .discover-card-placeholder { width: 100%; aspect-ratio: 3/4; display: flex; align-items: center; justify-content: center; background: #333; color: #6b7280; font-size: 32px; font-weight: bold; }
+        .discover-card-score { position: absolute; top: 6px; right: 6px; background: rgba(99, 102, 241, 0.9); color: #fff; padding: 2px 6px; border-radius: 6px; font-size: 11px; font-weight: bold; }
+        .discover-card-info { padding: 8px; }
+        .discover-card-title { color: #fff; font-size: 13px; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .discover-card-subtitle { color: #6b7280; font-size: 11px; margin-top: 4px; }
+        .discover-error { color: #ef4444; text-align: center; padding: 40px; }
+        .discover-empty { color: #6b7280; text-align: center; padding: 40px; }
+        .discover-pagination { grid-column: 1 / -1; display: flex; justify-content: center; align-items: center; padding: 24px 0; gap: 8px; }
+        .discover-load-more { padding: 10px 32px; background: #6366f1; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500; transition: background 0.2s; }
+        .discover-load-more:hover { background: #4f46e5; }
+        .discover-pagination-text { color: #6b7280; font-size: 13px; margin: 0; }
       `}</style>
 
       <div className="discover-search-row">
-        <input
-          type="text"
-          className="discover-search-input"
-          placeholder="Search manga..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          onKeyDown={handleKeyDown}
-        />
-        <button className="discover-search-btn" onClick={handleSearch}>
-          Search
-        </button>
+        <input type="text" className="discover-search-input" placeholder="Search manga..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} onKeyDown={handleKeyDown} />
+        <button className="discover-search-btn" onClick={handleSearch}>Search</button>
       </div>
 
       <div className="discover-categories">
         {CATEGORIES.map((cat) => (
-          <button
-            key={cat.label}
-            className={`category-btn ${activeCategory.label === cat.label ? "active" : ""}`}
-            onClick={() => {
-              setActiveCategory(cat);
-              setSelectedGenre("");
-            }}
-          >
+          <button key={cat.label} className={`category-btn ${activeCategory.label === cat.label ? "active" : ""}`} onClick={() => { setActiveCategory(cat); setSelectedGenre(""); }}>
             {cat.label}
           </button>
         ))}
       </div>
 
-      <button
-        className="discover-filter-toggle"
-        onClick={() => setShowFilters(!showFilters)}
-      >
+      <button className="discover-filter-toggle" onClick={() => setShowFilters(!showFilters)}>
         {showFilters ? "Hide Filters ▲" : "Filters ▼"}
       </button>
 
@@ -375,88 +127,48 @@ export function Discover({ apiBaseUrl, onMangaSelect }: DiscoverProps) {
         <div className="discover-filters">
           <label>Genre</label>
           <div className="discover-genres">
-            <button
-              className={`genre-btn ${!selectedGenre ? "active" : ""}`}
-              onClick={() => setSelectedGenre("")}
-            >
-              Any
-            </button>
+            <button className={`genre-btn ${!selectedGenre ? "active" : ""}`} onClick={() => setSelectedGenre("")}>Any</button>
             {GENRES.map((genre) => (
-              <button
-                key={genre}
-                className={`genre-btn ${selectedGenre === genre ? "active" : ""}`}
-                onClick={() => setSelectedGenre(genre)}
-              >
-                {genre}
-              </button>
+              <button key={genre} className={`genre-btn ${selectedGenre === genre ? "active" : ""}`} onClick={() => setSelectedGenre(genre)}>{genre}</button>
             ))}
           </div>
         </div>
       )}
 
-      {loading && (
-        <div className="loading-container">
-          <div className="loading-spinner" />
-          <p>Loading discover...</p>
-        </div>
+      {isLoading && (
+        <div className="loading-container"><div className="loading-spinner" /><p>Loading discover...</p></div>
       )}
 
-      {error && <div className="discover-error">{error}</div>}
-
-      {!loading && !error && manga.length === 0 && (
+      {!isLoading && !isFetching && allManga.length === 0 && (
         <div className="discover-empty">No manga found</div>
       )}
 
-      {!loading && !error && manga.length > 0 && (
+      {!isLoading && allManga.length > 0 && (
         <div className="discover-grid">
-          {manga.map((m) => (
-            <div
-              key={m.id}
-              className="discover-card"
-              onClick={() => onMangaSelect(m.id)}
-            >
+          {allManga.map((m: AniListManga) => (
+            <div key={m.id} className="discover-card" onClick={() => onMangaSelect(m.id)}>
               {m.coverImage?.large ? (
-                <img
-                  src={m.coverImage.large}
-                  alt={m.title.english || m.title.romaji}
-                  className="discover-card-cover"
-                />
+                <img src={m.coverImage.large} alt={m.title.english || m.title.romaji} className="discover-card-cover" />
               ) : (
-                <div className="discover-card-placeholder">
-                  {(m.title.english || m.title.romaji).charAt(0).toUpperCase()}
-                </div>
+                <div className="discover-card-placeholder">{(m.title.english || m.title.romaji).charAt(0).toUpperCase()}</div>
               )}
-              {m.averageScore && (
-                <div className="discover-card-score">{m.averageScore}%</div>
-              )}
+              {m.averageScore && <div className="discover-card-score">{m.averageScore}%</div>}
               <div className="discover-card-info">
-                <div className="discover-card-title">
-                  {m.title.english || m.title.romaji}
-                </div>
-                <div className="discover-card-subtitle">
-                  {m.mediaType.toUpperCase()}
-                  {m.chapters ? ` · ${m.chapters} ch` : ""}
-                </div>
+                <div className="discover-card-title">{m.title.english || m.title.romaji}</div>
+                <div className="discover-card-subtitle">{m.mediaType.toUpperCase()}{m.chapters ? ` · ${m.chapters} ch` : ""}</div>
               </div>
             </div>
           ))}
-          {loadingMore && (
+          {isFetchingNextPage && (
+            <div className="discover-pagination"><div className="loading-spinner" /><p>Loading more...</p></div>
+          )}
+          {!isFetchingNextPage && hasNextPage && (
             <div className="discover-pagination">
-              <div className="loading-spinner" />
-              <p>Loading more...</p>
+              <button className="discover-load-more" onClick={() => fetchNextPage()}>Load More</button>
             </div>
           )}
-          {!loadingMore && hasNextPage && (
-            <div className="discover-pagination">
-              <button className="discover-load-more" onClick={handleLoadMore}>
-                Load More
-              </button>
-            </div>
-          )}
-          {!loadingMore && !hasNextPage && manga.length > 0 && (
-            <div className="discover-pagination">
-              <p className="discover-pagination-text">All results loaded</p>
-            </div>
+          {!isFetchingNextPage && !hasNextPage && allManga.length > 0 && (
+            <div className="discover-pagination"><p className="discover-pagination-text">All results loaded</p></div>
           )}
         </div>
       )}

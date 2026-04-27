@@ -15,7 +15,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@mugiwara-manga/types": "workspace:*"
+    "@mugiwara-manga/types": "workspace:*",
+    "@tanstack/react-query": "^5.97.0"
   },
   "devDependencies": {
     "@mugiwara-manga/tsconfig": "workspace:*",
