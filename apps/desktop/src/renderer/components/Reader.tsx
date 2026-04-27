@@ -28,7 +28,7 @@ export function Reader({
   const { data: pages = [] as PageInfo[], isLoading: pagesLoading } = useChapterPages(mangaId, chapterId);
   const { data: chapterProgress } = useChapterProgress(mangaId, chapterId);
   const { data: serverReadingModeData } = useReadingMode(mangaId);
-  const updateProgress = useUpdateChapterProgress(mangaId, chapterId);
+  const { mutate: saveProgress } = useUpdateChapterProgress(mangaId, chapterId);
   const setReadingModeMutation = useSetReadingMode(mangaId);
 
   const [currentPage, setCurrentPage] = useState(0);
@@ -78,9 +78,9 @@ export function Reader({
   }, [pages.length, onInitialPageUsed]);
 
   useEffect(() => {
-    if (pages.length > 0 && !pagesLoading && chapterProgress && !hasRestoredProgress.current) {
+    if (pages.length > 0 && !pagesLoading && !hasRestoredProgress.current) {
       hasRestoredProgress.current = true;
-      if (chapterProgress.pageNumber > 1) {
+      if (chapterProgress?.pageNumber > 1) {
         const pageIndex = chapterProgress.pageNumber - 1;
         setCurrentPage(pageIndex);
         if (readingMode === "vertical") {
@@ -101,17 +101,16 @@ export function Reader({
   }, [readingMode, pages, savedPageIndex]);
 
   useEffect(() => {
-    if (pages.length > 0 && !loading) {
-      const timer = setTimeout(() => {
-        updateProgress.mutate({
-          pageNumber: currentPage + 1,
-          totalPages: pages.length,
-          isCompleted: currentPage === pages.length - 1,
-        });
-      }, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [currentPage, pages.length, loading, updateProgress]);
+    if (pages.length === 0 || loading) return;
+    const timer = setTimeout(() => {
+      saveProgress({
+        pageNumber: currentPage + 1,
+        totalPages: pages.length,
+        isCompleted: currentPage === pages.length - 1,
+      });
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [currentPage, pages.length, saveProgress]);
 
   useEffect(() => {
     if (readingMode !== "vertical") return;

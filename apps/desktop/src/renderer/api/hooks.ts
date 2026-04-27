@@ -302,7 +302,6 @@ export function useUpdateChapterProgress(mangaId: string, chapterId: string) {
     mutationFn: (body: { pageNumber: number; totalPages: number; isCompleted: boolean }) =>
       api.updateChapterProgress(mangaId, chapterId, body),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["chapterProgress", mangaId, chapterId] });
       queryClient.invalidateQueries({ queryKey: ["chapterProgress", "all", mangaId] });
     },
   });
