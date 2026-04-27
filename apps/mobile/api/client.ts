@@ -17,6 +17,10 @@ import {
   DiscoverManga,
   DiscoverBrowseResult,
   DiscoverFilters,
+  StorageBackend,
+  Plugin,
+  PluginInfo,
+  ScanResult,
 } from "../types";
 
 const SERVER_URL_KEY = "@mugiwara/server_url";
@@ -388,6 +392,95 @@ class ApiClient {
     await this.getClient().put(`/settings/readingMode.${mangaId}`, {
       value: mode,
     });
+  }
+
+  async updateSetting(key: string, value: string): Promise<void> {
+    await this.getClient().put(`/settings/${key}`, { value });
+  }
+
+  async updateSettings(settings: Record<string, string>): Promise<Record<string, string>> {
+    const response = await this.getClient().put("/settings", settings);
+    return response.data;
+  }
+
+  async resetSetting(key: string): Promise<void> {
+    await this.getClient().delete(`/settings/${key}`);
+  }
+
+  // Storage backends
+  async getStorageTypes(): Promise<string[]> {
+    const response = await this.getClient().get("/storage/types");
+    return response.data;
+  }
+
+  async getStorageBackends(): Promise<StorageBackend[]> {
+    const response = await this.getClient().get("/storage/backends");
+    return response.data;
+  }
+
+  async createStorageBackend(data: {
+    name: string;
+    type: string;
+    config?: Record<string, unknown>;
+    isDefault?: boolean;
+  }): Promise<{ id: string }> {
+    const response = await this.getClient().post("/storage/backends", data);
+    return response.data;
+  }
+
+  async updateStorageBackend(
+    id: string,
+    data: { name?: string; config?: Record<string, unknown>; isDefault?: boolean },
+  ): Promise<void> {
+    await this.getClient().put(`/storage/backends/${id}`, data);
+  }
+
+  async deleteStorageBackend(id: string): Promise<void> {
+    await this.getClient().delete(`/storage/backends/${id}`);
+  }
+
+  async scanStorage(): Promise<ScanResult> {
+    const response = await this.getClient().post("/storage/scan");
+    return response.data;
+  }
+
+  // Plugins
+  async getInstalledPlugins(): Promise<Plugin[]> {
+    const response = await this.getClient().get("/plugins/installed");
+    return response.data;
+  }
+
+  async getAvailablePlugins(query?: string, type?: string): Promise<PluginInfo[]> {
+    const params = new URLSearchParams();
+    if (query) params.append("query", query);
+    if (type) params.append("type", type);
+    const response = await this.getClient().get(`/plugins/available?${params.toString()}`);
+    return response.data;
+  }
+
+  async installPlugin(packageName: string, version?: string): Promise<void> {
+    await this.getClient().post("/plugins/install", { package: packageName, version });
+  }
+
+  async uninstallPlugin(id: string): Promise<void> {
+    await this.getClient().post(`/plugins/${id}/uninstall`);
+  }
+
+  async enablePlugin(id: string): Promise<void> {
+    await this.getClient().post(`/plugins/${id}/enable`);
+  }
+
+  async disablePlugin(id: string): Promise<void> {
+    await this.getClient().post(`/plugins/${id}/disable`);
+  }
+
+  // Queue bulk actions
+  async retryAllFailed(): Promise<void> {
+    await this.getClient().post("/queue/retry-failed");
+  }
+
+  async clearCompleted(): Promise<void> {
+    await this.getClient().post("/queue/clear-complete");
   }
 }
 

@@ -460,6 +460,186 @@ export function useSetReadingMode() {
   });
 }
 
+// Settings mutations
+export function useUpdateSetting() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ key, value }: { key: string; value: string }) =>
+      apiClient.updateSetting(key, value),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["settings"] });
+    },
+  });
+}
+
+export function useBulkUpdateSettings() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (settings: Record<string, string>) =>
+      apiClient.updateSettings(settings),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["settings"] });
+    },
+  });
+}
+
+export function useResetSetting() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (key: string) => apiClient.resetSetting(key),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["settings"] });
+    },
+  });
+}
+
+// Storage
+export function useStorageTypes() {
+  return useQuery({
+    queryKey: ["storageTypes"],
+    queryFn: () => apiClient.getStorageTypes(),
+  });
+}
+
+export function useStorageBackends() {
+  return useQuery({
+    queryKey: ["storageBackends"],
+    queryFn: () => apiClient.getStorageBackends(),
+  });
+}
+
+export function useCreateStorageBackend() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: {
+      name: string;
+      type: string;
+      config?: Record<string, unknown>;
+      isDefault?: boolean;
+    }) => apiClient.createStorageBackend(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["storageBackends"] });
+    },
+  });
+}
+
+export function useUpdateStorageBackend() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      data,
+    }: {
+      id: string;
+      data: { name?: string; config?: Record<string, unknown>; isDefault?: boolean };
+    }) => apiClient.updateStorageBackend(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["storageBackends"] });
+    },
+  });
+}
+
+export function useDeleteStorageBackend() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiClient.deleteStorageBackend(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["storageBackends"] });
+    },
+  });
+}
+
+export function useScanStorage() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiClient.scanStorage(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["library"] });
+    },
+  });
+}
+
+// Plugins
+export function useInstalledPlugins() {
+  return useQuery({
+    queryKey: ["installedPlugins"],
+    queryFn: () => apiClient.getInstalledPlugins(),
+  });
+}
+
+export function useAvailablePlugins(query?: string, type?: string) {
+  return useQuery({
+    queryKey: ["availablePlugins", query, type],
+    queryFn: () => apiClient.getAvailablePlugins(query, type),
+  });
+}
+
+export function useInstallPlugin() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ packageName, version }: { packageName: string; version?: string }) =>
+      apiClient.installPlugin(packageName, version),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["installedPlugins"] });
+      queryClient.invalidateQueries({ queryKey: ["availablePlugins"] });
+    },
+  });
+}
+
+export function useUninstallPlugin() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiClient.uninstallPlugin(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["installedPlugins"] });
+      queryClient.invalidateQueries({ queryKey: ["availablePlugins"] });
+    },
+  });
+}
+
+export function useEnablePlugin() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiClient.enablePlugin(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["installedPlugins"] });
+    },
+  });
+}
+
+export function useDisablePlugin() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiClient.disablePlugin(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["installedPlugins"] });
+    },
+  });
+}
+
+// Queue bulk actions
+export function useRetryAllFailed() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiClient.retryAllFailed(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["queueTasks"] });
+      queryClient.invalidateQueries({ queryKey: ["queueStats"] });
+    },
+  });
+}
+
+export function useClearCompleted() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiClient.clearCompleted(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["queueTasks"] });
+      queryClient.invalidateQueries({ queryKey: ["queueStats"] });
+    },
+  });
+}
+
 // Discover
 export function useDiscoverBrowse(filters: Omit<DiscoverFilters, 'page'>) {
   return useInfiniteQuery<DiscoverBrowseResult>({

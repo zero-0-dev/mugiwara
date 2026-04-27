@@ -186,3 +186,36 @@ export interface ImportProgressResponse {
   isComplete: boolean;
   chapters: ImportChapterProgress[];
 }
+
+export interface StorageBackend {
+  id: string;
+  name: string;
+  type: string;
+  config: Record<string, unknown>;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Plugin {
+  id: string;
+  type: "source" | "storage";
+  version: string;
+  isBuiltin: boolean;
+  isEnabled: boolean;
+  config: Record<string, unknown>;
+  installedAt?: string;
+  updatedAt?: string;
+}
+
+export interface PluginInfo {
+  name: string;
+  version: string;
+  description?: string;
+}
+
+export interface ScanResult {
+  added: number;
+  updated: number;
+  errors: string[];
+}

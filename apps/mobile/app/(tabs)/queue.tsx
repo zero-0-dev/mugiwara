@@ -6,6 +6,7 @@ import {
   IconButton,
   Card,
   Chip,
+  Button,
 } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import {
@@ -13,8 +14,50 @@ import {
   useQueueStats,
   useCancelTask,
   useRetryTask,
+  useRetryAllFailed,
+  useClearCompleted,
 } from "@/api/hooks";
 import { ImportTask } from "@/types";
+
+function QueueActions({
+  hasErrors,
+  hasCompleted,
+}: {
+  hasErrors: boolean;
+  hasCompleted: boolean;
+}) {
+  const retryAllFailed = useRetryAllFailed();
+  const clearCompleted = useClearCompleted();
+
+  return (
+    <View style={styles.actionsContainer}>
+      {hasErrors && (
+        <Button
+          mode="outlined"
+          onPress={() => retryAllFailed.mutate()}
+          loading={retryAllFailed.isPending}
+          textColor="#6366f1"
+          style={styles.actionButton}
+          icon="refresh"
+        >
+          Retry All Failed
+        </Button>
+      )}
+      {hasCompleted && (
+        <Button
+          mode="outlined"
+          onPress={() => clearCompleted.mutate()}
+          loading={clearCompleted.isPending}
+          textColor="#6366f1"
+          style={styles.actionButton}
+          icon="check-all"
+        >
+          Clear Completed
+        </Button>
+      )}
+    </View>
+  );
+}
 
 function TaskItem({ task }: { task: ImportTask }) {
   const cancelTask = useCancelTask();
@@ -163,6 +206,13 @@ export default function QueueScreen() {
         </View>
       )}
 
+      {stats && (stats.error > 0 || stats.complete > 0) && (
+        <QueueActions
+          hasErrors={stats.error > 0}
+          hasCompleted={stats.complete > 0}
+        />
+      )}
+
       {tasks && tasks.length === 0 ? (
         <View style={styles.emptyState}>
           <MaterialCommunityIcons
@@ -272,6 +322,16 @@ const styles = StyleSheet.create({
     color: "#ef4444",
     fontSize: 12,
     marginTop: 8,
+  },
+  actionsContainer: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
+  actionButton: {
+    borderColor: "#6366f1",
   },
   emptyState: {
     flex: 1,
