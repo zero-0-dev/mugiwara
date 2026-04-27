@@ -464,8 +464,8 @@ export function useSetReadingMode() {
 export function useDiscoverBrowse(filters: Omit<DiscoverFilters, 'page'>) {
   return useInfiniteQuery<DiscoverBrowseResult>({
     queryKey: ["discover", "browse", filters],
-    queryFn: ({ pageParam }) =>
-      apiClient.browseDiscover({ ...filters, page: pageParam as number }),
+    queryFn: ({ pageParam, signal }) =>
+      apiClient.browseDiscover({ ...filters, page: pageParam as number }, signal),
     initialPageParam: 1,
     getNextPageParam: (lastPage) =>
       lastPage.pageInfo.hasNextPage
@@ -477,7 +477,7 @@ export function useDiscoverBrowse(filters: Omit<DiscoverFilters, 'page'>) {
 export function useDiscoverManga(anilistId: number | null) {
   return useQuery<DiscoverManga>({
     queryKey: ["discover", "manga", anilistId],
-    queryFn: () => apiClient.getDiscoverManga(anilistId!),
+    queryFn: ({ signal }) => apiClient.getDiscoverManga(anilistId!, signal),
     enabled: !!anilistId,
   });
 }

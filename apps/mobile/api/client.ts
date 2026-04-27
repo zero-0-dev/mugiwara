@@ -349,7 +349,7 @@ class ApiClient {
   }
 
   // Discover
-  async browseDiscover(filters: DiscoverFilters): Promise<DiscoverBrowseResult> {
+  async browseDiscover(filters: DiscoverFilters, signal?: AbortSignal): Promise<DiscoverBrowseResult> {
     const params = new URLSearchParams();
     if (filters.sort) params.append("sort", filters.sort.join(","));
     if (filters.genre) params.append("genre", filters.genre);
@@ -361,12 +361,13 @@ class ApiClient {
     if (filters.perPage) params.append("perPage", String(filters.perPage));
     const response = await this.getClient().get(
       `/discover/browse?${params.toString()}`,
+      { signal },
     );
     return response.data;
   }
 
-  async getDiscoverManga(anilistId: number): Promise<DiscoverManga> {
-    const response = await this.getClient().get(`/discover/manga/${anilistId}`);
+  async getDiscoverManga(anilistId: number, signal?: AbortSignal): Promise<DiscoverManga> {
+    const response = await this.getClient().get(`/discover/manga/${anilistId}`, { signal });
     return response.data;
   }
 

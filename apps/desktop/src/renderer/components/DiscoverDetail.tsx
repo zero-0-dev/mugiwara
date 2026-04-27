@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AddMangaModal } from "./AddMangaModal";
 
 interface AniListManga {
@@ -47,6 +47,7 @@ export function DiscoverDetail({
   anilistId,
   onBack,
 }: DiscoverDetailProps) {
+  const abortRef = useRef<AbortController | null>(null);
   const [manga, setManga] = useState<AniListManga | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -62,6 +63,10 @@ export function DiscoverDetail({
   const [addModalSource, setAddModalSource] = useState("");
 
   useEffect(() => {
+    return () => abortRef.current?.abort();
+  }, []);
+
+  useEffect(() => {
     fetchManga();
     fetchSources();
   }, [anilistId, apiBaseUrl]);
@@ -74,24 +79,35 @@ export function DiscoverDetail({
   }, [selectedSource, manga]);
 
   async function fetchManga() {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
     try {
       setLoading(true);
       const response = await fetch(
         `${apiBaseUrl}/api/discover/manga/${anilistId}`,
+        { signal: controller.signal },
       );
       if (!response.ok) throw new Error("Failed to fetch manga");
       const data = await response.json();
       setManga(data);
     } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
+      if (abortRef.current !== controller) return;
       setLoading(false);
     }
   }
 
   async function fetchSources() {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
     try {
-      const response = await fetch(`${apiBaseUrl}/api/library/sources`);
+      const response = await fetch(`${apiBaseUrl}/api/library/sources`, {
+        signal: controller.signal,
+      });
       if (!response.ok) throw new Error("Failed to load sources");
       const data = await response.json();
       const remote = data.filter((s: Source) => s.id !== "local");
@@ -100,23 +116,30 @@ export function DiscoverDetail({
         setSelectedSource(remote[0].id);
       }
     } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
       console.error("Failed to fetch sources:", err);
     }
   }
 
   async function searchSource(sourceId: string, query: string) {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
     try {
       setSearching(true);
       const response = await fetch(
         `${apiBaseUrl}/api/library/sources/${sourceId}/search?q=${encodeURIComponent(query)}`,
+        { signal: controller.signal },
       );
       if (!response.ok) throw new Error("Search failed");
       const data = await response.json();
       setSearchResults(data);
     } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
       console.error("Search failed:", err);
       setSearchResults([]);
     } finally {
+      if (abortRef.current !== controller) return;
       setSearching(false);
     }
   }

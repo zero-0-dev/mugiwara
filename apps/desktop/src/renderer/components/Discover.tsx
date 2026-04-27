@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface AniListManga {
   id: number;
@@ -46,10 +46,15 @@ export function Discover({ apiBaseUrl, onMangaSelect }: DiscoverProps) {
   const [hasNextPage, setHasNextPage] = useState(false);
   const [page, setPage] = useState(1);
 
+  const abortRef = useRef<AbortController | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState(CATEGORIES[0]!);
   const [selectedGenre, setSelectedGenre] = useState("");
   const [showFilters, setShowFilters] = useState(false);
+
+  useEffect(() => {
+    return () => abortRef.current?.abort();
+  }, []);
 
   useEffect(() => {
     setPage(1);
@@ -64,6 +69,9 @@ export function Discover({ apiBaseUrl, onMangaSelect }: DiscoverProps) {
   }, [page]);
 
   async function fetchBrowse(pageNum: number, append: boolean) {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
     try {
       if (append) {
         setLoadingMore(true);
@@ -82,6 +90,7 @@ export function Discover({ apiBaseUrl, onMangaSelect }: DiscoverProps) {
 
       const response = await fetch(
         `${apiBaseUrl}/api/discover/browse?${params.toString()}`,
+        { signal: controller.signal },
       );
       if (!response.ok) throw new Error("Failed to fetch discover");
 
@@ -89,8 +98,10 @@ export function Discover({ apiBaseUrl, onMangaSelect }: DiscoverProps) {
       setManga((prev) => (append ? [...prev, ...(data.manga || [])] : data.manga || []));
       setHasNextPage(data.pageInfo.hasNextPage);
     } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
+      if (abortRef.current !== controller) return;
       setLoading(false);
       setLoadingMore(false);
     }
