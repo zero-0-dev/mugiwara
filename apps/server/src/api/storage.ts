@@ -13,7 +13,10 @@ router.use((req: any, _res, next) => {
 // GET /api/storage/types - List available storage backend types
 router.get("/types", async (_req: Request, res: Response) => {
   try {
-    const types = getRegisteredStorageIds();
+    const pm = (global as any).pluginManager;
+    const types = getRegisteredStorageIds().filter(
+      (id: string) => pm?.getStorage(id),
+    );
     res.json(types);
   } catch (error) {
     console.error("Error listing storage types:", error);
@@ -41,6 +44,14 @@ router.post("/backends", async (req: any, res: Response) => {
 
     if (!name || !type) {
       res.status(400).json({ error: "name and type are required" });
+      return;
+    }
+
+    const pm = (global as any).pluginManager;
+    if (!pm?.getStorage(type)) {
+      res.status(400).json({
+        error: `Storage type "${type}" is not available or has been disabled`,
+      });
       return;
     }
 

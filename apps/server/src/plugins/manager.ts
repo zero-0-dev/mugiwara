@@ -4,7 +4,14 @@ import {
   PluginConfig,
 } from "@mugiwara-manga/plugin-api";
 import { InstalledPluginRecord, LoadedPlugin } from "./types";
-import { getSourceFactory, getStorageFactory } from "./registry";
+import {
+  getSourceFactory,
+  getStorageFactory,
+  registerSource,
+  registerStorage,
+  unregisterSource,
+} from "./registry";
+import { createRequire } from "node:module";
 import { eq } from "drizzle-orm";
 import * as schema from "../database/schema";
 
@@ -208,16 +215,21 @@ export class PluginManager {
 
     // Shutdown and remove
     if (record.type === "source") {
-      const plugin = this.sources.get(record.id);
+      const plugin = Array.from(this.sources.values()).find(
+        (p) => p.record.id === packageName,
+      );
       if (plugin && !plugin.record.isBuiltin) {
         await (plugin.instance as MangaSource).shutdown();
-        this.sources.delete(record.id);
+        this.sources.delete(plugin.metadata.id);
+        unregisterSource(plugin.metadata.id);
       }
     } else {
-      const plugin = this.storage.get(record.id);
+      const plugin = Array.from(this.storage.values()).find(
+        (p) => p.record.id === packageName,
+      );
       if (plugin && !plugin.record.isBuiltin) {
         await (plugin.instance as StorageBackend).shutdown();
-        this.storage.delete(record.id);
+        this.storage.delete(plugin.metadata.id);
       }
     }
 
@@ -256,32 +268,28 @@ async function loadPluginFromDB(
   pluginsDir: string,
 ): Promise<void> {
   let instance: MangaSource | StorageBackend;
-  let requirePath: string;
 
-  // Plugins from DB are always external (built-in are hardcoded)
-  requirePath = `${pluginsDir}/node_modules/${record.id}`;
+  // Load plugin module via CJS require (handles .jsx/.tsx via tsx hooks)
+  const pluginRequire = createRequire(pluginsDir + "/package.json");
+  const mod = pluginRequire(record.id);
+  const factory = mod.default || mod;
 
-  // Dynamic import
-  const module = await import(requirePath);
-  const factory = module.default || module;
-
-  // Get the appropriate factory
-  if (record.type === "source") {
-    const sourceFactory = getSourceFactory(record.id);
-    if (!sourceFactory) {
-      throw new Error(`No factory registered for source: ${record.id}`);
-    }
-    instance = sourceFactory(record.config);
-  } else {
-    const storageFactory = getStorageFactory(record.id);
-    if (!storageFactory) {
-      throw new Error(`No factory registered for storage: ${record.id}`);
-    }
-    instance = storageFactory(record.config);
+  if (typeof factory !== "function") {
+    throw new Error(`Plugin ${record.id} does not export a factory function`);
   }
+
+  // Create instance directly from the dynamically imported factory
+  instance = factory(record.config);
 
   // Initialize the plugin
   await instance.initialize(record.config);
+
+  // Register factory into the registry so API endpoints can discover this plugin
+  if (record.type === "source") {
+    registerSource(instance.metadata.id, factory);
+  } else {
+    registerStorage(instance.metadata.id, factory);
+  }
 
   const loadedPlugin: LoadedPlugin = {
     record,

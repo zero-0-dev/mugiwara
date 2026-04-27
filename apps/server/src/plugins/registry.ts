@@ -27,6 +27,14 @@ export function getStorageFactory(id: string): StorageFactory | undefined {
   return storageRegistry.get(id);
 }
 
+export function unregisterSource(id: string): void {
+  sourceRegistry.delete(id);
+}
+
+export function unregisterStorage(id: string): void {
+  storageRegistry.delete(id);
+}
+
 export function getRegisteredSourceIds(): string[] {
   return Array.from(sourceRegistry.keys());
 }
