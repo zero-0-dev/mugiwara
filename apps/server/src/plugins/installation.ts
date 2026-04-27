@@ -70,8 +70,8 @@ export class PluginInstallationService {
     const packageInfo = await this.getPackageInfo(packageName);
 
     if (!packageInfo.mugiwara) {
-      // Uninstall if not a valid plugin
-      await this.runNpm(["uninstall", packageName], { cwd: this.pluginsDir });
+      // Remove if not a valid plugin
+      await this.removePackage(packageName);
       throw new Error(
         `Package ${packageName} is not a valid Mugiwara plugin (missing "mugiwara" field in package.json)`,
       );
@@ -89,7 +89,13 @@ export class PluginInstallationService {
       updatedAt: new Date().toISOString(),
     };
 
-    await this.db.insert(schema.installedPlugins).values(record);
+    try {
+      await this.db.insert(schema.installedPlugins).values(record);
+    } catch (error) {
+      // Rollback: remove the package if DB insert fails
+      await this.removePackage(packageName);
+      throw error;
+    }
 
     console.log(`✅ Installed plugin: ${packageName} v${packageInfo.version}`);
 
@@ -97,12 +103,10 @@ export class PluginInstallationService {
   }
 
   async uninstall(packageName: string): Promise<void> {
-    // Check if trying to uninstall a built-in plugin
     if (this.BUILT_IN_PLUGINS.includes(packageName)) {
       throw new Error(`Cannot uninstall built-in plugin: ${packageName}`);
     }
 
-    // Check if plugin exists
     const existing = await this.db.query.installedPlugins.findFirst({
       where: eq(schema.installedPlugins.id, packageName),
     });
@@ -113,13 +117,18 @@ export class PluginInstallationService {
 
     console.log(`🗑️ Uninstalling plugin: ${packageName}`);
 
-    // Run npm uninstall
-    await this.runNpm(["uninstall", packageName], { cwd: this.pluginsDir });
-
-    // Remove from database
+    // Remove from database first to prevent inconsistent state
     await this.db
       .delete(schema.installedPlugins)
       .where(eq(schema.installedPlugins.id, packageName));
+
+    try {
+      await this.removePackage(packageName);
+    } catch (error) {
+      // Rollback: re-insert the DB record if removal fails
+      await this.db.insert(schema.installedPlugins).values(existing);
+      throw error;
+    }
 
     console.log(`✅ Uninstalled plugin: ${packageName}`);
   }
@@ -192,6 +201,23 @@ export class PluginInstallationService {
 
   private isValidPluginName(name: string): boolean {
     return name.startsWith("mugiwara-plugin-") || name.startsWith("@mugiwara-manga/");
+  }
+
+  private async removePackage(packageName: string): Promise<void> {
+    const packagePath = path.join(
+      this.pluginsDir,
+      "node_modules",
+      ...packageName.split("/"),
+    );
+
+    await fs.rm(packagePath, { recursive: true, force: true });
+
+    // Remove from package.json
+    const packageJsonPath = path.join(this.pluginsDir, "package.json");
+    const content = await fs.readFile(packageJsonPath, "utf-8");
+    const pkg = JSON.parse(content);
+    delete pkg.dependencies?.[packageName];
+    await fs.writeFile(packageJsonPath, JSON.stringify(pkg, null, 2) + "\n");
   }
 
   private runNpm(args: string[], options: { cwd: string }): Promise<void> {

@@ -69,7 +69,8 @@ router.get("/installed", async (req: any, res: Response) => {
 router.post("/install", async (req: any, res: Response) => {
   try {
     const installer: PluginInstallationService = req.pluginInstaller;
-    const { package: packageName, version } = req.body;
+    const manager: PluginManager = req.pluginManager;
+    const { packageName, version } = req.body;
 
     if (!packageName) {
       res.status(400).json({ error: "package is required" });
@@ -77,8 +78,12 @@ router.post("/install", async (req: any, res: Response) => {
     }
 
     const plugin = await installer.install(packageName, version);
+
+    // Load the plugin into memory so it's available immediately
+    await manager.enablePlugin(packageName);
+
     res.status(201).json({
-      message: "Plugin installed. Server restart required to activate.",
+      message: "Plugin installed and activated.",
       plugin,
     });
   } catch (error) {
@@ -91,15 +96,23 @@ router.post("/install", async (req: any, res: Response) => {
 router.post("/:id/uninstall", async (req: any, res: Response) => {
   try {
     const installer: PluginInstallationService = req.pluginInstaller;
+    const manager: PluginManager = req.pluginManager;
     const { id } = req.params;
 
+    // Remove from memory first
+    await manager.disablePlugin(id);
+
+    // Then remove from DB and disk
     await installer.uninstall(id);
+
     res.json({
-      message: "Plugin uninstalled. Server restart required to complete.",
+      message: "Plugin uninstalled.",
     });
   } catch (error) {
     console.error("Error uninstalling plugin:", error);
-    res.status(500).json({ error: "Failed to uninstall plugin" });
+    const message =
+      error instanceof Error ? error.message : "Failed to uninstall plugin";
+    res.status(500).json({ error: message });
   }
 });
 
