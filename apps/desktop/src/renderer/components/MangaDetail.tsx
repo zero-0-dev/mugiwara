@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Manga, Chapter, ReadingProgress } from "@mugiwara-manga/types";
 
 interface MangaDetailProps {
@@ -30,6 +31,83 @@ interface AniListResult {
   } | null;
   year: number | null;
   genres: string[];
+}
+
+interface ChapterMenuProps {
+  chapter: ChapterWithProgress;
+  isActive: boolean;
+  position: { x: number; y: number } | null;
+  menuRef: React.MutableRefObject<HTMLDivElement | null>;
+  onMarkComplete: (chapterId: string, markPrevious?: boolean) => void;
+  onMarkIncomplete: (chapterId: string, markFollowing?: boolean) => void;
+}
+
+function ChapterMenu({
+  chapter,
+  isActive,
+  position,
+  menuRef,
+  onMarkComplete,
+  onMarkIncomplete,
+}: ChapterMenuProps) {
+  if (!isActive) return null;
+
+  const menuContent = (
+    <div
+      ref={menuRef}
+      className="chapter-menu"
+      style={{
+        position: "fixed",
+        top: position?.y || 0,
+        left: position?.x || 0,
+        backgroundColor: "#1f2937",
+        borderRadius: "8px",
+        boxShadow: "0 4px 6px rgba(0, 0, 0, 0.3)",
+        zIndex: 1000,
+        minWidth: "200px",
+        padding: "8px 0",
+      }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      {!chapter.isRead && (
+        <button
+          className="chapter-menu-item"
+          onClick={() => onMarkComplete(chapter.id)}
+        >
+          <span className="menu-icon">✓</span>
+          Mark as Read
+        </button>
+      )}
+      {chapter.isRead && (
+        <button
+          className="chapter-menu-item"
+          onClick={() => onMarkIncomplete(chapter.id)}
+        >
+          <span className="menu-icon">○</span>
+          Mark as Unread
+        </button>
+      )}
+      <div className="chapter-menu-divider" />
+      <button
+        className="chapter-menu-item"
+        onClick={() => onMarkComplete(chapter.id, true)}
+      >
+        <span className="menu-icon">✓✓</span>
+        Mark All Previous as Read
+      </button>
+      {chapter.isRead && (
+        <button
+          className="chapter-menu-item"
+          onClick={() => onMarkIncomplete(chapter.id, true)}
+        >
+          <span className="menu-icon">○○</span>
+          Mark All Following as Unread
+        </button>
+      )}
+    </div>
+  );
+
+  return createPortal(menuContent, document.body);
 }
 
 export function MangaDetail({
@@ -457,8 +535,33 @@ export function MangaDetail({
   // Handle chapter menu click
   const handleChapterMenuClick = (e: React.MouseEvent, chapterId: string) => {
     e.stopPropagation();
-    const rect = (e.target as HTMLElement).getBoundingClientRect();
-    setMenuPosition({ x: rect.left, y: rect.bottom });
+    e.preventDefault();
+    const btn = e.currentTarget as HTMLElement;
+    const rect = btn.getBoundingClientRect();
+
+    // Compensate for .chapter-item:hover translateX(4px) — the hover shifts
+    // getBoundingClientRect, causing the menu to jump when the user moves
+    // their mouse away from the chapter row toward the menu.
+    const chapterItem = btn.closest(".chapter-item") as HTMLElement;
+    let x = rect.left;
+    if (chapterItem && chapterItem.matches(":hover")) {
+      x -= 4;
+    }
+    let y = rect.bottom;
+
+    // Clamp to viewport so the menu never renders off-screen
+    const menuWidth = 220;
+    const menuHeight = 200;
+    const padding = 8;
+
+    if (x + menuWidth > window.innerWidth - padding) {
+      x = Math.max(padding, rect.right - menuWidth);
+    }
+    if (y + menuHeight > window.innerHeight - padding) {
+      y = Math.max(padding, rect.top - menuHeight);
+    }
+
+    setMenuPosition({ x, y });
     setActiveChapterMenu(chapterId);
   };
 
@@ -526,66 +629,6 @@ export function MangaDetail({
       return "pending";
     }
     return "idle";
-  };
-
-  // Chapter Menu Component
-  const ChapterMenu = ({ chapter }: { chapter: ChapterWithProgress }) => {
-    if (activeChapterMenu !== chapter.id) return null;
-
-    return (
-      <div
-        ref={menuRef}
-        className="chapter-menu"
-        style={{
-          position: "fixed",
-          top: menuPosition?.y || 0,
-          left: menuPosition?.x || 0,
-          backgroundColor: "#1f2937",
-          borderRadius: "8px",
-          boxShadow: "0 4px 6px rgba(0, 0, 0, 0.3)",
-          zIndex: 1000,
-          minWidth: "200px",
-          padding: "8px 0",
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {!chapter.isRead && (
-          <button
-            className="chapter-menu-item"
-            onClick={() => handleMarkChapterComplete(chapter.id)}
-          >
-            <span className="menu-icon">✓</span>
-            Mark as Read
-          </button>
-        )}
-        {chapter.isRead && (
-          <button
-            className="chapter-menu-item"
-            onClick={() => handleMarkChapterIncomplete(chapter.id)}
-          >
-            <span className="menu-icon">○</span>
-            Mark as Unread
-          </button>
-        )}
-        <div className="chapter-menu-divider" />
-        <button
-          className="chapter-menu-item"
-          onClick={() => handleMarkChapterComplete(chapter.id, true)}
-        >
-          <span className="menu-icon">✓✓</span>
-          Mark All Previous as Read
-        </button>
-        {chapter.isRead && (
-          <button
-            className="chapter-menu-item"
-            onClick={() => handleMarkChapterIncomplete(chapter.id, true)}
-          >
-            <span className="menu-icon">○○</span>
-            Mark All Following as Unread
-          </button>
-        )}
-      </div>
-    );
   };
 
   return (
@@ -1020,7 +1063,14 @@ export function MangaDetail({
                         >
                           ⋯
                         </button>
-                        <ChapterMenu chapter={chapter} />
+                        <ChapterMenu
+                          chapter={chapter}
+                          isActive={activeChapterMenu === chapter.id}
+                          position={menuPosition}
+                          menuRef={menuRef}
+                          onMarkComplete={handleMarkChapterComplete}
+                          onMarkIncomplete={handleMarkChapterIncomplete}
+                        />
                       </div>
 
                       <button
