@@ -1,9 +1,9 @@
 import React, { useState } from "react";
-import { ArrowDown, ArrowUp, Circle, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Circle, RefreshCw, X } from "lucide-react";
 import { useToast } from "./Toast";
 import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
 import { AddMangaModal } from "./AddMangaModal";
-import { useLibrary, useFilterOptions, useDeleteManga } from "../api/hooks";
+import { useLibrary, useFilterOptions, useDeleteManga, useCheckLibraryUpdates } from "../api/hooks";
 import { useApiClient } from "../api/context";
 import { Select } from "./Select";
 
@@ -41,6 +41,20 @@ export function Library({ onMangaSelect }: LibraryProps) {
   const { data: manga = [], isLoading } = useLibrary(queryFilters);
   const { data: filterOptions } = useFilterOptions();
   const deleteManga = useDeleteManga();
+  const checkLibraryUpdates = useCheckLibraryUpdates();
+
+  const handleCheckUpdates = () => {
+    checkLibraryUpdates.mutate(undefined, {
+      onSuccess: (data) => {
+        if (data.newChaptersTotal > 0) {
+          toast.success(`Found ${data.newChaptersTotal} new chapter${data.newChaptersTotal > 1 ? "s" : ""} across ${data.updated} manga!`);
+        } else {
+          toast.success("All manga are up to date.");
+        }
+      },
+      onError: (err) => toast.error(err.message),
+    });
+  };
 
   useKeyboardShortcuts([
     {
@@ -74,7 +88,12 @@ export function Library({ onMangaSelect }: LibraryProps) {
     <div className="library">
       <div className="library-header">
         <h2>Library</h2>
-        <button onClick={() => setShowAddManga(true)} className="btn btn-primary">+ Add Manga</button>
+        <div className="library-header-actions">
+          <button onClick={handleCheckUpdates} disabled={checkLibraryUpdates.isPending} className="btn btn-secondary">
+            {checkLibraryUpdates.isPending ? <><RefreshCw size={14} className="spin" /> Checking...</> : <><RefreshCw size={14} /> Check for Updates</>}
+          </button>
+          <button onClick={() => setShowAddManga(true)} className="btn btn-primary">+ Add Manga</button>
+        </div>
       </div>
 
       <div className="search-filter-section">

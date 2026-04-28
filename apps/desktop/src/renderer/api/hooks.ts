@@ -237,8 +237,13 @@ export function useDeleteManga() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (mangaId: string) => api.deleteManga(mangaId),
-    onSuccess: () => {
+    onSuccess: (_data, mangaId) => {
       queryClient.invalidateQueries({ queryKey: ["library"] });
+      queryClient.removeQueries({ queryKey: ["manga", mangaId] });
+      queryClient.removeQueries({ queryKey: ["chapters", mangaId] });
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
+      queryClient.invalidateQueries({ queryKey: ["queueTasks"] });
+      queryClient.invalidateQueries({ queryKey: ["queueStats"] });
     },
   });
 }
@@ -545,6 +550,47 @@ export function useTogglePlugin() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["pluginsInstalled"] });
       queryClient.invalidateQueries({ queryKey: ["sources"] });
+    },
+  });
+}
+
+// Library Updates
+export function useCheckMangaUpdates(mangaId: string) {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.checkMangaUpdates(mangaId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["chapters", mangaId] });
+      queryClient.invalidateQueries({ queryKey: ["manga", mangaId] });
+      queryClient.invalidateQueries({ queryKey: ["queueTasks"] });
+      queryClient.invalidateQueries({ queryKey: ["queueStats"] });
+    },
+  });
+}
+
+export function useCheckLibraryUpdates() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.checkLibraryUpdates(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["library"] });
+      queryClient.invalidateQueries({ queryKey: ["queueTasks"] });
+      queryClient.invalidateQueries({ queryKey: ["queueStats"] });
+    },
+  });
+}
+
+export function useDownloadAllChapters(mangaId: string) {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.downloadAllChapters(mangaId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["chapters", mangaId] });
+      queryClient.invalidateQueries({ queryKey: ["queueTasks"] });
+      queryClient.invalidateQueries({ queryKey: ["queueStats"] });
     },
   });
 }

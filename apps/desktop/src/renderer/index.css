@@ -102,9 +102,12 @@ body {
 }
 
 @keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
+  to { transform: rotate(360deg); }
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
 }
 
 /* Error */
@@ -419,6 +422,12 @@ body {
 .library-header h2 {
   font-size: 1.5rem;
   font-weight: 600;
+}
+
+.library-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .library-actions {
@@ -837,9 +846,19 @@ body {
 
 .manga-detail-header {
   margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .back-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.manga-detail-header-actions {
+  margin-left: auto;
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -2735,7 +2754,8 @@ body {
 .add-manga-chapters-container {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
 }
 
 /* Controls bar */
@@ -2785,7 +2805,9 @@ body {
 
 /* Chapter list */
 .add-manga-chapters {
-  max-height: 400px;
+  flex: 1;
+  min-height: 0;
+  max-height: 200px;
   overflow-y: auto;
   background: var(--bg-primary);
   border-radius: 8px;
@@ -2893,10 +2915,8 @@ body {
   padding: 2rem 0;
 }
 
-/* Sticky footer */
+/* Footer bar at the bottom */
 .add-manga-chapter-footer {
-  position: sticky;
-  bottom: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -2906,6 +2926,7 @@ body {
   margin-top: 1rem;
   border-radius: 0 0 8px 8px;
   gap: 1rem;
+  flex-shrink: 0;
 }
 
 .add-manga-chapter-footer-count {

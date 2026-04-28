@@ -333,6 +333,22 @@ class ApiClient {
     await this.getClient().post(`/library/import/${mangaId}/cancel`);
   }
 
+  // Library Updates
+  async checkMangaUpdates(mangaId: string): Promise<{ newChaptersFound: number }> {
+    const response = await this.getClient().post(`/library/manga/${mangaId}/check-updates`);
+    return response.data;
+  }
+
+  async checkLibraryUpdates(): Promise<{ checked: number; updated: number; newChaptersTotal: number }> {
+    const response = await this.getClient().post("/library/check-updates");
+    return response.data;
+  }
+
+  async downloadAllChapters(mangaId: string): Promise<{ chaptersQueued: number }> {
+    const response = await this.getClient().post(`/library/manga/${mangaId}/download-all`);
+    return response.data;
+  }
+
   // Queue
   async getQueueTasks(): Promise<ImportTask[]> {
     const response = await this.getClient().get("/queue/tasks");

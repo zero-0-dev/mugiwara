@@ -177,6 +177,9 @@ export class ApiClient {
       const errorData = await response.json().catch(() => ({ error: response.statusText }));
       throw new Error(errorData.error || response.statusText);
     }
+    if (response.status === 204 || response.status === 205) {
+      return undefined as T;
+    }
     return response.json();
   }
 
@@ -408,5 +411,18 @@ export class ApiClient {
 
   disablePlugin(id: string): Promise<void> {
     return this.request(`/api/plugins/${id}/disable`, { method: "POST" });
+  }
+
+  // Library Updates
+  checkMangaUpdates(mangaId: string): Promise<{ newChaptersFound: number }> {
+    return this.request(`/api/library/manga/${mangaId}/check-updates`, { method: "POST" });
+  }
+
+  checkLibraryUpdates(): Promise<{ checked: number; updated: number; newChaptersTotal: number }> {
+    return this.request("/api/library/check-updates", { method: "POST" });
+  }
+
+  downloadAllChapters(mangaId: string): Promise<{ chaptersQueued: number }> {
+    return this.request(`/api/library/manga/${mangaId}/download-all`, { method: "POST" });
   }
 }

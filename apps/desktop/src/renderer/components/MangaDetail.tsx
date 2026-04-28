@@ -21,6 +21,8 @@ import {
   useApplyMetadata,
   useAddMangaToCategory,
   useRemoveMangaFromCategory,
+  useCheckMangaUpdates,
+  useDownloadAllChapters,
 } from "../api/hooks";
 
 interface MangaDetailProps {
@@ -88,6 +90,34 @@ export function MangaDetail({ mangaId, onBack, onReadChapter }: MangaDetailProps
   const applyMetadata = useApplyMetadata(mangaId);
   const addToCategory = useAddMangaToCategory(mangaId);
   const removeFromCategory = useRemoveMangaFromCategory(mangaId);
+  const checkUpdates = useCheckMangaUpdates(mangaId);
+  const downloadAll = useDownloadAllChapters(mangaId);
+
+  const handleCheckUpdates = () => {
+    checkUpdates.mutate(undefined, {
+      onSuccess: (data) => {
+        if (data.newChaptersFound > 0) {
+          toast.success(`Found ${data.newChaptersFound} new chapter${data.newChaptersFound > 1 ? "s" : ""}! Queued for download.`);
+        } else {
+          toast.success("No new chapters found.");
+        }
+      },
+      onError: (err) => toast.error(err.message),
+    });
+  };
+
+  const handleDownloadAll = () => {
+    downloadAll.mutate(undefined, {
+      onSuccess: (data) => {
+        if (data.chaptersQueued > 0) {
+          toast.success(`Queued ${data.chaptersQueued} chapter${data.chaptersQueued > 1 ? "s" : ""} for download.`);
+        } else {
+          toast.success("No pending chapters to download.");
+        }
+      },
+      onError: (err) => toast.error(err.message),
+    });
+  };
 
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editedTitle, setEditedTitle] = useState("");
@@ -117,6 +147,7 @@ export function MangaDetail({ mangaId, onBack, onReadChapter }: MangaDetailProps
   }, [chapters, allProgress]);
 
   const readChaptersCount = enrichedChapters.filter((c) => c.isRead).length;
+  const hasPendingChapters = chapters.some((c) => c.importStatus === "pending");
 
   const handleContinueReading = () => {
     const firstIncomplete = enrichedChapters.find((c) => !c.isRead);
@@ -259,6 +290,16 @@ export function MangaDetail({ mangaId, onBack, onReadChapter }: MangaDetailProps
 
       <div className="manga-detail-header">
         <button onClick={onBack} className="btn btn-secondary back-btn"><ArrowLeft size={16} /> Back to Library</button>
+        <div className="manga-detail-header-actions">
+          <button onClick={handleCheckUpdates} disabled={checkUpdates.isPending} className="btn btn-secondary btn-sm">
+            {checkUpdates.isPending ? "Checking..." : "Check for Updates"}
+          </button>
+          {hasPendingChapters && (
+            <button onClick={handleDownloadAll} disabled={downloadAll.isPending} className="btn btn-primary btn-sm">
+              {downloadAll.isPending ? "Downloading..." : "Download All"}
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="manga-detail-content">

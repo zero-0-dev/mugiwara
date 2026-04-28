@@ -80,8 +80,13 @@ export function useDeleteManga() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => apiClient.deleteManga(id),
-    onSuccess: () => {
+    onSuccess: (_data, mangaId) => {
       queryClient.invalidateQueries({ queryKey: ["library"] });
+      queryClient.removeQueries({ queryKey: ["manga", mangaId] });
+      queryClient.removeQueries({ queryKey: ["chapters", mangaId] });
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
+      queryClient.invalidateQueries({ queryKey: ["queueTasks"] });
+      queryClient.invalidateQueries({ queryKey: ["queueStats"] });
     },
   });
 }
@@ -659,5 +664,43 @@ export function useDiscoverManga(anilistId: number | null) {
     queryKey: ["discover", "manga", anilistId],
     queryFn: ({ signal }) => apiClient.getDiscoverManga(anilistId!, signal),
     enabled: !!anilistId,
+  });
+}
+
+// Library Updates
+export function useCheckMangaUpdates() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (mangaId: string) => apiClient.checkMangaUpdates(mangaId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["chapters"] });
+      queryClient.invalidateQueries({ queryKey: ["manga"] });
+      queryClient.invalidateQueries({ queryKey: ["queueTasks"] });
+      queryClient.invalidateQueries({ queryKey: ["queueStats"] });
+    },
+  });
+}
+
+export function useCheckLibraryUpdates() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiClient.checkLibraryUpdates(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["library"] });
+      queryClient.invalidateQueries({ queryKey: ["queueTasks"] });
+      queryClient.invalidateQueries({ queryKey: ["queueStats"] });
+    },
+  });
+}
+
+export function useDownloadAllChapters() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (mangaId: string) => apiClient.downloadAllChapters(mangaId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["chapters"] });
+      queryClient.invalidateQueries({ queryKey: ["queueTasks"] });
+      queryClient.invalidateQueries({ queryKey: ["queueStats"] });
+    },
   });
 }

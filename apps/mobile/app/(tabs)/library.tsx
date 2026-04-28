@@ -15,8 +15,9 @@ import {
   ActivityIndicator,
   IconButton,
   FAB,
+  Snackbar,
 } from "react-native-paper";
-import { useLibrary, useFilterOptions } from "@/api/hooks";
+import { useLibrary, useFilterOptions, useCheckLibraryUpdates } from "@/api/hooks";
 import { MangaCard } from "@/components/MangaCard";
 import { Manga } from "@/types";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
@@ -34,6 +35,30 @@ export default function LibraryScreen() {
   const [mediaType, setMediaType] = useState<string | undefined>();
   const [filterMenuVisible, setFilterMenuVisible] = useState(false);
   const [sortMenuVisible, setSortMenuVisible] = useState(false);
+  const [snackbarVisible, setSnackbarVisible] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState("");
+
+  const checkLibraryUpdates = useCheckLibraryUpdates();
+
+  const showSnackbar = useCallback((message: string) => {
+    setSnackbarMessage(message);
+    setSnackbarVisible(true);
+  }, []);
+
+  const handleCheckUpdates = useCallback(() => {
+    checkLibraryUpdates.mutate(undefined, {
+      onSuccess: (data) => {
+        if (data.newChaptersTotal > 0) {
+          showSnackbar(`Found ${data.newChaptersTotal} new chapter${data.newChaptersTotal > 1 ? "s" : ""} across ${data.updated} manga!`);
+        } else {
+          showSnackbar("All manga are up to date.");
+        }
+      },
+      onError: (err) => {
+        showSnackbar(`Error checking updates: ${err.message}`);
+      },
+    });
+  }, [checkLibraryUpdates, showSnackbar]);
 
   const handleAddManga = () => {
     router.push("/add-manga" as any);
@@ -178,6 +203,13 @@ export default function LibraryScreen() {
             onPress={toggleSortOrder}
             iconColor="#d1d5db"
           />
+          <IconButton
+            icon="refresh"
+            size={20}
+            onPress={handleCheckUpdates}
+            iconColor="#d1d5db"
+            disabled={checkLibraryUpdates.isPending}
+          />
         </View>
 
         <FlatList
@@ -206,6 +238,14 @@ export default function LibraryScreen() {
           style={styles.fab}
           onPress={handleAddManga}
         />
+        <Snackbar
+          visible={snackbarVisible}
+          onDismiss={() => setSnackbarVisible(false)}
+          duration={3000}
+          style={styles.snackbar}
+        >
+          {snackbarMessage}
+        </Snackbar>
       </SafeAreaView>
     </SafeAreaProvider>
   );
@@ -261,5 +301,8 @@ const styles = StyleSheet.create({
     right: 16,
     bottom: 16,
     backgroundColor: "#6366f1",
+  },
+  snackbar: {
+    backgroundColor: "#333",
   },
 });

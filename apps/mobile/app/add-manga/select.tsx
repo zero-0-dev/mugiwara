@@ -96,29 +96,31 @@ export default function AddMangaSelectScreen() {
     });
   };
 
-  const handleImport = async () => {
+  const handleImport = () => {
     if (selectedCount === 0) return;
     setImporting(true);
-    try {
-      const chaptersToImport = chapters.filter((ch) =>
-        selectedChapters.has(ch.chapterId),
-      );
-      const result = await importManga.mutateAsync({
+    const chaptersToImport = chapters.filter((ch) =>
+      selectedChapters.has(ch.chapterId),
+    );
+    importManga.mutate(
+      {
         sourceId: sourceId || "",
         sourceMangaId: sourceMangaId || "",
         chapters: chaptersToImport,
-      });
-      router.push({
-        pathname: "/add-manga/import" as any,
-        params: { mangaId: result.mangaId, title: title || "" },
-      });
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to import manga",
-      );
-    } finally {
-      setImporting(false);
-    }
+      },
+      {
+        onSuccess: (result) => {
+          router.push({
+            pathname: "/add-manga/import" as any,
+            params: { mangaId: result.mangaId, title: title || "" },
+          });
+        },
+        onError: (err) => {
+          setImporting(false);
+          setError(err instanceof Error ? err.message : "Failed to import manga");
+        },
+      },
+    );
   };
 
   if (!sourceId || !sourceMangaId) {
@@ -173,7 +175,7 @@ export default function AddMangaSelectScreen() {
           </Button>
         </View>
       ) : (
-        <>
+        <View style={styles.content}>
           <Card style={styles.mangaInfoCard}>
             <View style={styles.mangaInfoRow}>
               {coverUrl ? (
@@ -299,7 +301,7 @@ export default function AddMangaSelectScreen() {
           >
             {error}
           </Snackbar>
-        </>
+        </View>
       )}
     </View>
   );
@@ -363,11 +365,14 @@ const styles = StyleSheet.create({
     backgroundColor: "#252525",
     marginHorizontal: 2,
   },
+  content: {
+    flex: 1,
+  },
   chapterList: {
     flex: 1,
   },
   chapterListContent: {
-    paddingBottom: 80,
+    paddingBottom: 8,
   },
   chapterRow: {
     flexDirection: "row",

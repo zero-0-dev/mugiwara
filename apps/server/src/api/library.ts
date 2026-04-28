@@ -164,12 +164,17 @@ router.post("/import", async (req: Request, res: Response) => {
       existingChapters.map((c: any) => c.chapterId),
     );
 
-    // Determine which chapters to import
-    const chaptersToImport = chapters || mangaDetails.chapters;
+    // Build set of selected chapter IDs for download queuing
+    const selectedChapterIds = chapters
+      ? new Set(chapters.map((c: any) => c.chapterId))
+      : null;
+
+    // Use ALL chapters from source for DB creation
+    const allChapters = mangaDetails.chapters;
 
     // Deduplicate chapters from source (some sources may return duplicates)
     const seenChapterIds = new Set<string>();
-    const uniqueChapters = chaptersToImport.filter((c: any) => {
+    const uniqueChapters = allChapters.filter((c: any) => {
       if (seenChapterIds.has(c.chapterId)) {
         return false;
       }
@@ -182,7 +187,7 @@ router.post("/import", async (req: Request, res: Response) => {
       (c: any) => !existingChapterIds.has(c.chapterId),
     );
 
-    // Add chapters to database with pending status
+    // Add ALL new chapters to database with pending status
     let chaptersAdded = 0;
     for (const chapter of newChapters) {
       try {
@@ -211,9 +216,14 @@ router.post("/import", async (req: Request, res: Response) => {
       }
     }
 
+    // Determine which chapters to queue for download
+    const chaptersToQueue = selectedChapterIds
+      ? newChapters.filter((c: any) => selectedChapterIds.has(c.chapterId))
+      : newChapters;
+
     // Queue chapters for import
     let chaptersQueued = 0;
-    for (const chapter of newChapters) {
+    for (const chapter of chaptersToQueue) {
       try {
         await global.taskRepository.create({
           type: "chapter",
@@ -369,6 +379,365 @@ router.post("/scan", async (_req: Request, res: Response): Promise<void> => {
     res.status(500).json({ error: "Failed to scan library" });
   }
 });
+
+// POST /api/library/manga/:id/check-updates - Check for new chapters from source
+router.post(
+  "/manga/:id/check-updates",
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const mangaId = req.params.id as string;
+
+      const { mangaRepository, chapterRepository } = await import(
+        "../database"
+      );
+      const manga = await mangaRepository.findById(mangaId);
+      if (!manga) {
+        res.status(404).json({ error: "Manga not found" });
+        return;
+      }
+
+      const sourceMangaId = manga.sourceMangaId;
+      const sourceId = manga.sourceId;
+      if (!sourceMangaId || !sourceId) {
+        res.status(400).json({ error: "Manga has no source information" });
+        return;
+      }
+
+      const source = global.pluginManager.getSource(sourceId);
+      if (!source || !source.checkForUpdates) {
+        res.status(404).json({ error: "Source not found or does not support updates" });
+        return;
+      }
+
+      // Find the last known chapter ID (by highest sortOrder)
+      const existingChapters = await chapterRepository.findByMangaId(mangaId);
+      const lastChapter =
+        existingChapters.length > 0
+          ? existingChapters.reduce((a: any, b: any) =>
+              a.sortOrder > b.sortOrder ? a : b,
+            )
+          : null;
+      const lastChapterId = lastChapter?.chapterId;
+
+      // Check for new chapters
+      const newSourceChapters = await source.checkForUpdates(
+        sourceMangaId,
+        lastChapterId,
+      );
+
+      if (!newSourceChapters || newSourceChapters.length === 0) {
+        await mangaRepository.update(mangaId, {
+          lastSourceCheck: new Date().toISOString(),
+        });
+        res.json({ newChaptersFound: 0, chapters: [] });
+        return;
+      }
+
+      // Deduplicate against existing chapters
+      const existingChapterIds = new Set(
+        existingChapters.map((c: any) => c.chapterId),
+      );
+      const trulyNewChapters = newSourceChapters.filter(
+        (c: any) => !existingChapterIds.has(c.chapterId),
+      );
+
+      if (trulyNewChapters.length === 0) {
+        await mangaRepository.update(mangaId, {
+          lastSourceCheck: new Date().toISOString(),
+        });
+        res.json({ newChaptersFound: 0, chapters: [] });
+        return;
+      }
+
+      // Deduplicate within source response
+      const seenIds = new Set<string>();
+      const uniqueNewChapters = trulyNewChapters.filter((c: any) => {
+        if (seenIds.has(c.chapterId)) return false;
+        seenIds.add(c.chapterId);
+        return true;
+      });
+
+      // Insert new chapters and queue for download
+      const createdChapters = [];
+      for (const chapter of uniqueNewChapters) {
+        try {
+          await chapterRepository.create({
+            id: uuidv4(),
+            mangaId: mangaId,
+            chapterId: chapter.chapterId,
+            title: chapter.title,
+            pagesCount: chapter.pageCount || 0,
+            sortOrder: chapter.sortOrder,
+            importStatus: "pending",
+          });
+
+          await global.taskRepository.create({
+            type: "chapter",
+            mangaId: mangaId,
+            chapterId: chapter.chapterId,
+            sortOrder: chapter.sortOrder,
+            sourceId: sourceId,
+            sourceChapterId: chapter.sourceChapterId,
+          });
+
+          createdChapters.push(chapter);
+        } catch (err: any) {
+          if (err.message?.includes("UNIQUE constraint failed")) {
+            console.log(
+              `[Updates] Chapter ${chapter.chapterId} already exists, skipping`,
+            );
+          } else {
+            console.error(
+              `[Updates] Failed to create chapter ${chapter.chapterId}:`,
+              err,
+            );
+          }
+        }
+      }
+
+      // Update last source check timestamp
+      await mangaRepository.update(mangaId, {
+        lastSourceCheck: new Date().toISOString(),
+      });
+
+      res.json({
+        newChaptersFound: createdChapters.length,
+        chapters: createdChapters,
+      });
+    } catch (error) {
+      console.error("Error checking for updates:", error);
+      res.status(500).json({ error: "Failed to check for updates" });
+    }
+  },
+);
+
+// POST /api/library/manga/:id/download-all - Download all pending chapters
+router.post(
+  "/manga/:id/download-all",
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const mangaId = req.params.id as string;
+
+      const { mangaRepository, chapterRepository } = await import(
+        "../database"
+      );
+      const manga = await mangaRepository.findById(mangaId);
+      if (!manga) {
+        res.status(404).json({ error: "Manga not found" });
+        return;
+      }
+
+      const sourceId = manga.sourceId;
+      const sourceMangaId = manga.sourceMangaId;
+
+      // Get all pending chapters
+      const allChapters = await chapterRepository.findByMangaId(mangaId);
+      const pendingChapters = allChapters.filter(
+        (c: any) => c.importStatus === "pending",
+      );
+
+      if (pendingChapters.length === 0) {
+        res.json({ chaptersQueued: 0 });
+        return;
+      }
+
+      // Resolve source to get sourceChapterId for each pending chapter
+      const dlSourceId = manga.sourceId;
+      const dlSourceMangaId = manga.sourceMangaId;
+      let chapterSourceMap = new Map<string, string>();
+
+      if (dlSourceMangaId) {
+        const source = global.pluginManager.getSource(dlSourceId || "unknown");
+        if (source) {
+          try {
+            const mangaDetails = await source.getMangaDetails(dlSourceMangaId);
+            for (const sc of mangaDetails.chapters) {
+              chapterSourceMap.set(sc.chapterId, sc.sourceChapterId);
+            }
+          } catch (err) {
+            console.error("[DownloadAll] Failed to fetch source details:", err);
+          }
+        }
+      }
+
+      // Queue each pending chapter
+      let chaptersQueued = 0;
+      for (const chapter of pendingChapters) {
+        try {
+          // Check if already queued
+          const existingTask = await global.taskRepository.getByChapter(
+            mangaId,
+            chapter.chapterId,
+          );
+          if (existingTask && ["pending", "running"].includes(existingTask.status)) {
+            continue;
+          }
+
+          await global.taskRepository.create({
+            type: "chapter",
+            mangaId: mangaId,
+            chapterId: chapter.chapterId,
+            sortOrder: chapter.sortOrder,
+            sourceId: dlSourceId || "unknown",
+            sourceChapterId:
+              chapterSourceMap.get(chapter.chapterId) || chapter.chapterId,
+          });
+          chaptersQueued++;
+        } catch (err) {
+          console.error(
+            `[DownloadAll] Failed to queue chapter ${chapter.chapterId}:`,
+            err,
+          );
+        }
+      }
+
+      res.json({ chaptersQueued });
+    } catch (error) {
+      console.error("Error queueing all chapters:", error);
+      res.status(500).json({ error: "Failed to queue all chapters" });
+    }
+  },
+);
+
+// POST /api/library/check-updates - Check for updates across all library manga
+async function checkSingleMangaForUpdates(manga: {
+  id: string;
+  title: string;
+  sourceId: string | null;
+  sourceMangaId: string | null;
+}): Promise<{
+  mangaId: string;
+  title: string;
+  newChapters: number;
+  error?: string;
+}> {
+  try {
+    const sourceMangaId = manga.sourceMangaId;
+    const sourceId = manga.sourceId;
+    if (!sourceMangaId || !sourceId) {
+      return { mangaId: manga.id, title: manga.title, newChapters: 0, error: "No source info" };
+    }
+
+    const source = global.pluginManager.getSource(sourceId);
+    if (!source || !source.checkForUpdates) {
+      return { mangaId: manga.id, title: manga.title, newChapters: 0, error: "Source not found or no update support" };
+    }
+
+    const { mangaRepository, chapterRepository } = await import("../database");
+    const existingChapters = await chapterRepository.findByMangaId(manga.id);
+    const lastChapter = existingChapters.length > 0
+      ? existingChapters.reduce((a: any, b: any) => (a.sortOrder > b.sortOrder ? a : b))
+      : null;
+    const lastChapterId = lastChapter?.chapterId;
+
+    const newSourceChapters = await source.checkForUpdates(sourceMangaId, lastChapterId);
+    if (!newSourceChapters || newSourceChapters.length === 0) {
+      await mangaRepository.update(manga.id, { lastSourceCheck: new Date().toISOString() });
+      return { mangaId: manga.id, title: manga.title, newChapters: 0 };
+    }
+
+    const existingChapterIds = new Set(existingChapters.map((c: any) => c.chapterId));
+    const trulyNew = newSourceChapters.filter((c: any) => !existingChapterIds.has(c.chapterId));
+    if (trulyNew.length === 0) {
+      await mangaRepository.update(manga.id, { lastSourceCheck: new Date().toISOString() });
+      return { mangaId: manga.id, title: manga.title, newChapters: 0 };
+    }
+
+    const seenIds = new Set<string>();
+    const uniqueNew = trulyNew.filter((c: any) => {
+      if (seenIds.has(c.chapterId)) return false;
+      seenIds.add(c.chapterId);
+      return true;
+    });
+
+    let created = 0;
+    for (const chapter of uniqueNew) {
+      try {
+        await chapterRepository.create({
+          id: uuidv4(),
+          mangaId: manga.id,
+          chapterId: chapter.chapterId,
+          title: chapter.title,
+          pagesCount: chapter.pageCount || 0,
+          sortOrder: chapter.sortOrder,
+          importStatus: "pending",
+        });
+
+        await global.taskRepository.create({
+          type: "chapter",
+          mangaId: manga.id,
+          chapterId: chapter.chapterId,
+          sortOrder: chapter.sortOrder,
+          sourceId: sourceId,
+          sourceChapterId: chapter.sourceChapterId,
+        });
+        created++;
+      } catch (err: any) {
+        if (!err.message?.includes("UNIQUE constraint failed")) {
+          console.error(`[LibraryUpdate] Failed for manga ${manga.id} chapter ${chapter.chapterId}:`, err);
+        }
+      }
+    }
+
+    await mangaRepository.update(manga.id, { lastSourceCheck: new Date().toISOString() });
+    return { mangaId: manga.id, title: manga.title, newChapters: created };
+  } catch (err) {
+    return { mangaId: manga.id, title: manga.title, newChapters: 0, error: (err as Error).message };
+  }
+}
+
+router.post(
+  "/check-updates",
+  async (_req: Request, res: Response): Promise<void> => {
+    try {
+      const { mangaRepository } = await import("../database");
+      const allManga = await mangaRepository.findAll();
+
+      // Process manga concurrently with a limit of 5
+      const CONCURRENCY = 5;
+      const results: Array<{
+        mangaId: string;
+        title: string;
+        newChapters: number;
+        error?: string;
+      }> = [];
+      let totalNewChapters = 0;
+      let updatedCount = 0;
+
+      for (let i = 0; i < allManga.length; i += CONCURRENCY) {
+        const chunk = allManga.slice(i, i + CONCURRENCY);
+        const chunkResults = await Promise.allSettled(
+          chunk.map((manga) => checkSingleMangaForUpdates(manga)),
+        );
+
+        for (const r of chunkResults) {
+          if (r.status === "fulfilled") {
+            results.push(r.value);
+            if (r.value.newChapters > 0) updatedCount++;
+            totalNewChapters += r.value.newChapters;
+          } else {
+            results.push({
+              mangaId: "unknown",
+              title: "unknown",
+              newChapters: 0,
+              error: r.reason?.message || "Unknown error",
+            });
+          }
+        }
+      }
+
+      res.json({
+        checked: allManga.length,
+        updated: updatedCount,
+        newChaptersTotal: totalNewChapters,
+        results,
+      });
+    } catch (error) {
+      console.error("Error checking library for updates:", error);
+      res.status(500).json({ error: "Failed to check library for updates" });
+    }
+  },
+);
 
 // POST /api/library/sources/local/configure - Configure local source
 router.post(

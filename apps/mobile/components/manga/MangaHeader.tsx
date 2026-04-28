@@ -7,6 +7,7 @@ import {
   Menu,
   Divider,
   IconButton,
+  ActivityIndicator,
 } from "react-native-paper";
 import { Image } from "expo-image";
 import type { Manga, Chapter, Category, ReadingProgress } from "@/types";
@@ -25,6 +26,11 @@ interface MangaHeaderProps {
   onCategoryToggle: (category: Category) => void;
   onContinueReading: () => void;
   onDeletePress: () => void;
+  onCheckUpdates?: () => void;
+  onDownloadAll?: () => void;
+  hasPendingChapters?: boolean;
+  isCheckingUpdates?: boolean;
+  isDownloadingAll?: boolean;
 }
 
 const META_COLOR = "#9ca3af";
@@ -63,6 +69,11 @@ export const MangaHeader = React.memo(function MangaHeader({
   onCategoryToggle,
   onContinueReading,
   onDeletePress,
+  onCheckUpdates,
+  onDownloadAll,
+  hasPendingChapters,
+  isCheckingUpdates,
+  isDownloadingAll,
 }: MangaHeaderProps) {
   // Determine continue button text based on progress
   const getContinueButtonText = useCallback((): string => {
@@ -134,6 +145,24 @@ export const MangaHeader = React.memo(function MangaHeader({
         >
           {getContinueButtonText()}
         </Button>
+
+        {onCheckUpdates && (
+          <IconButton
+            icon="refresh"
+            onPress={onCheckUpdates}
+            iconColor={ICON_COLOR}
+            disabled={isCheckingUpdates}
+          />
+        )}
+
+        {hasPendingChapters && onDownloadAll && (
+          <IconButton
+            icon="download"
+            onPress={onDownloadAll}
+            iconColor="#22c55e"
+            disabled={isDownloadingAll}
+          />
+        )}
 
         <Menu
           visible={categoryMenuVisible}

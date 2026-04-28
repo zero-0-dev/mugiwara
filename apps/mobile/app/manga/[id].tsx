@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback } from "react";
 import { View, FlatList, StyleSheet } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
-import { ActivityIndicator } from "react-native-paper";
+import { ActivityIndicator, Snackbar } from "react-native-paper";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import {
   useManga,
@@ -14,6 +14,8 @@ import {
   useAddMangaToCategory,
   useRemoveMangaFromCategory,
   useDeleteManga,
+  useCheckMangaUpdates,
+  useDownloadAllChapters,
 } from "@/api/hooks";
 import { apiClient } from "@/api/client";
 import type { Chapter, Category, ReadingProgress } from "@/types";
@@ -85,17 +87,63 @@ export default function MangaDetailScreen() {
   const { data: allCategories } = useCategories();
   const { data: mangaCategories } = useMangaCategories(id);
 
+  // UI State
+  const [snackbarVisible, setSnackbarVisible] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState("");
+
   // Mutations
   const markChapterComplete = useMarkChapterComplete();
   const markChapterIncomplete = useMarkChapterIncomplete();
   const addToCategory = useAddMangaToCategory();
   const removeFromCategory = useRemoveMangaFromCategory();
   const deleteManga = useDeleteManga();
+  const checkMangaUpdates = useCheckMangaUpdates();
+  const downloadAllChapters = useDownloadAllChapters();
+
+  const showSnackbar = useCallback((message: string) => {
+    setSnackbarMessage(message);
+    setSnackbarVisible(true);
+  }, []);
+
+  const handleCheckUpdates = useCallback(() => {
+    checkMangaUpdates.mutate(id, {
+      onSuccess: (data) => {
+        if (data.newChaptersFound > 0) {
+          showSnackbar(`Found ${data.newChaptersFound} new chapter${data.newChaptersFound > 1 ? "s" : ""}! Queued for download.`);
+        } else {
+          showSnackbar("No new chapters found.");
+        }
+      },
+      onError: (err) => {
+        showSnackbar(`Error: ${err.message}`);
+      },
+    });
+  }, [id, checkMangaUpdates, showSnackbar]);
+
+  const handleDownloadAll = useCallback(() => {
+    downloadAllChapters.mutate(id, {
+      onSuccess: (data) => {
+        if (data.chaptersQueued > 0) {
+          showSnackbar(`Queued ${data.chaptersQueued} chapter${data.chaptersQueued > 1 ? "s" : ""} for download.`);
+        } else {
+          showSnackbar("No pending chapters to download.");
+        }
+      },
+      onError: (err) => {
+        showSnackbar(`Error: ${err.message}`);
+      },
+    });
+  }, [id, downloadAllChapters, showSnackbar]);
 
   // Derived State - Memoized to prevent unnecessary re-renders
   const sortedChapters = useMemo(() => {
     return [...chapters].sort((a, b) => a.sortOrder - b.sortOrder);
   }, [chapters]);
+
+  const hasPendingChapters = useMemo(
+    () => sortedChapters.some((c) => c.importStatus === "pending"),
+    [sortedChapters],
+  );
 
   const progressMap = useMemo(
     () => buildProgressMap(allChapterProgress),
@@ -229,6 +277,11 @@ export default function MangaDetailScreen() {
           onCategoryToggle={handleCategoryToggle}
           onContinueReading={handleContinueReading}
           onDeletePress={handleDeletePress}
+          onCheckUpdates={handleCheckUpdates}
+          onDownloadAll={handleDownloadAll}
+          hasPendingChapters={hasPendingChapters}
+          isCheckingUpdates={checkMangaUpdates.isPending}
+          isDownloadingAll={downloadAllChapters.isPending}
         />
       ) : null,
     [
@@ -245,6 +298,11 @@ export default function MangaDetailScreen() {
       handleCategoryToggle,
       handleContinueReading,
       handleDeletePress,
+      handleCheckUpdates,
+      handleDownloadAll,
+      hasPendingChapters,
+      checkMangaUpdates.isPending,
+      downloadAllChapters.isPending,
     ],
   );
 
@@ -359,6 +417,15 @@ export default function MangaDetailScreen() {
           onMarkPreviousRead={handleMarkPreviousRead}
           onMarkFollowingUnread={handleMarkFollowingUnread}
         />
+
+        <Snackbar
+          visible={snackbarVisible}
+          onDismiss={() => setSnackbarVisible(false)}
+          duration={3000}
+          style={styles.snackbar}
+        >
+          {snackbarMessage}
+        </Snackbar>
       </SafeAreaView>
     </SafeAreaProvider>
   );
@@ -383,5 +450,8 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+  },
+  snackbar: {
+    backgroundColor: "#333",
   },
 });
