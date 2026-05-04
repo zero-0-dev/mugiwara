@@ -41,7 +41,7 @@ const PageItem = memo(({ index, url, aspectRatio }: PageItemProps) => {
       <Image
         source={{ uri: url }}
         style={[styles.image, { aspectRatio }]}
-        contentFit="cover"
+        contentFit="contain"
         transition={200}
         cachePolicy="memory-disk"
         contentPosition="center"

@@ -23,6 +23,7 @@ import {
   useRemoveMangaFromCategory,
   useCheckMangaUpdates,
   useDownloadAllChapters,
+  useSources,
 } from "../api/hooks";
 
 interface MangaDetailProps {
@@ -81,6 +82,10 @@ export function MangaDetail({ mangaId, onBack, onReadChapter }: MangaDetailProps
   const { data: allProgress = [] } = useAllChapterProgress(mangaId);
   const { data: categories = [] } = useCategories();
   const { data: mangaCategories = [] } = useMangaCategories(mangaId);
+  const { data: sources = [] } = useSources();
+  const sourceInfo = manga ? sources.find((s) => s.id === manga.sourceId) : undefined;
+  const isSourceOnline = !!sourceInfo;
+  const sourceName = sourceInfo?.name || manga?.sourceId || "Unknown";
 
   const markComplete = useMarkChapterComplete(mangaId);
   const markIncomplete = useMarkChapterIncomplete(mangaId);
@@ -271,7 +276,8 @@ export function MangaDetail({ mangaId, onBack, onReadChapter }: MangaDetailProps
   const getChapterDownloadStatus = (chapter: ChapterWithProgress) => {
     if (chapter.importStatus === "complete") return "complete";
     if (chapter.importStatus === "error") return "error";
-    if (chapter.importStatus === "pending" || chapter.importStatus === "downloading") return "pending";
+    if (chapter.importStatus === "pending") return "pending";
+    if (chapter.importStatus === "downloading") return "downloading";
     return "idle";
   };
 
@@ -345,6 +351,7 @@ export function MangaDetail({ mangaId, onBack, onReadChapter }: MangaDetailProps
               {manga.artist && <p className="meta-item"><strong>Artist:</strong> {manga.artist}</p>}
               <p className="meta-item"><strong>Status:</strong> {manga.status}</p>
               <p className="meta-item"><strong>Type:</strong> {manga.mediaType}</p>
+              <p className="meta-item"><strong>Source:</strong> {sourceName} <span className={`source-status-dot ${isSourceOnline ? "online" : "offline"}`} /></p>
               <p className="meta-item"><strong>Chapters:</strong> {chapters.length}</p>
               {manga.genres && manga.genres.length > 0 && (
                 <div className="meta-item"><strong>Genres:</strong><div className="genres-inline">{manga.genres.map((genre) => <span key={genre} className="genre-tag-small">{genre}</span>)}</div></div>

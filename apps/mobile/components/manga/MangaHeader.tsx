@@ -14,6 +14,8 @@ import type { Manga, Chapter, Category, ReadingProgress } from "@/types";
 
 interface MangaHeaderProps {
   manga: Manga;
+  sourceName?: string;
+  isSourceOnline?: boolean;
   coverUrl: string | undefined;
   sortedChapters: Chapter[];
   currentChapter: Chapter | undefined;
@@ -57,6 +59,8 @@ function useIsInCategory(
  */
 export const MangaHeader = React.memo(function MangaHeader({
   manga,
+  sourceName,
+  isSourceOnline,
   coverUrl,
   sortedChapters,
   currentChapter,
@@ -129,6 +133,20 @@ export const MangaHeader = React.memo(function MangaHeader({
           <Text variant="bodyMedium" style={styles.meta}>
             Type: {manga.mediaType}
           </Text>
+          {sourceName ? (
+            <View style={styles.sourceRow}>
+              <Text variant="bodyMedium" style={styles.meta}>
+                Source: {sourceName}
+
+              </Text>
+              <View
+                style={[
+                  styles.sourceDot,
+                  { backgroundColor: isSourceOnline ? "#22c55e" : "#ef4444" },
+                ]}
+              />
+            </View>
+          ) : null}
           <Text variant="bodyMedium" style={styles.meta}>
             Chapters: {sortedChapters?.length || 0}
           </Text>
@@ -238,6 +256,16 @@ export const MangaHeader = React.memo(function MangaHeader({
 const styles = StyleSheet.create({
   header: {
     paddingVertical: 16,
+  },
+  sourceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  sourceDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
   coverSection: {
     flexDirection: "row",

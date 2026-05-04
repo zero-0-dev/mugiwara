@@ -16,6 +16,7 @@ import {
   useDeleteManga,
   useCheckMangaUpdates,
   useDownloadAllChapters,
+  useSources,
 } from "@/api/hooks";
 import { apiClient } from "@/api/client";
 import type { Chapter, Category, ReadingProgress } from "@/types";
@@ -86,6 +87,7 @@ export default function MangaDetailScreen() {
   const { data: allChapterProgress } = useAllChapterProgress(id);
   const { data: allCategories } = useCategories();
   const { data: mangaCategories } = useMangaCategories(id);
+  const { data: sources = [] } = useSources();
 
   // UI State
   const [snackbarVisible, setSnackbarVisible] = useState(false);
@@ -139,6 +141,16 @@ export default function MangaDetailScreen() {
   const sortedChapters = useMemo(() => {
     return [...chapters].sort((a, b) => a.sortOrder - b.sortOrder);
   }, [chapters]);
+
+  const sourceName = useMemo(
+    () => sources.find((s) => s.id === manga?.sourceId)?.name || manga?.sourceId,
+    [sources, manga?.sourceId],
+  );
+
+  const isSourceOnline = useMemo(
+    () => sources.some((s) => s.id === manga?.sourceId),
+    [sources, manga?.sourceId],
+  );
 
   const hasPendingChapters = useMemo(
     () => sortedChapters.some((c) => c.importStatus === "pending"),
@@ -265,6 +277,8 @@ export default function MangaDetailScreen() {
       manga ? (
         <MangaHeader
           manga={manga}
+          sourceName={sourceName}
+          isSourceOnline={isSourceOnline}
           coverUrl={coverUrl}
           sortedChapters={sortedChapters}
           currentChapter={currentChapter}
@@ -286,6 +300,8 @@ export default function MangaDetailScreen() {
       ) : null,
     [
       manga,
+      sourceName,
+      isSourceOnline,
       coverUrl,
       sortedChapters,
       currentChapter,

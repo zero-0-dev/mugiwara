@@ -1165,6 +1165,25 @@ body {
 .meta-item {
   color: var(--text-secondary);
   margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.source-status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.source-status-dot.online {
+  background-color: #22c55e;
+}
+
+.source-status-dot.offline {
+  background-color: #ef4444;
 }
 
 /* Continue Reading Section */

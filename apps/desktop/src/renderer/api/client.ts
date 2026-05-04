@@ -101,10 +101,15 @@ export interface ChapterWithProgress {
 }
 
 export interface ReadingProgress {
+  id: string;
+  mangaId: string;
   chapterId: string;
-  completed: boolean;
-  pageNumber?: number;
-  totalPages?: number;
+  pageNumber: number;
+  totalPages: number;
+  percentComplete: number;
+  isCompleted: boolean;
+  lastReadAt: string;
+  deviceId?: string;
 }
 
 export interface ImportTask {
@@ -261,11 +266,11 @@ export class ApiClient {
   }
 
   // Categories
-  getCategories(): Promise<Array<{ id: string; name: string }>> {
+  getCategories(): Promise<Array<{ id: string; name: string; color?: string; sortOrder: number; createdAt: string }>> {
     return this.request("/api/categories");
   }
 
-  getMangaCategories(mangaId: string): Promise<Array<{ id: string; name: string }>> {
+  getMangaCategories(mangaId: string): Promise<Array<{ id: string; name: string; color?: string; sortOrder: number; createdAt: string }>> {
     return this.request(`/api/categories/manga/${mangaId}/categories`);
   }
 
