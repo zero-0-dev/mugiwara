@@ -27,9 +27,7 @@ export * from "./schema";
 export * from "./repositories";
 
 // Initialize database with default data
-export async function initDatabase(): Promise<void> {
-  // Create tables if they don't exist
-
+export function initDatabase(): void {
   migrate(db, {
     migrationsFolder: join(__dirname, "../../drizzle"),
   });

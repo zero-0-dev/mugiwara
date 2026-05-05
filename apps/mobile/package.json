@@ -10,7 +10,9 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "build:android": "eas build --platform android",
-    "build:ios": "eas build --platform ios"
+    "build:android:local": "expo run:android --variant release",
+    "build:ios": "eas build --platform ios",
+    "build:ios:local": "expo run:ios --configuration Release"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",

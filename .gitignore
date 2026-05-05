@@ -12,4 +12,6 @@ coverage
 *.tsbuildinfo
 .agents
 
-apps/server/data
+data
+apps/server/deploy
+apps/desktop/release

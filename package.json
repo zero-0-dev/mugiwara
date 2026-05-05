@@ -9,7 +9,11 @@
     "lint": "turbo lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "typecheck": "turbo typecheck",
-    "clean": "turbo clean && rm -rf node_modules"
+    "clean": "turbo clean && rm -rf node_modules",
+    "build:mobile:android": "cd apps/mobile && npx expo run:android --variant release",
+    "build:server:deploy": "turbo build --filter=@mugiwara-manga/server && pnpm --filter=@mugiwara-manga/server deploy --legacy apps/server/deploy",
+    "build:desktop:linux": "cd apps/desktop && npm run package:linux",
+    "build:desktop:win": "cd apps/desktop && npm run package:win"
   },
   "devDependencies": {
     "prettier": "^3.1.1",

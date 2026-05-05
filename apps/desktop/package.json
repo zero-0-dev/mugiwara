@@ -12,7 +12,46 @@
     "dev:main": "npm run build:main && npm run build:preload && electron dist/main/index.js --inspect=5858",
     "dev:renderer": "vite",
     "clean": "rm -rf dist release",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "package:linux": "npm run build && electron-builder --linux",
+    "package:win": "npm run build && electron-builder --win",
+    "package:all": "npm run build && electron-builder --linux --win"
+  },
+  "build": {
+    "appId": "dev.zero.mugiwara",
+    "productName": "Mugiwara",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../server/dist",
+        "to": "server"
+      },
+      {
+        "from": "../server/deploy/node_modules",
+        "to": "server/node_modules"
+      },
+      {
+        "from": "../server/drizzle",
+        "to": "drizzle"
+      }
+    ],
+    "linux": {
+      "target": ["AppImage"],
+      "category": "Utility"
+    },
+    "win": {
+      "target": ["nsis"]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
   },
   "dependencies": {
     "@mugiwara-manga/types": "workspace:*",
@@ -26,6 +65,7 @@
     "@vitejs/plugin-react": "^4.2.1",
     "concurrently": "^8.2.2",
     "electron": "^28.0.0",
+    "electron-builder": "^26.8.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "tsx": "^4.7.0",
