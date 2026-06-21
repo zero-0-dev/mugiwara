@@ -10,10 +10,10 @@
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "typecheck": "turbo typecheck",
     "clean": "turbo clean && rm -rf node_modules",
-    "build:mobile:android": "cd apps/mobile && npx expo run:android --variant release",
-    "build:server:deploy": "turbo build --filter=@mugiwara-manga/server && pnpm --filter=@mugiwara-manga/server deploy --legacy apps/server/deploy",
-    "build:desktop:linux": "cd apps/desktop && npm run package:linux",
-    "build:desktop:win": "cd apps/desktop && npm run package:win"
+    "build:app:android": "node scripts/build.mjs app:android",
+    "build:desktop:linux": "node scripts/build.mjs desktop:linux",
+    "build:desktop:win": "node scripts/build.mjs desktop:win",
+    "build:server:deploy": "turbo build --filter=@mugiwara-manga/server && rm -rf apps/server/deploy && pnpm --filter=@mugiwara-manga/server deploy --legacy apps/server/deploy"
   },
   "devDependencies": {
     "prettier": "^3.1.1",

@@ -20,9 +20,6 @@
   "build": {
     "appId": "dev.zero.mugiwara",
     "productName": "Mugiwara",
-    "directories": {
-      "output": "release"
-    },
     "files": [
       "dist/**/*",
       "package.json"
