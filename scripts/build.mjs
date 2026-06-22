@@ -32,7 +32,7 @@ function clean(dir) {
 const target = process.argv[2];
 if (!target) {
   console.error('Usage: node scripts/build.mjs <target>');
-  console.error('Targets: desktop:linux | desktop:win | app:android');
+  console.error('Targets: desktop:linux | desktop:win | desktop:mac | app:android');
   process.exit(1);
 }
 
@@ -41,9 +41,11 @@ console.log(`Building ${target} — version ${version}`);
 
 switch (target) {
   case 'desktop:linux':
-  case 'desktop:win': {
+  case 'desktop:win':
+  case 'desktop:mac': {
     const os = target.split(':')[1];
-    const flag = os === 'linux' ? '--linux' : '--win';
+    const flagMap = { linux: '--linux', win: '--win', mac: '--mac' };
+    const flag = flagMap[os];
     const distDir = join(ROOT, 'dist', 'desktop', os);
 
     clean(distDir);
@@ -121,6 +123,6 @@ switch (target) {
 
   default:
     console.error(`Unknown target: "${target}"`);
-    console.error('Targets: desktop:linux | desktop:win | app:android');
+    console.error('Targets: desktop:linux | desktop:win | desktop:mac | app:android');
     process.exit(1);
 }
