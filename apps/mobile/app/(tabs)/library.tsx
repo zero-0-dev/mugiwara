@@ -219,6 +219,7 @@ export default function LibraryScreen() {
           numColumns={NUM_COLUMNS}
           contentContainerStyle={styles.list}
           columnWrapperStyle={styles.columnWrapper}
+          removeClippedSubviews={false}
           refreshControl={
             <RefreshControl
               refreshing={isLoading}

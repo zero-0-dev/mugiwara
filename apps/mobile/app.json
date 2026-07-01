@@ -7,7 +7,7 @@
     "icon": "./assets/images/icon.png",
     "scheme": "mugiwara",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": false,
+    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "dev.zero.mugiwara"

@@ -85,10 +85,17 @@ switch (target) {
       { cwd: join(ROOT, 'apps', 'mobile'), encoding: 'utf8' },
     ).trim();
 
-    const workletsDir = execSync(
-      'node -e "console.log(path.dirname(require.resolve(\'react-native-worklets/package.json\')))"',
-      { cwd: join(ROOT, 'apps', 'mobile', 'node_modules', 'react-native-reanimated'), encoding: 'utf8' },
-    ).trim();
+    let gradleArgs = `-PREACT_NATIVE_NODE_MODULES_DIR="${rnDir}"`;
+
+    try {
+      const workletsDir = execSync(
+        'node -e "console.log(path.dirname(require.resolve(\'react-native-worklets/package.json\')))"',
+        { cwd: join(ROOT, 'apps', 'mobile', 'node_modules', 'react-native-reanimated'), encoding: 'utf8' },
+      ).trim();
+      gradleArgs += ` -PREACT_NATIVE_WORKLETS_NODE_MODULES_DIR="${workletsDir}"`;
+    } catch {
+      console.log('react-native-worklets not found (reanimated < 4.x), skipping worklets flag');
+    }
 
     const buildGradle = join(ROOT, 'apps', 'mobile', 'android', 'app', 'build.gradle');
     let gradleContent = readFileSync(buildGradle, 'utf8');
@@ -98,7 +105,7 @@ switch (target) {
     }
 
     run(
-      `./gradlew assembleRelease -PREACT_NATIVE_NODE_MODULES_DIR="${rnDir}" -PREACT_NATIVE_WORKLETS_NODE_MODULES_DIR="${workletsDir}"`,
+      `./gradlew assembleRelease ${gradleArgs}`,
       join(ROOT, 'apps', 'mobile', 'android'),
     );
 

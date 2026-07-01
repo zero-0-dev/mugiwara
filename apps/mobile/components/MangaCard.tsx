@@ -22,7 +22,7 @@ export function MangaCard({ manga, onPress, width = 120 }: MangaCardProps) {
       style={[styles.container, { width, height }]}
       activeOpacity={0.8}
     >
-      <View style={[styles.imageContainer, { width, height: width * 1.5 }]}>
+      <View style={[styles.imageContainer, { width, height: width * 1.5 }]} collapsable={false}>
         {coverUrl ? (
           <Image
             source={{ uri: coverUrl }}
