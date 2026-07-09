@@ -27,8 +27,20 @@ export abstract class BaseSource {
     signal?: AbortSignal,
   ): AsyncGenerator<PageData, void, unknown>;
 
-  // Optional: Check for new chapters since last check
-  // Default implementation returns empty array
+  /**
+   * Optional: Check for new chapters since last check.
+   *
+   * @remarks
+   * The default implementation calls `getMangaDetails()` and filters
+   * chapters with a `sortOrder` greater than that of `lastChapterId`.
+   *
+   * Sources that override this method MUST:
+   * - Return chapters sorted **oldest-first** (ascending `sortOrder`).
+   * - Return **only** chapters newer than `lastChapterId`.
+   * - Use the same `chapterId` format as `getMangaDetails()`.
+   * - Handle pagination internally (return ALL new chapters, not just
+   *   the first page).
+   */
   async checkForUpdates(
     sourceMangaId: string,
     lastChapterId?: string,
@@ -38,16 +50,14 @@ export abstract class BaseSource {
       return manga.chapters;
     }
 
-    // Find chapters after the last known one
-    const lastIndex = manga.chapters.findIndex(
+    const lastChapter = manga.chapters.find(
       (c) => c.chapterId === lastChapterId,
     );
-    if (lastIndex === -1) {
-      // Last chapter not found, return all (might be renumbered)
+    if (!lastChapter) {
       return manga.chapters;
     }
 
-    return manga.chapters.slice(lastIndex + 1);
+    return manga.chapters.filter((c) => c.sortOrder > lastChapter.sortOrder);
   }
 }
 

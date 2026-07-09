@@ -40,6 +40,15 @@ export interface SourceManga {
   bannerImageUrl?: string;
   genres?: string[];
   tags?: string[];
+  /**
+   * All chapters for this manga.
+   *
+   * Contract requirements:
+   * - MUST be sorted **oldest-first** (ascending by `sortOrder`).
+   * - MUST contain ALL chapters (handle pagination internally).
+   * - `chapterId` MUST be unique and consistent — the same chapter
+   *   must produce the same `chapterId` across calls.
+   */
   chapters: SourceChapter[];
 }
 
