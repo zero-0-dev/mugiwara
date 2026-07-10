@@ -14,7 +14,7 @@
     "build:desktop:linux": "node scripts/build.mjs desktop:linux",
     "build:desktop:win": "node scripts/build.mjs desktop:win",
     "build:desktop:osx": "node scripts/build.mjs desktop:mac",
-    "build:server:deploy": "turbo build --filter=@mugiwara-manga/server && rm -rf apps/server/deploy && pnpm --filter=@mugiwara-manga/server deploy --legacy apps/server/deploy"
+    "build:server:deploy": "turbo build --filter=@mugiwara-manga/server"
   },
   "devDependencies": {
     "prettier": "^3.1.1",

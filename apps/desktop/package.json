@@ -31,7 +31,7 @@
         "to": "server"
       },
       {
-        "from": "../server/deploy/node_modules",
+        "from": "../server/node_modules",
         "to": "server/node_modules"
       },
       {

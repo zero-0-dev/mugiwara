@@ -38,8 +38,8 @@ export class ServerManager {
     if (this.isDev) {
       return this.config.port; // In dev mode, server is started separately by turbo, so just return the port
     } else {
-      // In production, run the compiled server
-      serverCmd = "node";
+      // In production, run the compiled server using Electron's bundled Node
+      serverCmd = process.execPath;
       serverArgs = [path.join(process.resourcesPath, "server/index.js")];
       serverCwd = process.cwd();
     }
