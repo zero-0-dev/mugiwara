@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 import { execSync } from 'node:child_process';
-import { existsSync, mkdirSync, copyFileSync, rmSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, mkdirSync, copyFileSync, rmSync, readFileSync, writeFileSync, readdirSync, readlinkSync } from 'node:fs';
+import { platform } from 'node:os';
+import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(fileURLToPath(import.meta.url), '..', '..');
@@ -18,7 +19,7 @@ function getVersion() {
 
 function run(cmd, cwd = ROOT) {
   console.log(`\n> ${cmd}`);
-  execSync(cmd, { cwd, stdio: 'inherit' });
+  execSync(cmd, { cwd, stdio: 'inherit', env: { ...process.env, CI: 'true', CSC_IDENTITY_AUTO_DISCOVERY: 'false' } });
 }
 
 function clean(dir) {
@@ -51,6 +52,39 @@ switch (target) {
     clean(distDir);
 
     run('pnpm build:server:deploy');
+
+    const serverDeployDir = join(ROOT, 'dist', 'server-deploy');
+    clean(serverDeployDir);
+    execSync(
+      `pnpm --filter=@mugiwara-manga/server deploy --prod --legacy "${serverDeployDir}"`,
+      { cwd: ROOT, stdio: 'inherit', env: { ...process.env, CI: 'true' } },
+    );
+    execSync(`cp -R "${join(ROOT, 'apps', 'server', 'dist')}/." "${serverDeployDir}/dist/"`, { stdio: 'inherit' });
+    execSync(`CI=true pnpm install`, { cwd: ROOT, stdio: 'inherit', env: { ...process.env, CI: 'true' } });
+
+    function removeExternalSymlinks(dir) {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const entryPath = join(dir, entry.name);
+        if (entry.isSymbolicLink()) {
+          const target = readlinkSync(entryPath);
+          const resolved = resolve(dir, target);
+          if (!resolved.startsWith(serverDeployDir)) {
+            rmSync(entryPath);
+          }
+        } else if (entry.isDirectory()) {
+          removeExternalSymlinks(entryPath);
+        }
+      }
+    }
+    removeExternalSymlinks(join(serverDeployDir, 'node_modules'));
+
+    // @electron/rebuild needs a package.json in the module-dir
+    execSync(`cp "${join(serverDeployDir, 'package.json')}" "${join(serverDeployDir, 'node_modules', 'package.json')}"`, { stdio: 'inherit' });
+    const electronVersion = JSON.parse(readFileSync(join(ROOT, 'apps', 'desktop', 'node_modules', 'electron', 'package.json'), 'utf8')).version;
+    execSync(`npx @electron/rebuild -v ${electronVersion} -m "${join(serverDeployDir, 'node_modules')}" -f`, {
+      cwd: ROOT, stdio: 'inherit', env: { ...process.env, CI: 'true' },
+    });
+
     run('pnpm turbo build --filter=@mugiwara-manga/desktop');
 
     run(
@@ -61,7 +95,11 @@ switch (target) {
     const tarName = `mugiwara-${os}-${version}.tar.gz`;
     const tarPath = join(ROOT, 'dist', 'desktop', tarName);
     console.log(`\nCompressing to ${tarPath}...`);
-    run(`tar -czf "${tarPath}" --transform "s,^${os},mugiwara," -C "${join(ROOT, 'dist', 'desktop')}" "${os}"`);
+    if (platform() === 'darwin') {
+      run(`tar -czf "${tarPath}" -s "/^${os}/mugiwara/" -C "${join(ROOT, 'dist', 'desktop')}" "${os}"`);
+    } else {
+      run(`tar -czf "${tarPath}" --transform "s,^${os},mugiwara," -C "${join(ROOT, 'dist', 'desktop')}" "${os}"`);
+    }
 
     console.log(`\nDone: ${distDir} (${tarName})`);
     break;
@@ -122,7 +160,11 @@ switch (target) {
     const tarName = `mugiwara-android-${version}.tar.gz`;
     const tarPath = join(distDir, '..', tarName);
     console.log(`\nCompressing to ${tarPath}...`);
-    run(`tar -czf "${tarPath}" --transform "s,^android,mugiwara," -C "${join(distDir, '..')}" "android"`);
+    if (platform() === 'darwin') {
+      run(`tar -czf "${tarPath}" -s "/^android/mugiwara/" -C "${join(distDir, '..')}" "android"`);
+    } else {
+      run(`tar -czf "${tarPath}" --transform "s,^android,mugiwara," -C "${join(distDir, '..')}" "android"`);
+    }
 
     console.log(`\nDone: ${apkDest} (${tarName})`);
     break;

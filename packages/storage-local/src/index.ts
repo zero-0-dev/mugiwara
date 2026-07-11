@@ -25,7 +25,7 @@ class LocalStorage extends BaseStorage {
 
   async initialize(config: PluginConfig): Promise<void> {
     this.config = {
-      basePath: config.basePath || "./data/manga",
+      basePath: config.basePath || path.join(process.env.DATA_DIR || process.cwd(), "manga"),
     };
 
     // Ensure base directory exists

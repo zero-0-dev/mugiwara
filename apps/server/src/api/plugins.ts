@@ -88,7 +88,8 @@ router.post("/install", async (req: any, res: Response) => {
     });
   } catch (error) {
     console.error("Error installing plugin:", error);
-    res.status(500).json({ error: "Failed to install plugin" });
+    const message = error instanceof Error ? error.message : "Failed to install plugin";
+    res.status(500).json({ error: message });
   }
 });
 

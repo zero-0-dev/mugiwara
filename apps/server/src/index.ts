@@ -2,6 +2,13 @@ import express, { Request, Response } from "express";
 import cors from "cors";
 import { join } from "path";
 
+process.on("uncaughtException", (err) => {
+  console.error("Uncaught exception:", err);
+});
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled rejection:", reason);
+});
+
 import { initDatabase, closeDatabase, db } from "./database";
 import { registerBuiltInPlugins } from "./plugins";
 import { PluginManager } from "./plugins/manager";

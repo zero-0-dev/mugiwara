@@ -69,7 +69,7 @@ const mediaTypes = [
 
 export function SettingsPage({ onBack }: SettingsPageProps) {
   const [activeTab, setActiveTab] = React.useState<string>("reading");
-  const { data: serverSettings, isLoading } = useSettings();
+  const { data: serverSettings, isLoading, isError, error } = useSettings();
   const saveSetting = useSaveSetting();
   const toast = useToast();
   const [saveSuccess, setSaveSuccess] = React.useState<string | null>(null);
@@ -201,6 +201,17 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
         <div className="settings-loading">
           <div className="loading-spinner"></div>
           <p>Loading settings...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="settings-page">
+        <div className="error-container">
+          <h3>Failed to load settings</h3>
+          <p>{(error as Error)?.message || "Unable to connect to server. Please try again."}</p>
         </div>
       </div>
     );

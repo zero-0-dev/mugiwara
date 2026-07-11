@@ -1,5 +1,6 @@
 import { spawn, ChildProcess } from "child_process";
 import path from "path";
+import { appendFileSync, writeFileSync } from "fs";
 import { app } from "electron";
 import net from "net";
 
@@ -13,13 +14,25 @@ export class ServerManager {
   private readonly config: ServerConfig;
   private isReady: boolean = false;
   private readonly isDev: boolean;
+  private logFile: string = "";
+
+  private writeLog(level: string, message: string) {
+    const line = `[${new Date().toISOString()}] [${level}] ${message}\n`;
+    console.log(line.trimEnd());
+    if (this.logFile) {
+      try { appendFileSync(this.logFile, line); } catch {}
+    }
+  }
 
   constructor() {
     this.isDev = !app.isPackaged;
     this.config = {
-      port: 0, // Will find available port
+      port: 0,
       dataDir: path.join(app.getPath("userData"), "data"),
     };
+    this.logFile = path.join(this.config.dataDir, "server.log");
+    // Clear log file on each start to prevent unbounded growth
+    try { writeFileSync(this.logFile, ""); } catch {}
   }
 
   async start(): Promise<number> {
@@ -38,26 +51,24 @@ export class ServerManager {
     if (this.isDev) {
       return this.config.port; // In dev mode, server is started separately by turbo, so just return the port
     } else {
-      // In production, run the compiled server using Electron's bundled Node
       serverCmd = process.execPath;
       serverArgs = [path.join(process.resourcesPath, "server/index.js")];
-      serverCwd = process.cwd();
+      serverCwd = app.getPath("userData");
     }
 
     // Set environment variables
     const env = {
       ...process.env,
+      ELECTRON_RUN_AS_NODE: "1",
       PORT: this.config.port.toString(),
       DATA_DIR: this.config.dataDir,
       NODE_ENV: this.isDev ? "development" : "production",
     };
 
-    console.log(`[ServerManager] Starting server on port ${this.config.port}`);
-    console.log(
-      `[ServerManager] Command: ${serverCmd} ${serverArgs.join(" ")}`,
-    );
-    console.log(`[ServerManager] Working directory: ${serverCwd}`);
-    console.log(`[ServerManager] Data directory: ${this.config.dataDir}`);
+    this.writeLog("MANAGER", `Starting server on port ${this.config.port}`);
+    this.writeLog("MANAGER", `Command: ${serverCmd} ${serverArgs.join(" ")}`);
+    this.writeLog("MANAGER", `Working directory: ${serverCwd}`);
+    this.writeLog("MANAGER", `Data directory: ${this.config.dataDir}`);
 
     // Start server as child process
     this.serverProcess = spawn(serverCmd, serverArgs, {
@@ -68,18 +79,16 @@ export class ServerManager {
 
     // Handle server output
     this.serverProcess.stdout?.on("data", (data) => {
-      console.log(`[Server] ${data.toString().trim()}`);
+      this.writeLog("SERVER", data.toString().trimEnd());
     });
 
     this.serverProcess.stderr?.on("data", (data) => {
-      console.error(`[Server Error] ${data.toString().trim()}`);
+      this.writeLog("ERROR", data.toString().trimEnd());
     });
 
     // Handle server exit
     this.serverProcess.on("exit", (code, signal) => {
-      console.log(
-        `[ServerManager] Server exited with code ${code}, signal ${signal}`,
-      );
+      this.writeLog("MANAGER", `Server exited with code ${code}, signal ${signal}`);
       this.serverProcess = null;
       this.isReady = false;
     });
@@ -88,7 +97,7 @@ export class ServerManager {
     await this.waitForServer(this.config.port, 30000); // 30 second timeout
     this.isReady = true;
 
-    console.log(`[ServerManager] Server ready on port ${this.config.port}`);
+    this.writeLog("MANAGER", `Server ready on port ${this.config.port}`);
     return this.config.port;
   }
 
@@ -97,7 +106,7 @@ export class ServerManager {
       return;
     }
 
-    console.log("[ServerManager] Stopping server...");
+    this.writeLog("MANAGER", "Stopping server...");
 
     // Send graceful shutdown signal
     this.serverProcess.kill("SIGTERM");
@@ -105,7 +114,7 @@ export class ServerManager {
     // Wait for process to exit (with timeout)
     await new Promise<void>((resolve) => {
       const timeout = setTimeout(() => {
-        console.log("[ServerManager] Force killing server...");
+        this.writeLog("MANAGER", "Force killing server...");
         this.serverProcess?.kill("SIGKILL");
         resolve();
       }, 5000);

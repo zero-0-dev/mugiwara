@@ -2,6 +2,9 @@ import { app, BrowserWindow, ipcMain, dialog, shell } from "electron";
 import path from "path";
 import { ServerManager } from "./server-manager";
 
+// Disable GPU acceleration to prevent crashes on macOS
+app.disableHardwareAcceleration();
+
 // Keep a global reference to prevent garbage collection
 let mainWindow: BrowserWindow | null = null;
 let serverManager: ServerManager | null = null;
@@ -114,7 +117,19 @@ ipcMain.handle("select-folder", async () => {
 });
 
 // App event handlers
-app.whenReady().then(initialize);
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on("second-instance", () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    }
+  });
+
+  app.whenReady().then(initialize);
+}
 
 app.on("window-all-closed", async () => {
   // Stop the server before quitting (only in production)
