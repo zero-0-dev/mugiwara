@@ -146,6 +146,11 @@ body {
 .app-header h1 {
   font-size: 1.25rem;
   font-weight: 600;
+  -webkit-app-region: no-drag;
+}
+
+.platform-darwin .app-header {
+  padding-left: 6rem;
 }
 
 /* Top Navigation */
@@ -1470,6 +1475,10 @@ body {
 
 .top-controls {
   top: 0;
+}
+
+.platform-darwin .top-controls {
+  padding-left: 6rem;
 }
 
 .bottom-controls {

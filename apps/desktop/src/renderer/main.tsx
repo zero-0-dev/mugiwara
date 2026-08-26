@@ -4,6 +4,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import App from './App';
 import './index.css';
 
+if (window.electronAPI?.platform === "darwin") {
+  document.body.classList.add("platform-darwin");
+}
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {

@@ -172,6 +172,8 @@ export function Reader({
   }, [currentPage, onPrevChapter, readingMode]);
 
   const handleScreenClick = (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.closest(".reader-controls")) return;
     if (readingMode === "vertical") {
       setShowControls(true);
       if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
@@ -231,7 +233,7 @@ export function Reader({
       <div className={`reader-controls top-controls ${showControls ? "visible" : ""}`}>
         <button onMouseDown={(e) => { e.stopPropagation(); onBack(); }} className="btn btn-secondary">Back</button>
         <div className="reader-settings">
-          <select value={readingMode} onChange={(e) => handleModeChange(e.target.value as ReadingMode)} onMouseDown={(e) => e.stopPropagation()}>
+          <select value={readingMode} onChange={(e) => handleModeChange(e.target.value as ReadingMode)}>
             <option value="rtl">Right to Left (Manga)</option>
             <option value="ltr">Left to Right</option>
             <option value="vertical">Vertical (Webtoon)</option>
