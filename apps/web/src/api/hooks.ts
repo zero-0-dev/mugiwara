@@ -139,7 +139,9 @@ export function useImportProgress(mangaId: string | null) {
     queryKey: ["importProgress", mangaId],
     queryFn: () => api.getImportProgress(mangaId!),
     enabled: !!mangaId,
-    refetchInterval: (query) => (query.state.data?.isComplete ? false : 2000),
+    // Import progress is user-facing; poll quickly enough to show queued ->
+    // downloading -> complete transitions even for fast local imports.
+    refetchInterval: (query) => (query.state.data?.isComplete ? false : 750),
   });
 }
 

@@ -162,8 +162,12 @@ class LocalSource extends BaseSource {
         } else if (this.isArchiveFile(entry.name)) {
           // Archive file (CBZ, ZIP, etc.)
           return true;
-        } else if (this.isImageFile(entry.name)) {
-          // Direct image in manga folder (flat structure)
+        } else if (
+          this.isImageFile(entry.name) &&
+          !this.isCoverImage(entry.name)
+        ) {
+          // Direct page image in manga folder (flat structure). Cover files
+          // alone do not make a folder a manga.
           return true;
         }
       }
@@ -228,12 +232,24 @@ class LocalSource extends BaseSource {
     try {
       const entries = await fs.readdir(mangaPath, { withFileTypes: true });
 
-      // Check for flat structure (images directly in manga folder)
+      // Check for flat structure (page images directly in manga folder).
+      // A cover/poster file is metadata, not a chapter, and chapter
+      // subdirectories take precedence over flat images.
       const hasDirectImages = entries.some(
-        (entry) => entry.isFile() && this.isImageFile(entry.name),
+        (entry) =>
+          entry.isFile() &&
+          this.isImageFile(entry.name) &&
+          !this.isCoverImage(entry.name),
       );
+      const hasChapterDirectories = (
+        await Promise.all(
+          entries
+            .filter((entry) => entry.isDirectory())
+            .map((entry) => this.hasImageFiles(path.join(mangaPath, entry.name))),
+        )
+      ).some(Boolean);
 
-      if (hasDirectImages) {
+      if (hasDirectImages && !hasChapterDirectories) {
         // Flat structure - create a single chapter for all images in the folder
         chapters.push({
           path: mangaPath,
@@ -393,6 +409,11 @@ class LocalSource extends BaseSource {
   private isImageFile(filename: string): boolean {
     const ext = path.extname(filename).toLowerCase();
     return [".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"].includes(ext);
+  }
+
+  private isCoverImage(filename: string): boolean {
+    const lower = filename.toLowerCase();
+    return lower.startsWith("cover.") || lower.startsWith("poster.");
   }
 
   private isArchiveFile(filename: string): boolean {
