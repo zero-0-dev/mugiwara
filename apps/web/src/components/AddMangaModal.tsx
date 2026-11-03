@@ -20,7 +20,7 @@ import type { SearchResult } from "../api/client";
 
 interface AddMangaModalProps {
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (mangaId: string) => void;
   onViewManga: (mangaId: string) => void;
   initialSearchQuery?: string;
   initialSourceId?: string;
@@ -150,8 +150,13 @@ export function AddMangaModal({
   useEffect(() => {
     if (importMutation.isSuccess && importMutation.data) {
       dispatch({ type: "IMPORT_START" });
-      onSuccess();
+      // The import endpoint returns as soon as the manga and its chapters are
+      // registered and the download tasks are queued. Leave the modal open
+      // only long enough to report that, then let the parent take the user
+      // back to the library (which is invalidated by useImportManga).
+      onSuccess(importMutation.data.mangaId);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [importMutation.isSuccess, importMutation.data]);
 
   function handleClose() {

@@ -197,6 +197,7 @@ function App() {
           <DiscoverDetail
             anilistId={selectedAnilistId}
             onBack={handleBackFromDiscover}
+            onAddedToLibrary={handleBackFromDiscoverToLibrary}
           />
         ) : null;
       case "manga-detail":

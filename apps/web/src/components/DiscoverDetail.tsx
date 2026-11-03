@@ -21,9 +21,14 @@ interface SearchResult {
 interface DiscoverDetailProps {
   anilistId: number;
   onBack: () => void;
+  onAddedToLibrary: () => void;
 }
 
-export function DiscoverDetail({ anilistId, onBack }: DiscoverDetailProps) {
+export function DiscoverDetail({
+  anilistId,
+  onBack,
+  onAddedToLibrary,
+}: DiscoverDetailProps) {
   const [showDescription, setShowDescription] = useState(false);
   const [selectedSource, setSelectedSource] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -57,6 +62,9 @@ export function DiscoverDetail({ anilistId, onBack }: DiscoverDetailProps) {
 
   function handleAddMangaSuccess() {
     setShowAddModal(false);
+    // The new manga is already in the library; show it there instead of
+    // leaving the user on the AniList discovery page.
+    onAddedToLibrary();
   }
 
   if (isLoading) {

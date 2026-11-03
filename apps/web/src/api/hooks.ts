@@ -372,10 +372,16 @@ export function useImportManga() {
   return useMutation({
     mutationFn: (body: { sourceId: string; sourceMangaId: string; chapters: Array<{ sourceChapterId: string; chapterId: string; title?: string; sortOrder: number; language?: string; scanlationGroup?: string }> }) =>
       api.importManga(body),
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["library"] });
+      queryClient.invalidateQueries({ queryKey: ["filterOptions"] });
       queryClient.invalidateQueries({ queryKey: ["queueTasks"] });
       queryClient.invalidateQueries({ queryKey: ["queueStats"] });
+      if (data?.mangaId) {
+        queryClient.invalidateQueries({ queryKey: ["manga", data.mangaId] });
+        queryClient.invalidateQueries({ queryKey: ["chapters", data.mangaId] });
+        queryClient.invalidateQueries({ queryKey: ["importProgress", data.mangaId] });
+      }
     },
   });
 }
