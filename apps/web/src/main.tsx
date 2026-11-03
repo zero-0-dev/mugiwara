@@ -13,7 +13,11 @@ if (window.electronAPI?.platform === "darwin") {
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60 * 5,
+      // The server is the source of truth for library, chapter and download
+      // state, and the download queue changes it in the background. Refetch on
+      // mount so navigating between screens never shows stale data. The
+      // remote-only discovery/search queries opt back into a longer staleTime.
+      staleTime: 0,
       retry: 2,
     },
   },

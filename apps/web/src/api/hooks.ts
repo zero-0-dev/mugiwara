@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useRef } from "react";
 import { useQuery, useMutation, useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { useApiClient } from "./context";
 
@@ -36,6 +37,20 @@ export function useChapters(mangaId: string) {
     queryKey: ["chapters", mangaId],
     queryFn: () => api.getChapters(mangaId),
     enabled: !!mangaId,
+    // Downloads run in the server-side queue. While a chapter is actively
+    // being written, poll so page counts/progress stay fresh. "pending" alone
+    // is not a signal: it also means "not downloaded yet" for chapters that
+    // were never queued. useDownloadQueueSync handles queued tasks.
+    refetchInterval: (query) => {
+      const chapters = query.state.data as
+        | Array<{ importStatus?: string }>
+        | undefined;
+      return chapters?.some(
+        (chapter) => chapter.importStatus === "downloading",
+      )
+        ? 3000
+        : false;
+    },
   });
 }
 
@@ -101,6 +116,8 @@ export function useSearchSource(sourceId: string | null, query: string) {
     queryKey: ["search", sourceId, query],
     queryFn: () => api.searchSource(sourceId!, query),
     enabled: !!sourceId && query.length >= 2,
+    // Remote source results are expensive; reuse them within a session.
+    staleTime: 1000 * 60 * 5,
   });
 }
 
@@ -110,6 +127,7 @@ export function useSourceManga(sourceId: string | null, sourceMangaId: string | 
     queryKey: ["sourceManga", sourceId, sourceMangaId],
     queryFn: () => api.getSourceManga(sourceId!, sourceMangaId!),
     enabled: !!sourceId && !!sourceMangaId,
+    staleTime: 1000 * 60 * 5,
   });
 }
 
@@ -121,7 +139,7 @@ export function useImportProgress(mangaId: string | null) {
     queryKey: ["importProgress", mangaId],
     queryFn: () => api.getImportProgress(mangaId!),
     enabled: !!mangaId,
-    refetchInterval: 2000,
+    refetchInterval: (query) => (query.state.data?.isComplete ? false : 2000),
   });
 }
 
@@ -152,6 +170,8 @@ export function useDiscoverBrowse(filters: { sort?: string; country?: string; se
     queryKey: ["discover", "browse", filters],
     queryFn: ({ pageParam = 1 }) => api.discoverBrowse({ ...filters, page: pageParam }),
     initialPageParam: 1,
+    // AniList is remote and rate-limited; don't refetch on every screen mount.
+    staleTime: 1000 * 60 * 5,
     getNextPageParam: (lastPage) => {
       if (lastPage.pageInfo.hasNextPage) {
         return lastPage.pageInfo.currentPage + 1;
@@ -167,18 +187,86 @@ export function useDiscoverManga(anilistId: number) {
     queryKey: ["discover", "manga", anilistId],
     queryFn: () => api.discoverManga(anilistId),
     enabled: !!anilistId,
+    staleTime: 1000 * 60 * 5,
   });
 }
 
 // ─── Queue ─────────────────────────────────────────────────────────────────
 
+function useTaskQueue(
+  queryKey: readonly unknown[],
+  load: () => ReturnType<ReturnType<typeof useApiClient>["getQueueTasks"]>,
+) {
+  return useQuery({
+    queryKey,
+    queryFn: load,
+    // Always check the queue when a screen mounts: downloads progress even
+    // while no mutation is running.
+    staleTime: 0,
+    // Poll only while there is work in flight. The web client invalidates this
+    // query when a download is queued, which restarts the interval.
+    refetchInterval: (query) => {
+      const tasks = query.state.data as
+        | Array<{ status?: string }>
+        | undefined;
+      return tasks?.some(
+        (task) => task.status === "pending" || task.status === "running",
+      )
+        ? 3000
+        : false;
+    },
+  });
+}
+
 export function useQueueTasks(limit = 50) {
   const api = useApiClient();
-  return useQuery({
-    queryKey: ["queueTasks"],
-    queryFn: () => api.getQueueTasks(limit),
-    refetchInterval: 3000,
-  });
+  return useTaskQueue(["queueTasks"], () => api.getQueueTasks(limit));
+}
+
+export function useMangaQueueTasks(mangaId: string) {
+  const api = useApiClient();
+  return useTaskQueue(["queueTasks", "manga", mangaId], () =>
+    api.getQueueTasks(50, mangaId),
+  );
+}
+
+/**
+ * Keeps the chapter list of one manga in sync with the server-side download
+ * queue. The queue changes outside of any mutation (the server worker finishes
+ * downloads on its own), so invalidation alone is not enough: while tasks for
+ * this manga are pending/running we refresh the derived chapter queries, and
+ * we refresh once more when the last task settles.
+ */
+export function useDownloadQueueSync(mangaId: string) {
+  const queryClient = useQueryClient();
+  const { data: tasks = [] } = useMangaQueueTasks(mangaId);
+  const hasActiveTasks = useMemo(
+    () =>
+      tasks.some(
+        (task) =>
+          task.mangaId === mangaId &&
+          (task.status === "pending" || task.status === "running"),
+      ),
+    [tasks, mangaId],
+  );
+  const wasActiveRef = useRef(false);
+
+  useEffect(() => {
+    if (hasActiveTasks) {
+      wasActiveRef.current = true;
+      queryClient.invalidateQueries({ queryKey: ["chapters", mangaId] });
+      queryClient.invalidateQueries({ queryKey: ["importProgress", mangaId] });
+      return;
+    }
+
+    if (wasActiveRef.current) {
+      wasActiveRef.current = false;
+      queryClient.invalidateQueries({ queryKey: ["chapters", mangaId] });
+      queryClient.invalidateQueries({ queryKey: ["manga", mangaId] });
+      queryClient.invalidateQueries({ queryKey: ["importProgress", mangaId] });
+      queryClient.invalidateQueries({ queryKey: ["library"] });
+    }
+  }, [hasActiveTasks, tasks, mangaId, queryClient]);
 }
 
 export function useQueueStats() {
@@ -239,8 +327,13 @@ export function useDeleteManga() {
     mutationFn: (mangaId: string) => api.deleteManga(mangaId),
     onSuccess: (_data, mangaId) => {
       queryClient.invalidateQueries({ queryKey: ["library"] });
+      queryClient.invalidateQueries({ queryKey: ["filterOptions"] });
       queryClient.removeQueries({ queryKey: ["manga", mangaId] });
       queryClient.removeQueries({ queryKey: ["chapters", mangaId] });
+      queryClient.removeQueries({ queryKey: ["chapterProgress", "all", mangaId] });
+      queryClient.removeQueries({ queryKey: ["chapterProgress", mangaId] });
+      queryClient.removeQueries({ queryKey: ["mangaCategories", mangaId] });
+      queryClient.removeQueries({ queryKey: ["importProgress", mangaId] });
       queryClient.invalidateQueries({ queryKey: ["categories"] });
       queryClient.invalidateQueries({ queryKey: ["queueTasks"] });
       queryClient.invalidateQueries({ queryKey: ["queueStats"] });
@@ -268,7 +361,7 @@ export function useMarkChapterComplete(mangaId: string) {
       api.markChapterComplete(mangaId, chapterId, { markPrevious }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["library"] });
-      queryClient.invalidateQueries({ queryKey: ["chapterProgress", "all", mangaId] });
+      queryClient.invalidateQueries({ queryKey: ["chapterProgress"] });
     },
   });
 }
@@ -281,7 +374,7 @@ export function useMarkChapterIncomplete(mangaId: string) {
       api.markChapterIncomplete(mangaId, chapterId, { markFollowing }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["library"] });
-      queryClient.invalidateQueries({ queryKey: ["chapterProgress", "all", mangaId] });
+      queryClient.invalidateQueries({ queryKey: ["chapterProgress"] });
     },
   });
 }
@@ -292,6 +385,8 @@ export function useDownloadChapter(mangaId: string) {
   return useMutation({
     mutationFn: (chapterId: string) => api.downloadChapter(mangaId, chapterId),
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["chapters", mangaId] });
+      queryClient.invalidateQueries({ queryKey: ["importProgress", mangaId] });
       queryClient.invalidateQueries({ queryKey: ["queueTasks"] });
       queryClient.invalidateQueries({ queryKey: ["queueStats"] });
     },
@@ -308,6 +403,10 @@ export function useUpdateChapterProgress(mangaId: string, chapterId: string) {
       api.updateChapterProgress(mangaId, chapterId, body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["chapterProgress", "all", mangaId] });
+      queryClient.invalidateQueries({ queryKey: ["chapterProgress", mangaId, chapterId] });
+      // Reading progress affects the library sorting ("last read") and the
+      // per-card progress bar.
+      queryClient.invalidateQueries({ queryKey: ["library"] });
     },
   });
 }
@@ -322,6 +421,7 @@ export function useFetchMetadata(mangaId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["manga", mangaId] });
       queryClient.invalidateQueries({ queryKey: ["library"] });
+      queryClient.invalidateQueries({ queryKey: ["filterOptions"] });
     },
   });
 }
@@ -334,6 +434,7 @@ export function useApplyMetadata(mangaId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["manga", mangaId] });
       queryClient.invalidateQueries({ queryKey: ["library"] });
+      queryClient.invalidateQueries({ queryKey: ["filterOptions"] });
     },
   });
 }
@@ -348,6 +449,7 @@ export function useAddMangaToCategory(mangaId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["mangaCategories", mangaId] });
       queryClient.invalidateQueries({ queryKey: ["library"] });
+      queryClient.invalidateQueries({ queryKey: ["filterOptions"] });
     },
   });
 }
@@ -360,6 +462,7 @@ export function useRemoveMangaFromCategory(mangaId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["mangaCategories", mangaId] });
       queryClient.invalidateQueries({ queryKey: ["library"] });
+      queryClient.invalidateQueries({ queryKey: ["filterOptions"] });
     },
   });
 }
@@ -391,7 +494,10 @@ export function useCancelImport() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (mangaId: string) => api.cancelImport(mangaId),
-    onSuccess: () => {
+    onSuccess: (_data, mangaId) => {
+      queryClient.invalidateQueries({ queryKey: ["chapters", mangaId] });
+      queryClient.invalidateQueries({ queryKey: ["importProgress", mangaId] });
+      queryClient.invalidateQueries({ queryKey: ["library"] });
       queryClient.invalidateQueries({ queryKey: ["queueTasks"] });
       queryClient.invalidateQueries({ queryKey: ["queueStats"] });
     },
@@ -432,6 +538,10 @@ export function useCancelTask() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["queueTasks"] });
       queryClient.invalidateQueries({ queryKey: ["queueStats"] });
+      // Chapter rows and import progress are derived from queue state.
+      queryClient.invalidateQueries({ queryKey: ["chapters"] });
+      queryClient.invalidateQueries({ queryKey: ["importProgress"] });
+      queryClient.invalidateQueries({ queryKey: ["library"] });
     },
   });
 }
@@ -444,6 +554,8 @@ export function useRetryTask() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["queueTasks"] });
       queryClient.invalidateQueries({ queryKey: ["queueStats"] });
+      queryClient.invalidateQueries({ queryKey: ["chapters"] });
+      queryClient.invalidateQueries({ queryKey: ["importProgress"] });
     },
   });
 }
@@ -456,6 +568,8 @@ export function useRetryAllFailed() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["queueTasks"] });
       queryClient.invalidateQueries({ queryKey: ["queueStats"] });
+      queryClient.invalidateQueries({ queryKey: ["chapters"] });
+      queryClient.invalidateQueries({ queryKey: ["importProgress"] });
     },
   });
 }
@@ -513,6 +627,10 @@ export function useScanStorage() {
   return useMutation({
     mutationFn: (body?: { backendId?: string }) => api.scanStorage(body || {}),
     onSuccess: () => {
+      // Scanning can add manga and chapters to the library.
+      queryClient.invalidateQueries({ queryKey: ["library"] });
+      queryClient.invalidateQueries({ queryKey: ["filterOptions"] });
+      queryClient.invalidateQueries({ queryKey: ["chapters"] });
       queryClient.invalidateQueries({ queryKey: ["queueTasks"] });
       queryClient.invalidateQueries({ queryKey: ["queueStats"] });
     },
@@ -569,6 +687,9 @@ export function useCheckMangaUpdates(mangaId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["chapters", mangaId] });
       queryClient.invalidateQueries({ queryKey: ["manga", mangaId] });
+      queryClient.invalidateQueries({ queryKey: ["importProgress", mangaId] });
+      queryClient.invalidateQueries({ queryKey: ["library"] });
+      queryClient.invalidateQueries({ queryKey: ["filterOptions"] });
       queryClient.invalidateQueries({ queryKey: ["queueTasks"] });
       queryClient.invalidateQueries({ queryKey: ["queueStats"] });
     },
@@ -582,6 +703,9 @@ export function useCheckLibraryUpdates() {
     mutationFn: () => api.checkLibraryUpdates(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["library"] });
+      queryClient.invalidateQueries({ queryKey: ["filterOptions"] });
+      queryClient.invalidateQueries({ queryKey: ["chapters"] });
+      queryClient.invalidateQueries({ queryKey: ["manga"] });
       queryClient.invalidateQueries({ queryKey: ["queueTasks"] });
       queryClient.invalidateQueries({ queryKey: ["queueStats"] });
     },
@@ -595,6 +719,8 @@ export function useDownloadAllChapters(mangaId: string) {
     mutationFn: () => api.downloadAllChapters(mangaId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["chapters", mangaId] });
+      queryClient.invalidateQueries({ queryKey: ["importProgress", mangaId] });
+      queryClient.invalidateQueries({ queryKey: ["library"] });
       queryClient.invalidateQueries({ queryKey: ["queueTasks"] });
       queryClient.invalidateQueries({ queryKey: ["queueStats"] });
     },

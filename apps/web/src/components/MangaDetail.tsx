@@ -23,6 +23,7 @@ import {
   useRemoveMangaFromCategory,
   useCheckMangaUpdates,
   useDownloadAllChapters,
+  useDownloadQueueSync,
   useSources,
 } from "../api/hooks";
 
@@ -97,6 +98,10 @@ export function MangaDetail({ mangaId, onBack, onReadChapter }: MangaDetailProps
   const removeFromCategory = useRemoveMangaFromCategory(mangaId);
   const checkUpdates = useCheckMangaUpdates(mangaId);
   const downloadAll = useDownloadAllChapters(mangaId);
+
+  // Downloads finish in the background; keep the chapter list's download
+  // badges in sync without requiring a page reload.
+  useDownloadQueueSync(mangaId);
 
   const handleCheckUpdates = () => {
     checkUpdates.mutate(undefined, {
