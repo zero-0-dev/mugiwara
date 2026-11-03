@@ -16,12 +16,14 @@ export function isCapacitor(): boolean {
 
   // Fallback for when the Capacitor runtime global is not available yet.
   // Capacitor serves the app from capacitor://localhost (iOS) or
-  // https://localhost (Android). The Vite dev server and the LAN server both
+  // http(s)://localhost (Android). The Vite dev server and the LAN server both
   // have a port, so this does not catch normal web usage.
   const { protocol, hostname, port } = window.location;
   return (
     protocol === "capacitor:" ||
-    (protocol === "https:" && hostname === "localhost" && port === "")
+    ((protocol === "https:" || protocol === "http:") &&
+      hostname === "localhost" &&
+      port === "")
   );
 }
 

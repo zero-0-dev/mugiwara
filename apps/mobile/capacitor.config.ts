@@ -6,7 +6,11 @@ const config: CapacitorConfig = {
   // The same Vite build used by the browser and Electron shell.
   webDir: "../web/dist",
   server: {
-    androidScheme: "https",
+    // Serve the bundled app from http://localhost. The Mugiwara server is a
+    // plain-HTTP LAN service, and Android WebView refuses to load <img> assets
+    // from an HTTP origin when the app itself is served over HTTPS (mixed
+    // content), even with allowMixedContent enabled. Same scheme avoids that.
+    androidScheme: "http",
     // The bundled web client talks to a plain-HTTP Mugiwara server on the LAN.
     cleartext: true,
   },

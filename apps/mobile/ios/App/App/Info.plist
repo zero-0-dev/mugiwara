@@ -28,6 +28,12 @@
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
+		<!-- WKWebView (the Capacitor UI) loads both API responses and images
+		     from the plain-HTTP LAN server. This key must be explicit: when
+		     another ATS exception key is present, NSAllowsArbitraryLoads is
+		     ignored on iOS 10+. -->
+		<key>NSAllowsArbitraryLoadsInWebContent</key>
+		<true/>
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>

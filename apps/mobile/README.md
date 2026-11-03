@@ -129,15 +129,19 @@ pnpm --filter @mugiwara-manga/mobile run:ios
 
 ## Cleartext HTTP on the LAN
 
-The web client runs from `capacitor://localhost` / `https://localhost`, so
-calling a plain `http://` LAN server is cross-origin or mixed content.
+The web client runs from `capacitor://localhost` on iOS and
+`http://localhost` on Android, so calling a plain `http://` LAN server is
+cross-origin (and would be mixed content if Android were still on `https`).
 
-- **Android:** `android.allowMixedContent` and `server.cleartext` are enabled in
-  `capacitor.config.ts`, and `AndroidManifest.xml` has
-  `android:usesCleartextTraffic="true"`.
-- **iOS:** `ios/App/App/Info.plist` has an ATS exception
-  (`NSAllowsArbitraryLoads` + `NSAllowsLocalNetworking`) and a local-network
-  usage description.
+- **Android:** `server.androidScheme` is `http` (not `https`) and
+  `server.cleartext` is enabled in `capacitor.config.ts`, and
+  `AndroidManifest.xml` has `android:usesCleartextTraffic="true"`. Serving the
+  bundled UI from `https://localhost` makes the WebView treat LAN images as
+  mixed content and silently refuse to load them, even with
+  `android.allowMixedContent`; using `http://localhost` avoids that.
+- **iOS:** `ios/App/App/Info.plist` has ATS exceptions
+  (`NSAllowsArbitraryLoads`, `NSAllowsArbitraryLoadsInWebContent` and
+  `NSAllowsLocalNetworking`) and a local-network usage description.
 
 These are appropriate for a self-hosted LAN app. If you put the server behind
 HTTPS, remove them.
