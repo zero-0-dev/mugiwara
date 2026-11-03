@@ -1,8 +1,22 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import App from './App';
+import App, { THEME_STORAGE_KEY } from './App';
 import './index.css';
+
+// Apply the last known theme before the first paint so a light-theme user does
+// not get a dark flash while /api/settings loads.
+try {
+  const cachedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
+  if (cachedTheme) {
+    document.documentElement.dataset.theme = cachedTheme;
+    document
+      .querySelector('meta[name="theme-color"]')
+      ?.setAttribute("content", cachedTheme === "light" ? "#f0ece8" : "#1a1a1a");
+  }
+} catch {
+  // localStorage can be unavailable; the server theme still applies later.
+}
 
 if (window.electronAPI?.platform === "darwin") {
   // Window chrome is a shell concern. The app header/reader read this variable

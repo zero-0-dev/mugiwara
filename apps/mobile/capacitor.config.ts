@@ -22,6 +22,18 @@ const config: CapacitorConfig = {
   ios: {
     contentInset: "automatic",
   },
+  plugins: {
+    // Capacitor 8 bundles SystemBars in @capacitor/core. "css" injects the
+    // --safe-area-inset-* variables that index.css consumes alongside env(),
+    // and style is kept in sync with the app theme at runtime (App.tsx).
+    SystemBars: {
+      style: "DARK",
+      hidden: false,
+      animation: "NONE",
+      insetsHandling: "css",
+      initialViewportFitValueHint: "cover",
+    },
+  },
 };
 
 export default config;

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { useDiscoverBrowse } from "../api/hooks";
 
@@ -36,14 +36,16 @@ interface DiscoverProps {
 
 export function Discover({ onMangaSelect }: DiscoverProps) {
   const [searchQuery, setSearchQuery] = useState("");
+  const [submittedQuery, setSubmittedQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState(CATEGORIES[0]!);
   const [selectedGenre, setSelectedGenre] = useState("");
   const [showFilters, setShowFilters] = useState(false);
+  const categoryRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
   const filters = {
     sort: activeCategory.sort,
     country: activeCategory.country,
-    search: searchQuery || undefined,
+    search: submittedQuery || undefined,
     genre: selectedGenre || undefined,
     perPage: 30,
   };
@@ -63,8 +65,16 @@ export function Discover({ onMangaSelect }: DiscoverProps) {
   );
 
   function handleSearch() {
-    // searchQuery is already in filters
+    setSubmittedQuery(searchQuery.trim());
   }
+
+  useEffect(() => {
+    categoryRefs.current[activeCategory.label]?.scrollIntoView({
+      inline: "center",
+      block: "nearest",
+      behavior: "smooth",
+    });
+  }, [activeCategory.label]);
 
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === "Enter") handleSearch();
@@ -108,13 +118,19 @@ export function Discover({ onMangaSelect }: DiscoverProps) {
       `}</style>
 
       <div className="discover-search-row">
-        <input type="text" className="discover-search-input" placeholder="Search manga..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} onKeyDown={handleKeyDown} />
+        <input type="text" className="discover-search-input" placeholder="Search manga..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} onKeyDown={handleKeyDown} aria-label="Search manga" />
         <button className="discover-search-btn" onClick={handleSearch}>Search</button>
       </div>
 
       <div className="discover-categories">
         {CATEGORIES.map((cat) => (
-          <button key={cat.label} className={`category-btn ${activeCategory.label === cat.label ? "active" : ""}`} onClick={() => { setActiveCategory(cat); setSelectedGenre(""); }}>
+          <button
+            key={cat.label}
+            ref={(element) => { categoryRefs.current[cat.label] = element; }}
+            className={`category-btn ${activeCategory.label === cat.label ? "active" : ""}`}
+            aria-pressed={activeCategory.label === cat.label}
+            onClick={() => { setActiveCategory(cat); setSelectedGenre(""); }}
+          >
             {cat.label}
           </button>
         ))}
@@ -147,7 +163,20 @@ export function Discover({ onMangaSelect }: DiscoverProps) {
       {!isLoading && allManga.length > 0 && (
         <div className="discover-grid">
           {allManga.map((m: AniListManga) => (
-            <div key={m.id} className="discover-card" onClick={() => onMangaSelect(m.id)}>
+            <div
+              key={m.id}
+              className="discover-card"
+              onClick={() => onMangaSelect(m.id)}
+              role="button"
+              tabIndex={0}
+              aria-label={`Open ${m.title.english || m.title.romaji}`}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onMangaSelect(m.id);
+                }
+              }}
+            >
               {m.coverImage?.large ? (
                 <img src={m.coverImage.large} alt={m.title.english || m.title.romaji} className="discover-card-cover" />
               ) : (

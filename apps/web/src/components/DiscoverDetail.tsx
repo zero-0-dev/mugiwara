@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { ArrowLeft, ChevronDown, ChevronUp } from "lucide-react";
 import { AddMangaModal } from "./AddMangaModal";
 import { useDiscoverManga, useSources, useSearchSource } from "../api/hooks";
@@ -45,14 +45,11 @@ export function DiscoverDetail({
     selectedSource && title ? title : "",
   );
 
-  const sourcesInited = useRef(false);
-  if (!sourcesInited.current && sources.length > 0 && !selectedSource) {
+  useEffect(() => {
+    if (selectedSource || sources.length === 0) return;
     const remote = sources.filter((s: Source) => s.id !== "local");
-    if (remote.length > 0) {
-      setSelectedSource(remote[0]!.id);
-    }
-    sourcesInited.current = true;
-  }
+    if (remote.length > 0) setSelectedSource(remote[0]!.id);
+  }, [sources, selectedSource]);
 
   function handleOpenAddModal(result: SearchResult) {
     setAddModalSource(selectedSource || "");
@@ -200,6 +197,10 @@ export function DiscoverDetail({
             ))}
           </div>
 
+          {remoteSources.length === 0 && (
+            <p className="discover-detail-no-results">No remote manga sources are installed. Add a source plugin in Settings → Plugins.</p>
+          )}
+
           {searching && (
             <div className="loading-container" style={{ padding: "20px" }}>
               <div className="loading-spinner" /><p>Searching...</p>
@@ -210,7 +211,19 @@ export function DiscoverDetail({
             <div className="discover-detail-source-results">
               <p style={{ color: "#9ca3af", fontSize: 12, margin: "0 0 8px 0" }}>Results:</p>
               {searchResults.map((result: SearchResult) => (
-                <div key={result.sourceMangaId} className="discover-detail-source-result" onClick={() => handleOpenAddModal(result)}>
+                <div
+                  key={result.sourceMangaId}
+                  className="discover-detail-source-result"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => handleOpenAddModal(result)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      handleOpenAddModal(result);
+                    }
+                  }}
+                >
                   {result.coverImageUrl ? (
                     <img src={result.coverImageUrl} alt={result.title} className="discover-detail-source-result-cover" />
                   ) : (

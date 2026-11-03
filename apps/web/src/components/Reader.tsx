@@ -211,9 +211,17 @@ export function Reader({
     }
   };
 
+  useEffect(() => {
+    return () => {
+      if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+    };
+  }, []);
+
   const handleContextMenu = (e: React.MouseEvent) => {
     if (readingMode === "vertical") return;
     e.preventDefault();
+    if (e.button !== 2) return;
+    if (window.matchMedia?.("(hover: none)").matches) return;
     if ((e.target as HTMLElement).closest(".reader-controls")) return;
     goToPrevPage();
   };
@@ -231,7 +239,7 @@ export function Reader({
     }
   };
 
-  if (pagesLoading || pages.length === 0) {
+  if (pagesLoading) {
     return <div className="reader-loading"><div className="loading-spinner"></div><p>Loading chapter...</p></div>;
   }
 
