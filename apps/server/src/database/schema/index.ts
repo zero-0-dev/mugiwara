@@ -155,24 +155,37 @@ export const chaptersRelations = relations(chapters, ({ one, many }) => ({
   progress: many(readingProgress),
 }));
 
-export const readingProgress = sqliteTable("reading_progress", {
-  id: text("id").primaryKey(),
-  mangaId: text("manga_id")
-    .notNull()
-    .references(() => manga.id, { onDelete: "cascade" }),
-  chapterId: text("chapter_id").references(() => chapters.id, {
-    onDelete: "set null",
+export const readingProgress = sqliteTable(
+  "reading_progress",
+  {
+    id: text("id").primaryKey(),
+    mangaId: text("manga_id")
+      .notNull()
+      .references(() => manga.id, { onDelete: "cascade" }),
+    chapterId: text("chapter_id").references(() => chapters.id, {
+      onDelete: "set null",
+    }),
+    pageNumber: integer("page_number").notNull().default(1),
+    totalPages: integer("total_pages").notNull().default(0),
+    // percentComplete and isCompleted are now calculated dynamically
+    // percentComplete = (pageNumber / totalPages) * 100
+    // isCompleted = pageNumber >= totalPages
+    lastReadAt: text("last_read_at")
+      .notNull()
+      .default(sql`(current_timestamp)`),
+    // Progress is stored per device. Older clients that do not send a device
+    // id are normalized to "default" by the server so the unique index below
+    // also protects them from duplicate rows.
+    deviceId: text("device_id").notNull().default("default"),
+  },
+  (table) => ({
+    // One progress row per manga/chapter/device. The library picks the most
+    // recent row across devices for cards and filters.
+    uniqueReadingProgress: uniqueIndex(
+      "unique_reading_progress_idx",
+    ).on(table.mangaId, table.chapterId, table.deviceId),
   }),
-  pageNumber: integer("page_number").notNull().default(1),
-  totalPages: integer("total_pages").notNull().default(0),
-  // percentComplete and isCompleted are now calculated dynamically
-  // percentComplete = (pageNumber / totalPages) * 100
-  // isCompleted = pageNumber >= totalPages
-  lastReadAt: text("last_read_at")
-    .notNull()
-    .default(sql`(current_timestamp)`),
-  deviceId: text("device_id"),
-});
+);
 
 export const readingProgressRelations = relations(
   readingProgress,

@@ -15,6 +15,13 @@
       "when": 1776534681088,
       "tag": "0001_remove-reading-progress-columns",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1793712574975,
+      "tag": "0002_progress-unique-device",
+      "breakpoints": true
     }
   ]
 }

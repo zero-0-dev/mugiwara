@@ -1,6 +1,25 @@
-import { eq, and, desc, sql, inArray } from "drizzle-orm";
+import { eq, and, desc, sql, inArray, isNull } from "drizzle-orm";
 import { db, readingProgress } from "../index";
 import { chapters } from "../schema";
+
+/**
+ * Device semantics
+ * ----------------
+ * Reading progress is stored per device: one row per
+ * (mangaId, chapterId, deviceId). The web client persists a random UUID in
+ * localStorage and sends it with every write, so the same chapter can have a
+ * row for each device a reader uses. Library cards and filters use the most
+ * recent row across all devices.
+ *
+ * Older clients do not send a device id. They are normalized to this stable
+ * fallback so the unique index also prevents duplicate rows for them.
+ */
+export const DEFAULT_DEVICE_ID = "default";
+
+export function normalizeDeviceId(deviceId?: string | null): string {
+  const trimmed = deviceId?.trim();
+  return trimmed ? trimmed : DEFAULT_DEVICE_ID;
+}
 
 // Helper function to calculate percentComplete from pageNumber and totalPages
 export function calculatePercentComplete(
@@ -66,7 +85,7 @@ export const progressRepository = {
       record = await db.query.readingProgress.findFirst({
         where: and(
           eq(readingProgress.mangaId, mangaId),
-          eq(readingProgress.deviceId, deviceId),
+          eq(readingProgress.deviceId, normalizeDeviceId(deviceId)),
         ),
         orderBy: desc(readingProgress.lastReadAt),
       });
@@ -85,10 +104,11 @@ export const progressRepository = {
       eq(readingProgress.chapterId, chapterId),
     ];
     if (deviceId) {
-      conditions.push(eq(readingProgress.deviceId, deviceId));
+      conditions.push(eq(readingProgress.deviceId, normalizeDeviceId(deviceId)));
     }
     const record = await db.query.readingProgress.findFirst({
       where: and(...conditions),
+      orderBy: desc(readingProgress.lastReadAt),
     });
     return enrichProgressRecord(record);
   },
@@ -96,12 +116,27 @@ export const progressRepository = {
   async findAllByMangaId(mangaId: string, deviceId?: string) {
     const conditions = [eq(readingProgress.mangaId, mangaId)];
     if (deviceId) {
-      conditions.push(eq(readingProgress.deviceId, deviceId));
+      conditions.push(eq(readingProgress.deviceId, normalizeDeviceId(deviceId)));
     }
     const records = await db.query.readingProgress.findMany({
       where: and(...conditions),
       orderBy: desc(readingProgress.lastReadAt),
     });
+
+    // Without a device filter the same chapter can have one row per device.
+    // Collapse them to the most recent row per chapter, which is the state the
+    // detail screen and the library should show.
+    if (!deviceId) {
+      const seenChapters = new Set<string>();
+      const latestPerChapter = records.filter((record) => {
+        if (!record.chapterId) return true;
+        if (seenChapters.has(record.chapterId)) return false;
+        seenChapters.add(record.chapterId);
+        return true;
+      });
+      return enrichProgressRecords(latestPerChapter);
+    }
+
     return enrichProgressRecords(records);
   },
 
@@ -113,92 +148,153 @@ export const progressRepository = {
   },
 
   async create(data: typeof readingProgress.$inferInsert) {
-    const result = await db.insert(readingProgress).values(data).returning();
+    const result = await db
+      .insert(readingProgress)
+      .values({
+        ...data,
+        deviceId: normalizeDeviceId(data.deviceId),
+        lastReadAt: data.lastReadAt ?? new Date().toISOString(),
+      })
+      .returning();
     return enrichProgressRecord(result[0])!;
   },
 
   async update(id: string, data: Partial<typeof readingProgress.$inferInsert>) {
     const result = await db
       .update(readingProgress)
-      .set({ ...data, lastReadAt: new Date().toISOString() })
+      .set({
+        ...data,
+        ...(data.deviceId !== undefined
+          ? { deviceId: normalizeDeviceId(data.deviceId) }
+          : {}),
+        lastReadAt: data.lastReadAt ?? new Date().toISOString(),
+      })
       .where(eq(readingProgress.id, id))
       .returning();
     return enrichProgressRecord(result[0])!;
   },
 
-  // New upsert that properly keys by mangaId + chapterId + deviceId
+  /**
+   * Atomic upsert keyed by (mangaId, chapterId, deviceId).
+   *
+   * SQLite serializes writers, and ON CONFLICT makes concurrent/duplicate
+   * submissions collapse into the same row instead of racing a read-then-write
+   * check. Rows without a chapter (the deprecated manga-level endpoint) cannot
+   * match the unique key because NULLs are distinct in SQLite, so they use the
+   * transactional fallback below.
+   */
   async upsert(data: typeof readingProgress.$inferInsert) {
-    // Build the key conditions: mangaId + chapterId + optional deviceId
-    const conditions: any[] = [eq(readingProgress.mangaId, data.mangaId)];
+    const lastReadAt = data.lastReadAt ?? new Date().toISOString();
+    const values = {
+      ...data,
+      deviceId: normalizeDeviceId(data.deviceId),
+      lastReadAt,
+    };
 
-    // Only add chapterId condition if it's provided
-    if (data.chapterId) {
-      conditions.push(eq(readingProgress.chapterId, data.chapterId));
-    } else {
-      // If no chapterId, look for records with null chapterId
-      conditions.push(eq(readingProgress.chapterId, null as any));
+    if (!data.chapterId) {
+      return this.upsertMangaLevel(values);
     }
 
-    if (data.deviceId) {
-      conditions.push(eq(readingProgress.deviceId, data.deviceId));
-    }
+    const result = await db
+      .insert(readingProgress)
+      .values(values)
+      .onConflictDoUpdate({
+        target: [
+          readingProgress.mangaId,
+          readingProgress.chapterId,
+          readingProgress.deviceId,
+        ],
+        set: {
+          pageNumber: values.pageNumber ?? 1,
+          totalPages: values.totalPages ?? 0,
+          lastReadAt,
+        },
+      })
+      .returning();
 
-    const existing = await db.query.readingProgress.findFirst({
-      where: and(...conditions),
+    return enrichProgressRecord(result[0])!;
+  },
+
+  // Transactional fallback for the deprecated manga-level progress endpoint,
+  // where there is no chapter id to include in the unique key.
+  async upsertMangaLevel(data: typeof readingProgress.$inferInsert) {
+    const deviceId = normalizeDeviceId(data.deviceId);
+    const lastReadAt = data.lastReadAt ?? new Date().toISOString();
+
+    return db.transaction((tx) => {
+      const existing = tx
+        .select()
+        .from(readingProgress)
+        .where(
+          and(
+            eq(readingProgress.mangaId, data.mangaId),
+            isNull(readingProgress.chapterId),
+            eq(readingProgress.deviceId, deviceId),
+          ),
+        )
+        .orderBy(desc(readingProgress.lastReadAt))
+        .get();
+
+      if (existing) {
+        const updated = tx
+          .update(readingProgress)
+          .set({
+            chapterId: data.chapterId ?? null,
+            pageNumber: data.pageNumber ?? 1,
+            totalPages: data.totalPages ?? 0,
+            lastReadAt,
+          })
+          .where(eq(readingProgress.id, existing.id))
+          .returning()
+          .get();
+        return enrichProgressRecord(updated)!;
+      }
+
+      const created = tx
+        .insert(readingProgress)
+        .values({
+          ...data,
+          deviceId,
+          lastReadAt,
+        })
+        .returning()
+        .get();
+      return enrichProgressRecord(created)!;
     });
-
-    if (existing) {
-      return await this.update(existing.id, {
-        pageNumber: data.pageNumber,
-        totalPages: data.totalPages,
-      });
-    }
-
-    const result = await this.create(data);
-    return result;
   },
 
   // Legacy upsert for backward compatibility (keys by mangaId + deviceId only)
   async upsertByManga(data: typeof readingProgress.$inferInsert) {
-    const existing = await this.findByMangaAndDevice(
-      data.mangaId,
-      data.deviceId || undefined,
-    );
-
-    if (existing) {
-      return await this.update(existing.id, {
-        chapterId: data.chapterId,
-        pageNumber: data.pageNumber,
-        totalPages: data.totalPages,
-      });
-    }
-
-    const result = await this.create(data);
-    return result;
+    // If a chapter id is present this is really per-chapter progress and can
+    // use the atomic unique-key path. Otherwise fall back to the manga-level
+    // transactional upsert.
+    return this.upsert(data);
   },
 
   // Mark specific chapters as completed/incomplete
   // Completed = set pageNumber to totalPages
-  // Incomplete = set pageNumber to 1
+  // Incomplete = delete the progress row
   async markChaptersComplete(
     mangaId: string,
     chapterIds: string[],
     shouldComplete: boolean,
     deviceId?: string,
   ) {
+    if (chapterIds.length === 0) return;
+
     const now = new Date().toISOString();
+    const normalizedDeviceId = normalizeDeviceId(deviceId);
 
     // Build base conditions
-    const baseConditions: any[] = [eq(readingProgress.mangaId, mangaId)];
-    if (deviceId) {
-      baseConditions.push(eq(readingProgress.deviceId, deviceId));
-    }
+    const baseConditions: any[] = [
+      eq(readingProgress.mangaId, mangaId),
+      eq(readingProgress.deviceId, normalizedDeviceId),
+    ];
 
     // Get existing progress records to know their totalPages
     const existingProgress = await db.query.readingProgress.findMany({
       where: and(
         ...baseConditions,
-        // Filter by chapterIds
         sql`${readingProgress.chapterId} IN (${sql.join(
           chapterIds.map((id) => sql`${id}`),
           sql`, `,
@@ -253,21 +349,25 @@ export const progressRepository = {
           chapterData.map((c) => [c.id, c.pagesCount]),
         );
 
-        // Create progress records with pageNumber = totalPages
-        await db.insert(readingProgress).values(
-          missingChapterIds.map((chapterId) => {
-            const totalPages = chapterPagesMap.get(chapterId) || 0;
-            return {
-              id: uuidv4(),
-              mangaId,
-              chapterId,
-              pageNumber: totalPages, // Set to totalPages to mark as complete
-              totalPages,
-              deviceId: deviceId || null,
-              lastReadAt: now,
-            };
-          }),
-        );
+        // Create progress records with pageNumber = totalPages. Ignore
+        // conflicts in case another request created the same row first.
+        await db
+          .insert(readingProgress)
+          .values(
+            missingChapterIds.map((chapterId) => {
+              const totalPages = chapterPagesMap.get(chapterId) || 0;
+              return {
+                id: uuidv4(),
+                mangaId,
+                chapterId,
+                pageNumber: totalPages, // Set to totalPages to mark as complete
+                totalPages,
+                deviceId: normalizedDeviceId,
+                lastReadAt: now,
+              };
+            }),
+          )
+          .onConflictDoNothing();
       }
     }
   },

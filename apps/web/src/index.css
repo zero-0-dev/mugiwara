@@ -538,12 +538,20 @@ body {
 }
 
 .progress-bar {
-  /* position: absolute; */
   bottom: 0;
   left: 0;
   right: 0;
   height: 4px;
   background: rgba(0, 0, 0, 0.5);
+}
+
+/* Library card progress: pin to the bottom edge of the (overflow-hidden)
+   cover so it is always visible instead of flowing below the image. */
+.manga-cover .progress-bar {
+  position: absolute;
+  z-index: 2;
+  overflow: hidden;
+  border-radius: 0 0 8px 8px;
 }
 
 .progress-fill {

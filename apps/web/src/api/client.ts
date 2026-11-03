@@ -1,3 +1,9 @@
+import type {
+  LibraryFilterOptions,
+  LibraryManga,
+} from "@mugiwara-manga/types";
+import { getDeviceId } from "./device";
+
 export interface Source {
   id: string;
   name: string;
@@ -72,24 +78,9 @@ export interface BrowseResult {
   pageInfo: { hasNextPage: boolean; currentPage: number; totalPages: number };
 }
 
-export interface MangaWithCount {
-  id: string;
-  title: string;
-  coverImage?: string;
-  author?: string;
-  artist?: string;
-  unreadCount: number;
-  totalCount: number;
-  chapterCount?: number;
-  progress?: { percentComplete: number };
-}
+export type MangaWithCount = LibraryManga;
 
-export interface FilterOptions {
-  categories: Array<{ id: string; name: string }>;
-  statuses: string[];
-  mediaTypes: string[];
-  readingStatuses: string[];
-}
+export type FilterOptions = LibraryFilterOptions;
 
 export interface ChapterWithProgress {
   id: string;
@@ -105,7 +96,7 @@ export interface ChapterWithProgress {
 export interface ReadingProgress {
   id: string;
   mangaId: string;
-  chapterId: string;
+  chapterId: string | null;
   pageNumber: number;
   totalPages: number;
   percentComplete: number;
@@ -257,15 +248,15 @@ export class ApiClient {
   }
 
   updateChapterProgress(mangaId: string, chapterId: string, body: { pageNumber: number; totalPages: number; isCompleted: boolean }): Promise<void> {
-    return this.request(`/api/manga/${mangaId}/chapters/${chapterId}/progress`, { method: "POST", body: JSON.stringify(body) });
+    return this.request(`/api/manga/${mangaId}/chapters/${chapterId}/progress`, { method: "POST", body: JSON.stringify({ ...body, deviceId: getDeviceId() }) });
   }
 
   markChapterComplete(mangaId: string, chapterId: string, body?: { markPrevious?: boolean }): Promise<void> {
-    return this.request(`/api/manga/${mangaId}/chapters/${chapterId}/complete`, { method: "POST", body: JSON.stringify(body || {}) });
+    return this.request(`/api/manga/${mangaId}/chapters/${chapterId}/complete`, { method: "POST", body: JSON.stringify({ ...(body || {}), deviceId: getDeviceId() }) });
   }
 
   markChapterIncomplete(mangaId: string, chapterId: string, body?: { markFollowing?: boolean }): Promise<void> {
-    return this.request(`/api/manga/${mangaId}/chapters/${chapterId}/complete`, { method: "DELETE", body: JSON.stringify(body || {}) });
+    return this.request(`/api/manga/${mangaId}/chapters/${chapterId}/complete`, { method: "DELETE", body: JSON.stringify({ ...(body || {}), deviceId: getDeviceId() }) });
   }
 
   downloadChapter(mangaId: string, chapterId: string): Promise<void> {
