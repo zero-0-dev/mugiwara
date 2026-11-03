@@ -611,7 +611,7 @@ export function Reader({
       scroller.removeEventListener("touchend", handleTouchEnd);
       scroller.removeEventListener("touchcancel", handleTouchCancel);
     };
-  }, [paged, direction, onPrevChapter, onNextChapter]);
+  }, [paged, pages.length, direction, onPrevChapter, onNextChapter]);
 
   // Preload the current page and its neighbours so normal paging has no
   // blank flash. The browser cache serves the <img> tags from here.
@@ -924,7 +924,7 @@ export function Reader({
       element.removeEventListener("touchend", handleTouchEnd);
       element.removeEventListener("touchcancel", handleTouchEnd);
     };
-  }, [cancelPendingTap]);
+  }, [cancelPendingTap, pages.length]);
 
   const resetZoom = () => setZoom(DEFAULT_ZOOM);
 
