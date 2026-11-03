@@ -68,13 +68,46 @@ export interface Chapter {
 export interface ReadingProgress {
   id: string;
   mangaId: string;
-  chapterId: string;
+  // Progress rows whose chapter was deleted keep the history but lose the
+  // chapter reference (the FK is ON DELETE SET NULL).
+  chapterId: string | null;
   pageNumber: number;
   totalPages: number;
   percentComplete: number;
   isCompleted: boolean;
   lastReadAt: string;
   deviceId?: string;
+}
+
+/**
+ * Reading status shown by the library filters.
+ *
+ * - `reading`: the manga has at least one progress row, but not every chapter
+ *   is completed.
+ * - `completed`: the manga has chapters and every chapter is completed (using
+ *   the most recent progress row per chapter across all devices).
+ * - `not-started`: the manga has no progress rows at all.
+ */
+export type LibraryReadingStatus = "reading" | "completed" | "not-started";
+
+export interface LibraryManga extends Omit<Manga, "progress"> {
+  chapterCount: number;
+  // Most recent progress row across every device, enriched with
+  // percentComplete/isCompleted. Raw database rows are never returned.
+  progress?: ReadingProgress;
+  readingStatus: LibraryReadingStatus;
+}
+
+export interface LibraryFilterOptions {
+  categories: Category[];
+  statuses: Array<{ status: string; count: number }>;
+  mediaTypes: Array<{ mediaType: string; count: number }>;
+  readingStatus: {
+    total: number;
+    reading: number;
+    completed: number;
+    notStarted: number;
+  };
 }
 
 export interface Category {

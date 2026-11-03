@@ -1,5 +1,6 @@
-import { eq, like, or, and, desc, sql, count } from "drizzle-orm";
+import { eq, like, or, and, desc } from "drizzle-orm";
 import { db, manga, chapters, readingProgress, importTasks } from "../index";
+import { libraryRepository } from "./library";
 
 export const mangaRepository = {
   async findAll() {
@@ -67,24 +68,8 @@ export const mangaRepository = {
   },
 
   async getWithProgress() {
-    const results = await db
-      .select({
-        manga: manga,
-        progress: readingProgress,
-        chapterCount: count(chapters.id),
-      })
-      .from(manga)
-      .leftJoin(readingProgress, eq(manga.id, readingProgress.mangaId))
-      .leftJoin(chapters, eq(manga.id, chapters.mangaId))
-      .groupBy(manga.id)
-      .orderBy(
-        desc(sql`COALESCE(${readingProgress.lastReadAt}, ${manga.createdAt})`),
-      );
-
-    return results.map((r) => ({
-      ...r.manga,
-      progress: r.progress || undefined,
-      chapterCount: r.chapterCount,
-    }));
+    // Legacy listing path. It shares the same aggregates as the library
+    // filter endpoint so chapter counts and progress cannot diverge.
+    return libraryRepository.findAll();
   },
 };
