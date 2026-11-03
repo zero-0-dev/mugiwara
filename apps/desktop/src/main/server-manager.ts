@@ -52,6 +52,11 @@ export class ServerManager {
       WEB_DIR: path.join(process.resourcesPath, "web"),
       HOST: "0.0.0.0",
       NODE_ENV: this.isDev ? "development" : "production",
+      // The desktop shell deliberately allows plugin installation even though
+      // the embedded server binds the LAN interface. Plugin installs still
+      // require an admin token, explicit confirmation, an approved registry and
+      // npm lifecycle scripts are disabled.
+      MUGIWARA_ALLOW_REMOTE_PLUGIN_INSTALL: "true",
     };
 
     console.log(`[ServerManager] Starting server on port ${this.config.port}`);

@@ -62,18 +62,38 @@ body {
   background: var(--bg-primary);
   color: var(--text-primary);
   line-height: 1.6;
-  transition: background-color 0.3s ease, color 0.3s ease;
+  transition:
+    background-color 0.3s ease,
+    color 0.3s ease;
 }
 
-#root, .app, .app-header, .settings-page, .manga-detail, .library,
-.reader-loading, .reader-error, .reader-empty,
-.manga-detail-loading, .manga-detail-error,
-.chapter-item, .settings-nav .nav-item,
-.search-results-modal, .add-manga-modal,
-.category-dropdown, .manga-card,
-.discover-card, .backend-card, .plugin-card, .task-card,
-.stat-card, .category-item {
-  transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+#root,
+.app,
+.app-header,
+.settings-page,
+.manga-detail,
+.library,
+.reader-loading,
+.reader-error,
+.reader-empty,
+.manga-detail-loading,
+.manga-detail-error,
+.chapter-item,
+.settings-nav .nav-item,
+.search-results-modal,
+.add-manga-modal,
+.category-dropdown,
+.manga-card,
+.discover-card,
+.backend-card,
+.plugin-card,
+.task-card,
+.stat-card,
+.category-item {
+  transition:
+    background-color 0.3s ease,
+    border-color 0.3s ease,
+    box-shadow 0.3s ease;
 }
 
 #root {
@@ -102,7 +122,9 @@ body {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .spin {
@@ -2068,7 +2090,9 @@ body {
   color: inherit;
   cursor: pointer;
   opacity: 0.5;
-  transition: opacity 0.15s, background-color 0.15s;
+  transition:
+    opacity 0.15s,
+    background-color 0.15s;
 }
 
 .category-remove-btn:hover {
@@ -2647,7 +2671,10 @@ body {
   overflow: hidden;
   cursor: pointer;
   border: 1px solid var(--bg-tertiary);
-  transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s,
+    border-color 0.2s;
 }
 
 .add-manga-result-card:hover {
@@ -2871,7 +2898,9 @@ body {
   border-bottom: 1px solid var(--bg-tertiary);
   font-size: 0.875rem;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
   border-left: 3px solid transparent;
 }
 
@@ -3415,6 +3444,169 @@ button.server-status {
 .server-setup-help code {
   color: var(--text-primary);
   word-break: break-all;
+}
+
+.server-setup-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin: 1.25rem 0 1rem;
+  padding: 0.25rem;
+  background: var(--bg-primary);
+  border: 1px solid var(--bg-tertiary);
+  border-radius: 10px;
+}
+
+.server-setup-tab {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.55rem 0.75rem;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.server-setup-tab.active {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.server-setup-locked-url {
+  padding: 0.75rem;
+  background: var(--bg-primary);
+  border: 1px solid var(--bg-tertiary);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-family: var(--font-mono, monospace);
+  font-size: 0.875rem;
+  word-break: break-all;
+  margin-bottom: 0.5rem;
+}
+
+.server-setup-code {
+  font-family: var(--font-mono, monospace);
+  letter-spacing: 0.12em;
+}
+
+.server-setup-connect {
+  width: 100%;
+  margin-top: 1.25rem;
+  justify-content: center;
+}
+
+.server-setup-notice {
+  margin-top: 0.75rem;
+  color: var(--success);
+  font-size: 0.875rem;
+}
+
+.server-setup-link {
+  margin-top: 0.75rem;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 0.8125rem;
+  cursor: pointer;
+  text-align: left;
+}
+
+/* Security / paired devices */
+
+.security-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.pairing-code-panel {
+  padding: 1rem;
+  margin-bottom: 1.25rem;
+  border: 1px dashed var(--accent);
+  border-radius: 10px;
+  background: rgba(99, 102, 241, 0.08);
+}
+
+.pairing-code-value {
+  display: block;
+  margin: 0.5rem 0;
+  font-family: var(--font-mono, monospace);
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+}
+
+.pairing-code-hint {
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+}
+
+.device-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+.device-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.875rem;
+  border: 1px solid var(--bg-tertiary);
+  border-radius: 10px;
+  background: var(--bg-primary);
+}
+
+.device-card.current {
+  border-color: var(--accent);
+}
+
+.device-card-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.device-card-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.device-card-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+}
+
+.device-badge {
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(99, 102, 241, 0.18);
+  color: var(--accent);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.device-card-meta {
+  margin-top: 0.2rem;
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
 }
 
 /* ==========================================================================

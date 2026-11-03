@@ -159,11 +159,43 @@ export interface AvailablePlugin {
   keywords?: string[];
 }
 
+export interface AuthDevice {
+  id: string;
+  label: string;
+  isAdmin: boolean;
+  createdAt: string;
+  lastUsedAt: string | null;
+  expiresAt: string | null;
+  revokedAt: string | null;
+  isCurrent?: boolean;
+}
+
+export interface AuthStatus {
+  authRequired: boolean;
+  paired: boolean;
+  firstRun: boolean;
+  activeDevices: number;
+}
+
+export interface PluginPolicy {
+  installEnabled: boolean;
+  reason: string | null;
+  exposedOnNetwork: boolean;
+  allowRemoteInstall: boolean;
+  registryUrl: string;
+  allowlistMode: "explicit" | "namespace";
+  allowedPackages: string[];
+}
+
 export class ApiClient {
   private baseUrl: string;
+  private authToken: string | null;
+  private contentToken: string | null = null;
+  private contentTokenExpiresAt = 0;
 
-  constructor(baseUrl: string) {
+  constructor(baseUrl: string, authToken: string | null = null) {
     this.baseUrl = baseUrl;
+    this.authToken = authToken;
   }
 
   setBaseUrl(url: string) {
@@ -174,23 +206,76 @@ export class ApiClient {
     return this.baseUrl;
   }
 
+  setAuthToken(token: string | null) {
+    this.authToken = token;
+    this.contentToken = null;
+    this.contentTokenExpiresAt = 0;
+  }
+
+  hasAuthToken(): boolean {
+    return Boolean(this.authToken);
+  }
+
+  setContentToken(token: string | null, expiresInSeconds?: number) {
+    this.contentToken = token;
+    this.contentTokenExpiresAt = token
+      ? Date.now() + Math.max(30, (expiresInSeconds ?? 900) - 60) * 1000
+      : 0;
+  }
+
   getAssetUrl(path?: string, cacheBuster?: number): string | undefined {
     if (!path) return undefined;
     const url = /^https?:\/\//i.test(path) ? path : `${this.baseUrl}${path}`;
-    if (!cacheBuster) return url;
-    return `${url}${url.includes("?") ? "&" : "?"}t=${cacheBuster}`;
+    const params: string[] = [];
+    if (cacheBuster) params.push(`t=${cacheBuster}`);
+    // <img> cannot send an Authorization header. The session cookie covers
+    // same-origin browser/Electron, while this short-lived scoped token covers
+    // Capacitor and any other cross-origin client.
+    if (this.contentToken) {
+      params.push(`contentToken=${encodeURIComponent(this.contentToken)}`);
+    }
+    if (params.length === 0) return url;
+    return `${url}${url.includes("?") ? "&" : "?"}${params.join("&")}`;
+  }
+
+  async refreshContentToken(): Promise<string | null> {
+    if (!this.authToken) return null;
+    if (this.contentToken && Date.now() < this.contentTokenExpiresAt) {
+      return this.contentToken;
+    }
+    try {
+      const issued = await this.request<{ token: string; expiresIn: number }>(
+        "/api/auth/content-token",
+        { method: "POST" },
+      );
+      this.setContentToken(issued.token, issued.expiresIn);
+      return issued.token;
+    } catch {
+      return null;
+    }
   }
 
   private async request<T>(path: string, options?: RequestInit): Promise<T> {
+    const headers = new Headers(options?.headers);
+    if (options?.body !== undefined && !headers.has("Content-Type")) {
+      headers.set("Content-Type", "application/json");
+    }
+    if (this.authToken) {
+      headers.set("Authorization", `Bearer ${this.authToken}`);
+    }
+
     const response = await fetch(`${this.baseUrl}${path}`, {
       ...options,
-      headers: {
-        "Content-Type": "application/json",
-        ...options?.headers,
-      },
+      headers,
+      credentials: "same-origin",
     });
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: response.statusText }));
+      if (response.status === 401 && this.authToken) {
+        window.dispatchEvent(new CustomEvent("mugiwara:unauthorized"));
+      }
+      const errorData = await response
+        .json()
+        .catch(() => ({ error: response.statusText }));
       throw new Error(errorData.error || response.statusText);
     }
     if (response.status === 204 || response.status === 205) {
@@ -199,19 +284,75 @@ export class ApiClient {
     return response.json();
   }
 
+  // Auth / pairing
+  getAuthStatus(): Promise<AuthStatus> {
+    return this.request<AuthStatus>("/api/auth/status");
+  }
+
+  getMe(): Promise<{ device: AuthDevice; isAdmin: boolean; via: string }> {
+    return this.request("/api/auth/me");
+  }
+
+  getDevices(): Promise<AuthDevice[]> {
+    return this.request("/api/auth/devices");
+  }
+
+  revokeDevice(id: string): Promise<void> {
+    return this.request(`/api/auth/devices/${encodeURIComponent(id)}/revoke`, {
+      method: "POST",
+    });
+  }
+
+  logout(): Promise<void> {
+    return this.request("/api/auth/logout", { method: "POST" });
+  }
+
+  logoutAll(): Promise<{ revokedDevices: number }> {
+    return this.request("/api/auth/logout-all", { method: "POST" });
+  }
+
+  rotateToken(): Promise<{ token: string; device: AuthDevice }> {
+    return this.request("/api/auth/rotate", { method: "POST" });
+  }
+
+  createPairingCode(): Promise<{
+    code: string;
+    expiresAt: string;
+    expiresIn: number;
+  }> {
+    return this.request("/api/auth/pairing/init", { method: "POST" });
+  }
+
+  // Plugin install policy
+  getPluginPolicy(): Promise<PluginPolicy> {
+    return this.request("/api/plugins/policy");
+  }
+
   // Library
-  getLibrary(params?: { search?: string; status?: string; mediaType?: string; genre?: string; category?: string; readingStatus?: string; sortBy?: string; sortOrder?: string }): Promise<MangaWithCount[]> {
+  getLibrary(params?: {
+    search?: string;
+    status?: string;
+    mediaType?: string;
+    genre?: string;
+    category?: string;
+    readingStatus?: string;
+    sortBy?: string;
+    sortOrder?: string;
+  }): Promise<MangaWithCount[]> {
     const searchParams = new URLSearchParams();
     if (params?.search) searchParams.set("search", params.search);
     if (params?.status) searchParams.set("status", params.status);
     if (params?.mediaType) searchParams.set("mediaType", params.mediaType);
     if (params?.genre) searchParams.set("genre", params.genre);
     if (params?.category) searchParams.set("category", params.category);
-    if (params?.readingStatus) searchParams.set("readingStatus", params.readingStatus);
+    if (params?.readingStatus)
+      searchParams.set("readingStatus", params.readingStatus);
     if (params?.sortBy) searchParams.set("sortBy", params.sortBy);
     if (params?.sortOrder) searchParams.set("sortOrder", params.sortOrder);
     const qs = searchParams.toString();
-    return this.request<MangaWithCount[]>(`/api/library/filter${qs ? `?${qs}` : ""}`);
+    return this.request<MangaWithCount[]>(
+      `/api/library/filter${qs ? `?${qs}` : ""}`,
+    );
   }
 
   getFilterOptions(): Promise<FilterOptions> {
@@ -227,15 +368,26 @@ export class ApiClient {
     return this.request(`/api/manga/${id}`, { method: "DELETE" });
   }
 
-  updateManga(id: string, body: Partial<import("@mugiwara-manga/types").Manga>): Promise<void> {
-    return this.request(`/api/manga/${id}`, { method: "PUT", body: JSON.stringify(body) });
+  updateManga(
+    id: string,
+    body: Partial<import("@mugiwara-manga/types").Manga>,
+  ): Promise<void> {
+    return this.request(`/api/manga/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    });
   }
 
-  getChapters(mangaId: string): Promise<import("@mugiwara-manga/types").Chapter[]> {
+  getChapters(
+    mangaId: string,
+  ): Promise<import("@mugiwara-manga/types").Chapter[]> {
     return this.request(`/api/manga/${mangaId}/chapters`);
   }
 
-  getChapterPages(mangaId: string, chapterId: string): Promise<import("@mugiwara-manga/types").PageInfo[]> {
+  getChapterPages(
+    mangaId: string,
+    chapterId: string,
+  ): Promise<import("@mugiwara-manga/types").PageInfo[]> {
     return this.request(`/api/manga/${mangaId}/chapters/${chapterId}/pages`);
   }
 
@@ -243,7 +395,10 @@ export class ApiClient {
     return this.request(`/api/manga/${mangaId}/progress/all`);
   }
 
-  getChapterProgress(mangaId: string, chapterId: string): Promise<ReadingProgress> {
+  getChapterProgress(
+    mangaId: string,
+    chapterId: string,
+  ): Promise<ReadingProgress> {
     return this.request(`/api/manga/${mangaId}/chapters/${chapterId}/progress`);
   }
 
@@ -260,37 +415,71 @@ export class ApiClient {
   }
 
   downloadChapter(mangaId: string, chapterId: string): Promise<void> {
-    return this.request(`/api/manga/${mangaId}/chapters/${chapterId}/download`, { method: "POST" });
+    return this.request(
+      `/api/manga/${mangaId}/chapters/${chapterId}/download`,
+      { method: "POST" },
+    );
   }
 
   // Metadata
   fetchMetadata(mangaId: string): Promise<void> {
-    return this.request(`/api/manga/${mangaId}/metadata/fetch`, { method: "POST" });
+    return this.request(`/api/manga/${mangaId}/metadata/fetch`, {
+      method: "POST",
+    });
   }
 
   searchMetadata(mangaId: string, query: string): Promise<AniListManga[]> {
-    return this.request(`/api/manga/${mangaId}/metadata/search?q=${encodeURIComponent(query)}`);
+    return this.request(
+      `/api/manga/${mangaId}/metadata/search?q=${encodeURIComponent(query)}`,
+    );
   }
 
   applyMetadata(mangaId: string, body: { anilistId: number }): Promise<void> {
-    return this.request(`/api/manga/${mangaId}/metadata/apply`, { method: "POST", body: JSON.stringify(body) });
+    return this.request(`/api/manga/${mangaId}/metadata/apply`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
   }
 
   // Categories
-  getCategories(): Promise<Array<{ id: string; name: string; color?: string; sortOrder: number; createdAt: string }>> {
+  getCategories(): Promise<
+    Array<{
+      id: string;
+      name: string;
+      color?: string;
+      sortOrder: number;
+      createdAt: string;
+    }>
+  > {
     return this.request("/api/categories");
   }
 
-  getMangaCategories(mangaId: string): Promise<Array<{ id: string; name: string; color?: string; sortOrder: number; createdAt: string }>> {
+  getMangaCategories(
+    mangaId: string,
+  ): Promise<
+    Array<{
+      id: string;
+      name: string;
+      color?: string;
+      sortOrder: number;
+      createdAt: string;
+    }>
+  > {
     return this.request(`/api/categories/manga/${mangaId}/categories`);
   }
 
   addMangaToCategory(mangaId: string, categoryId: string): Promise<void> {
-    return this.request(`/api/categories/manga/${mangaId}/categories`, { method: "POST", body: JSON.stringify({ categoryId }) });
+    return this.request(`/api/categories/manga/${mangaId}/categories`, {
+      method: "POST",
+      body: JSON.stringify({ categoryId }),
+    });
   }
 
   removeMangaFromCategory(mangaId: string, categoryId: string): Promise<void> {
-    return this.request(`/api/categories/manga/${mangaId}/categories/${categoryId}`, { method: "DELETE" });
+    return this.request(
+      `/api/categories/manga/${mangaId}/categories/${categoryId}`,
+      { method: "DELETE" },
+    );
   }
 
   // Sources
@@ -299,16 +488,30 @@ export class ApiClient {
   }
 
   searchSource(sourceId: string, query: string): Promise<SearchResult[]> {
-    return this.request(`/api/library/sources/${sourceId}/search?q=${encodeURIComponent(query)}`);
+    return this.request(
+      `/api/library/sources/${sourceId}/search?q=${encodeURIComponent(query)}`,
+    );
   }
 
-  getSourceManga(sourceId: string, sourceMangaId: string): Promise<MangaDetails> {
-    return this.request(`/api/library/sources/${sourceId}/manga/${encodeURIComponent(sourceMangaId)}`);
+  getSourceManga(
+    sourceId: string,
+    sourceMangaId: string,
+  ): Promise<MangaDetails> {
+    return this.request(
+      `/api/library/sources/${sourceId}/manga/${encodeURIComponent(sourceMangaId)}`,
+    );
   }
 
   // Import
-  importManga(body: { sourceId: string; sourceMangaId: string; chapters: MangaDetails["chapters"] }): Promise<{ mangaId: string }> {
-    return this.request("/api/library/import", { method: "POST", body: JSON.stringify(body) });
+  importManga(body: {
+    sourceId: string;
+    sourceMangaId: string;
+    chapters: MangaDetails["chapters"];
+  }): Promise<{ mangaId: string }> {
+    return this.request("/api/library/import", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
   }
 
   getImportProgress(mangaId: string): Promise<ImportProgressResponse> {
@@ -316,7 +519,9 @@ export class ApiClient {
   }
 
   cancelImport(mangaId: string): Promise<void> {
-    return this.request(`/api/library/import/${mangaId}/cancel`, { method: "POST" });
+    return this.request(`/api/library/import/${mangaId}/cancel`, {
+      method: "POST",
+    });
   }
 
   // Settings
@@ -325,7 +530,10 @@ export class ApiClient {
   }
 
   saveSetting(key: string, value: unknown): Promise<void> {
-    return this.request(`/api/settings/${key}`, { method: "PUT", body: JSON.stringify({ value }) });
+    return this.request(`/api/settings/${key}`, {
+      method: "PUT",
+      body: JSON.stringify({ value }),
+    });
   }
 
   getReadingMode(mangaId: string): Promise<{ mode: string }> {
@@ -333,11 +541,23 @@ export class ApiClient {
   }
 
   setReadingMode(mangaId: string, mode: string): Promise<void> {
-    return this.request(`/api/settings/readingMode.${mangaId}`, { method: "PUT", body: JSON.stringify({ value: mode }) });
+    return this.request(`/api/settings/readingMode.${mangaId}`, {
+      method: "PUT",
+      body: JSON.stringify({ value: mode }),
+    });
   }
 
   // Discover
-  discoverBrowse(params: { sort?: string; country?: string; search?: string; genre?: string; format?: string; status?: string; page?: number; perPage?: number }): Promise<BrowseResult> {
+  discoverBrowse(params: {
+    sort?: string;
+    country?: string;
+    search?: string;
+    genre?: string;
+    format?: string;
+    status?: string;
+    page?: number;
+    perPage?: number;
+  }): Promise<BrowseResult> {
     const searchParams = new URLSearchParams();
     if (params.sort) searchParams.set("sort", params.sort);
     if (params.country) searchParams.set("country", params.country);
@@ -366,7 +586,9 @@ export class ApiClient {
   }
 
   cancelTask(taskId: string): Promise<void> {
-    return this.request(`/api/queue/tasks/${taskId}/cancel`, { method: "POST" });
+    return this.request(`/api/queue/tasks/${taskId}/cancel`, {
+      method: "POST",
+    });
   }
 
   retryTask(taskId: string): Promise<void> {
@@ -390,12 +612,25 @@ export class ApiClient {
     return this.request("/api/storage/types");
   }
 
-  createStorageBackend(body: { type: string; name: string; config: Record<string, unknown> }): Promise<void> {
-    return this.request("/api/storage/backends", { method: "POST", body: JSON.stringify(body) });
+  createStorageBackend(body: {
+    type: string;
+    name: string;
+    config: Record<string, unknown>;
+  }): Promise<void> {
+    return this.request("/api/storage/backends", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
   }
 
-  updateStorageBackend(id: string, body: { config: Record<string, unknown> }): Promise<void> {
-    return this.request(`/api/storage/backends/${id}`, { method: "PUT", body: JSON.stringify(body) });
+  updateStorageBackend(
+    id: string,
+    body: { config: Record<string, unknown> },
+  ): Promise<void> {
+    return this.request(`/api/storage/backends/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    });
   }
 
   deleteStorageBackend(id: string): Promise<void> {
@@ -403,7 +638,10 @@ export class ApiClient {
   }
 
   scanStorage(body: { backendId?: string }): Promise<void> {
-    return this.request("/api/storage/scan", { method: "POST", body: JSON.stringify(body) });
+    return this.request("/api/storage/scan", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
   }
 
   // Plugins
@@ -415,12 +653,22 @@ export class ApiClient {
     return this.request("/api/plugins/available");
   }
 
-  installPlugin(body: { packageName: string }): Promise<void> {
-    return this.request("/api/plugins/install", { method: "POST", body: JSON.stringify(body) });
+  installPlugin(body: {
+    packageName: string;
+    version?: string;
+    confirm: true;
+  }): Promise<void> {
+    return this.request("/api/plugins/install", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
   }
 
   uninstallPlugin(id: string): Promise<void> {
-    return this.request(`/api/plugins/${id}/uninstall`, { method: "POST" });
+    return this.request(`/api/plugins/${id}/uninstall`, {
+      method: "POST",
+      body: JSON.stringify({ confirm: true }),
+    });
   }
 
   enablePlugin(id: string): Promise<void> {
@@ -433,14 +681,22 @@ export class ApiClient {
 
   // Library Updates
   checkMangaUpdates(mangaId: string): Promise<{ newChaptersFound: number }> {
-    return this.request(`/api/library/manga/${mangaId}/check-updates`, { method: "POST" });
+    return this.request(`/api/library/manga/${mangaId}/check-updates`, {
+      method: "POST",
+    });
   }
 
-  checkLibraryUpdates(): Promise<{ checked: number; updated: number; newChaptersTotal: number }> {
+  checkLibraryUpdates(): Promise<{
+    checked: number;
+    updated: number;
+    newChaptersTotal: number;
+  }> {
     return this.request("/api/library/check-updates", { method: "POST" });
   }
 
   downloadAllChapters(mangaId: string): Promise<{ chaptersQueued: number }> {
-    return this.request(`/api/library/manga/${mangaId}/download-all`, { method: "POST" });
+    return this.request(`/api/library/manga/${mangaId}/download-all`, {
+      method: "POST",
+    });
   }
 }

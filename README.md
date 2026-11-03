@@ -62,8 +62,95 @@ Notes:
 - The server listens on `0.0.0.0` by default. Set `HOST=127.0.0.1` to restrict
   it to the local machine.
 - Open the port in the host firewall (default `3001`).
-- There is no authentication yet. Treat it as a trusted-LAN service and do not
-  expose it to the internet without a reverse proxy and auth.
+- Every `/api` route except `/api/health` requires a paired device token. The
+  server is safe to run on a trusted LAN, but still put it behind HTTPS and a
+  reverse proxy if it is reachable from the internet.
+
+## Authentication and pairing
+
+The server uses a single-user bearer-token model. The raw token is shown once;
+the database stores only its SHA-256 hash plus the device label, creation time,
+last-used time and revocation state.
+
+On first start, the server prints a short-lived pairing code:
+
+```
+🔑 First-run pairing code: ABCD2345
+   Valid for 10 minutes. Enter it in the Mugiwara app to pair this device.
+```
+
+In the app, enter the server address and that code (or paste an access token)
+on the Connect screen. Codes are single use and expire after 10 minutes. Once
+paired, open **Settings → Security** to:
+
+- see paired devices,
+- revoke one device,
+- create a pairing code for another device,
+- rotate the current token (API: `POST /api/auth/rotate`),
+- log out all devices (`POST /api/auth/logout-all`).
+
+The web client stores the token per server origin in `localStorage` and sends
+`Authorization: Bearer …` from the single API client. The server also sets an
+`HttpOnly`, `SameSite=Lax` session cookie on pairing. That cookie lets
+same-origin browser and Electron `<img>` tags load covers and reader pages.
+Capacitor and other cross-origin clients request a short-lived (15 minute)
+content-scoped signed token from `POST /api/auth/content-token`; the client
+appends it as `?contentToken=…` to content URLs. It only works on
+`/api/content/*` and is invalidated when the device token is revoked.
+
+The packaged Electron app provisions a token automatically over loopback and
+passes it to the renderer through the preload bridge, so desktop setup stays
+zero-touch. Set `MUGIWARA_AUTH_TOKEN` to override that for a headless or shared
+server. In development Electron reads the same env var or pairs through the
+loopback server.
+
+### Environment variables
+
+| Variable                                           | Default                       | Purpose                                                                                                                         |
+| -------------------------------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `PORT`                                             | `3001`                        | HTTP port.                                                                                                                      |
+| `HOST`                                             | `0.0.0.0`                     | Bind address. Use `127.0.0.1` for local-only.                                                                                   |
+| `DATA_DIR`                                         | `./data`                      | SQLite database, covers and plugin installs.                                                                                    |
+| `WEB_DIR`                                          | auto-detect                   | Built web client directory.                                                                                                     |
+| `MUGIWARA_ALLOWED_ORIGINS`                         | empty                         | Comma-separated extra CORS origins. Wildcards are ignored; same-origin and known Electron/Capacitor origins are always allowed. |
+| `MUGIWARA_TRUST_PROXY`                             | `false`                       | Set to `true` when a reverse proxy terminates TLS (affects secure cookies and client IPs).                                      |
+| `MUGIWARA_COOKIE_SECURE`                           | auto                          | Force the `Secure` cookie flag.                                                                                                 |
+| `MUGIWARA_AUTH_TOKEN` / `MUGIWARA_BOOTSTRAP_TOKEN` | empty                         | Provision a fixed admin token (minimum 24 characters). The value is never logged.                                               |
+| `MUGIWARA_BOOTSTRAP_LABEL`                         | `Bootstrap token`             | Device label for the bootstrap token.                                                                                           |
+| `MUGIWARA_TOKEN_TTL_DAYS`                          | `0`                           | Optional bearer-token lifetime in days. `0` means tokens do not expire until revoked.                                           |
+| `MUGIWARA_PLUGIN_REGISTRY`                         | `https://registry.npmjs.org/` | Approved npm registry. Must be HTTPS (HTTP is allowed only for localhost).                                                      |
+| `MUGIWARA_PLUGIN_ALLOWLIST`                        | empty                         | Comma-separated exact package allowlist. Empty allows the `mugiwara-plugin-*` and `@mugiwara-manga/*` namespaces.               |
+| `MUGIWARA_ALLOW_REMOTE_PLUGIN_INSTALL`             | `false`                       | Permit plugin installs while bound to a non-loopback interface.                                                                 |
+| `MUGIWARA_PLUGIN_INSTALL_ENABLED`                  | `true`                        | Master switch for plugin installation.                                                                                          |
+
+### CORS, CSRF and body limits
+
+CORS never uses `*`: only configured origins, the request's own origin, and the
+known Electron/Vite (`http://localhost:5173`) and Capacitor
+(`http://localhost`, `https://localhost`, `capacitor://localhost`) origins are
+allowed, with `Access-Control-Allow-Credentials: true`. Disallowed preflights
+are rejected with `403`.
+
+State-changing requests that use cookie authentication must have a valid
+`Origin` (or be same-origin/non-browser). `application/x-www-form-urlencoded`
+writes are rejected with `415`; API writes use JSON. The global JSON body limit
+is 1 MB, with a 20 MB limit for `/api/library/import`.
+
+Auth and expensive routes (discovery, source search, metadata, storage scans,
+plugin install/update) are rate limited. Auth failures, plugin
+install/uninstall/update and destructive operations are written to the
+`audit_logs` table; audit rows never contain tokens, pairing codes or request
+bodies.
+
+### Plugin installation safety
+
+Plugin installation is admin-only and requires `confirm: true` in the request
+body (the UI asks for confirmation). npm runs with `--ignore-scripts`, no audit
+or funding checks, and the configured registry. Packages must match the approved
+namespace or explicit allowlist and the `mugiwara-plugin-*` / `@mugiwara-manga/*`
+name pattern. When the server is bound to a non-loopback interface, installs
+and updates are disabled unless `MUGIWARA_ALLOW_REMOTE_PLUGIN_INSTALL=true`.
+Built-in source and storage plugins keep working and cannot be uninstalled.
 
 ## Library data, progress and reading status
 
@@ -110,8 +197,9 @@ pnpm build:desktop:win
 pnpm build:desktop:linux
 ```
 
-By default the packaged desktop app starts its own server. To use a server that
-is already running on the LAN instead:
+By default the packaged desktop app starts its own server and provisions a
+loopback auth token automatically for the renderer. To use a server that is
+already running on the LAN instead:
 
 ```sh
 MUGIWARA_SERVER_URL=http://192.168.1.20:3001 pnpm --filter @mugiwara-manga/desktop dev
@@ -216,8 +304,9 @@ You can also use `pnpm --filter @mugiwara-manga/mobile run:ios` to let Capacitor
 pick a connected device/emulator.
 
 On first launch, enter the server address printed by the server, for example
-`http://192.168.1.20:3001`. The app verifies it with `/api/health` before
-saving.
+`http://192.168.1.20:3001`, then the one-time pairing code printed by the
+server. The app verifies the address with `/api/health` before saving the
+token for that server origin.
 
 Cleartext HTTP is already configured for the LAN use case:
 
@@ -228,6 +317,18 @@ Cleartext HTTP is already configured for the LAN use case:
 
 See `apps/mobile/README.md` for details. If you later put the server behind
 HTTPS, remove the cleartext exceptions.
+
+## Tests
+
+The server has focused security tests (auth, CORS/CSRF, content tokens and
+plugin install hardening) using Vitest and Supertest:
+
+```sh
+pnpm --filter @mugiwara-manga/server test
+```
+
+The tests use a temporary `DATA_DIR` and an exported app factory, so they never
+bind a port or touch your real library.
 
 ## Why no per-platform UI
 

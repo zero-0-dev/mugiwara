@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import { StorageManager } from "../storage";
 import { getRegisteredStorageIds } from "../plugins/registry";
+import { recordAudit } from "../services/audit";
 
 const router: Router = Router();
 
@@ -14,8 +15,8 @@ router.use((req: any, _res, next) => {
 router.get("/types", async (_req: Request, res: Response) => {
   try {
     const pm = (global as any).pluginManager;
-    const types = getRegisteredStorageIds().filter(
-      (id: string) => pm?.getStorage(id),
+    const types = getRegisteredStorageIds().filter((id: string) =>
+      pm?.getStorage(id),
     );
     res.json(types);
   } catch (error) {
@@ -112,6 +113,12 @@ router.delete("/backends/:id", async (req: any, res: Response) => {
     const { id } = req.params;
 
     await manager.deleteBackend(id);
+    recordAudit({
+      event: "storage.backend.delete",
+      actor: req.auth?.id ?? null,
+      ip: req.ip ?? req.socket.remoteAddress ?? null,
+      details: { backendId: id },
+    });
     res.json({ message: "Storage backend deleted" });
   } catch (error) {
     console.error("Error deleting storage backend:", error);

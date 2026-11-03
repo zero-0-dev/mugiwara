@@ -5,6 +5,7 @@ import {
   chapterRepository,
 } from "../database";
 import { v4 as uuidv4 } from "uuid";
+import { recordAudit } from "../services/audit";
 
 const router: Router = Router();
 
@@ -123,6 +124,12 @@ router.delete("/:id", async (req: Request, res: Response): Promise<void> => {
     }
 
     await mangaRepository.delete(id);
+    recordAudit({
+      event: "manga.delete",
+      actor: req.auth?.id ?? null,
+      ip: req.ip ?? req.socket.remoteAddress ?? null,
+      details: { mangaId: id, title: manga?.title ?? null },
+    });
     res.status(204).send();
   } catch (error) {
     console.error("Error deleting manga:", error);

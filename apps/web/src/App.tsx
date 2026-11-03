@@ -13,9 +13,11 @@ import { useSettings } from "./api/hooks";
 import { ApiClientProvider } from "./api/context";
 import { ToastProvider } from "./components/Toast";
 import {
+  clearStoredAuthToken,
   getStoredServerUrl,
   isCapacitor,
   resolveServer,
+  saveStoredAuthToken,
   saveStoredServerUrl,
 } from "./platform/server";
 
@@ -28,10 +30,18 @@ function ThemeApplier() {
   return null;
 }
 
-type View = "library" | "manga-detail" | "reader" | "settings" | "discover" | "discover-detail";
+type View =
+  | "library"
+  | "manga-detail"
+  | "reader"
+  | "settings"
+  | "discover"
+  | "discover-detail";
 
 function App() {
   const [apiBaseUrl, setApiBaseUrl] = useState<string>("");
+  const [authToken, setAuthToken] = useState<string | null>(null);
+  const [contentToken, setContentToken] = useState<string | null>(null);
   const [serverLabel, setServerLabel] = useState<string>("");
   const [needsServerSetup, setNeedsServerSetup] = useState(false);
   const [showServerSetup, setShowServerSetup] = useState(false);
@@ -39,7 +49,9 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<View>("library");
   const [selectedMangaId, setSelectedMangaId] = useState<string | null>(null);
-  const [selectedAnilistId, setSelectedAnilistId] = useState<number | null>(null);
+  const [selectedAnilistId, setSelectedAnilistId] = useState<number | null>(
+    null,
+  );
   const [selectedChapterId, setSelectedChapterId] = useState<string | null>(
     null,
   );
@@ -60,6 +72,8 @@ function App() {
       try {
         const resolved = await resolveServer();
         setApiBaseUrl(resolved.baseUrl);
+        setAuthToken(resolved.authToken);
+        setContentToken(resolved.contentToken);
         setServerLabel(resolved.label);
         setNeedsServerSetup(resolved.needsSetup);
         setLoading(false);
@@ -72,7 +86,20 @@ function App() {
     init();
   }, []);
 
-  const handleServerConnected = (url: string) => {
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      clearStoredAuthToken(apiBaseUrl);
+      setAuthToken(null);
+      setContentToken(null);
+      setNeedsServerSetup(true);
+    };
+    window.addEventListener("mugiwara:unauthorized", handleUnauthorized);
+    return () =>
+      window.removeEventListener("mugiwara:unauthorized", handleUnauthorized);
+  }, [apiBaseUrl]);
+
+  const handleServerConnected = (url: string, token: string) => {
+    saveStoredAuthToken(url, token);
     saveStoredServerUrl(url);
     // Reload so every query and the API client start from the new origin.
     window.location.reload();
@@ -178,8 +205,13 @@ function App() {
   if (needsServerSetup || showServerSetup) {
     return (
       <ServerSetup
-        initialUrl={getStoredServerUrl()}
+        initialUrl={
+          apiBaseUrl ||
+          getStoredServerUrl() ||
+          (typeof window !== "undefined" ? window.location.origin : "")
+        }
         canCancel={!needsServerSetup}
+        lockUrl={!canChangeServer}
         onCancel={() => setShowServerSetup(false)}
         onConnected={handleServerConnected}
       />
@@ -236,53 +268,57 @@ function App() {
   };
 
   return (
-    <ApiClientProvider baseUrl={apiBaseUrl}>
+    <ApiClientProvider
+      baseUrl={apiBaseUrl}
+      authToken={authToken}
+      contentToken={contentToken}
+    >
       <ThemeApplier />
       <ToastProvider>
-      <div className="app">
-        <header className="app-header">
-          <h1 onClick={handleBackToLibrary} style={{ cursor: "pointer" }}>
-            Mugiwara
-          </h1>
-          <div className="header-actions">
-            <button
-              onClick={handleBackToLibrary}
-              className={`nav-btn ${currentView === "library" || currentView === "manga-detail" || currentView === "reader" ? "active" : ""}`}
-            >
-              <BookOpen size={16} />
-              Library
-            </button>
-            <button
-              onClick={handleOpenDiscover}
-              className={`nav-btn ${currentView === "discover" || currentView === "discover-detail" ? "active" : ""}`}
-            >
-              <Compass size={16} />
-              Discover
-            </button>
-            <button
-              onClick={handleOpenSettings}
-              className="btn btn-icon"
-              title="Settings"
-            >
-              <Settings size={20} />
-            </button>
-            {canChangeServer ? (
+        <div className="app">
+          <header className="app-header">
+            <h1 onClick={handleBackToLibrary} style={{ cursor: "pointer" }}>
+              Mugiwara
+            </h1>
+            <div className="header-actions">
               <button
-                className="server-status"
-                title="Change server"
-                onClick={() => setShowServerSetup(true)}
+                onClick={handleBackToLibrary}
+                className={`nav-btn ${currentView === "library" || currentView === "manga-detail" || currentView === "reader" ? "active" : ""}`}
               >
-                Server: {serverLabel || "not set"}
+                <BookOpen size={16} />
+                Library
               </button>
-            ) : (
-              <span className="server-status">
-                Server: {serverLabel || "local"}
-              </span>
-            )}
-          </div>
-        </header>
-        <main className="app-main">{renderContent()}</main>
-      </div>
+              <button
+                onClick={handleOpenDiscover}
+                className={`nav-btn ${currentView === "discover" || currentView === "discover-detail" ? "active" : ""}`}
+              >
+                <Compass size={16} />
+                Discover
+              </button>
+              <button
+                onClick={handleOpenSettings}
+                className="btn btn-icon"
+                title="Settings"
+              >
+                <Settings size={20} />
+              </button>
+              {canChangeServer ? (
+                <button
+                  className="server-status"
+                  title="Change server"
+                  onClick={() => setShowServerSetup(true)}
+                >
+                  Server: {serverLabel || "not set"}
+                </button>
+              ) : (
+                <span className="server-status">
+                  Server: {serverLabel || "local"}
+                </span>
+              )}
+            </div>
+          </header>
+          <main className="app-main">{renderContent()}</main>
+        </div>
       </ToastProvider>
     </ApiClientProvider>
   );

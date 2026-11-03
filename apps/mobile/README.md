@@ -11,6 +11,12 @@ example:
 http://192.168.1.20:3001
 ```
 
+Then enter the one-time pairing code printed on the server console. The app
+stores the resulting bearer token per server origin and sends it with every API
+request. Reader pages and covers are loaded by `<img>` tags, so the client also
+requests a short-lived content-scoped token and appends it to `/api/content`
+URLs; that is what keeps images working across the Capacitor WebView origin.
+
 ## Requirements
 
 - Node 22+ (the repo is on Node 26)

@@ -1,10 +1,13 @@
 import { Router, Request, Response } from "express";
-import { readFile } from "fs/promises";
+import { readFile, realpath } from "fs/promises";
 import { existsSync } from "fs";
 import * as yauzl from "yauzl";
-import { join } from "path";
+import { basename, join, resolve, sep } from "path";
+
+import { getLibraryDirectories } from "../services/settings";
 
 const router: Router = Router();
+const DATA_DIR = process.env.DATA_DIR || join(process.cwd(), "data");
 
 // GET /api/content/manga/:mangaId/chapters/:chapterId/pages/:pageNumber - Serve chapter page
 router.get(
@@ -88,7 +91,15 @@ router.get(
       const { path, archive, file } = req.query;
 
       if (path && typeof path === "string") {
-        // Direct file access
+        // Direct file access. This legacy endpoint must never become an
+        // arbitrary file-read primitive: only paths inside a configured
+        // library directory are served.
+        if (!(await isPathAllowed(path))) {
+          res
+            .status(403)
+            .json({ error: "Path is outside the configured library" });
+          return;
+        }
         if (!existsSync(path)) {
           res.status(404).json({ error: "File not found" });
           return;
@@ -115,6 +126,15 @@ router.get(
         typeof file === "string"
       ) {
         // Archive file access
+        const safeFile = basename(file);
+        if (
+          safeFile !== file ||
+          safeFile.includes("..") ||
+          !(await isPathAllowed(archive))
+        ) {
+          res.status(403).json({ error: "Archive path is not allowed" });
+          return;
+        }
         if (!existsSync(archive)) {
           res.status(404).json({ error: "Archive not found" });
           return;
@@ -159,8 +179,12 @@ router.get(
         res.status(400).json({ error: "Filename is required" });
         return;
       }
-      const thumbnailsDir = join(process.cwd(), "data", "thumbnails");
-      const filepath = join(thumbnailsDir, filename);
+      const thumbnailsDir = join(DATA_DIR, "thumbnails");
+      const filepath = safeJoin(thumbnailsDir, filename);
+      if (!filepath) {
+        res.status(400).json({ error: "Invalid filename" });
+        return;
+      }
 
       if (!existsSync(filepath)) {
         res.status(404).json({ error: "Thumbnail not found" });
@@ -188,8 +212,12 @@ router.get(
         res.status(400).json({ error: "Filename is required" });
         return;
       }
-      const coversDir = join(process.cwd(), "data", "covers");
-      const filepath = join(coversDir, filename);
+      const coversDir = join(DATA_DIR, "covers");
+      const filepath = safeJoin(coversDir, filename);
+      if (!filepath) {
+        res.status(400).json({ error: "Invalid filename" });
+        return;
+      }
 
       if (!existsSync(filepath)) {
         res.status(404).json({ error: "Cover image not found" });
@@ -206,6 +234,44 @@ router.get(
     }
   },
 );
+
+function safeJoin(baseDir: string, filename: string): string | null {
+  if (!filename || basename(filename) !== filename) return null;
+  const resolved = resolve(baseDir, filename);
+  const prefix = resolve(baseDir) + sep;
+  return resolved.startsWith(prefix) ? resolved : null;
+}
+
+async function isPathAllowed(candidate: string): Promise<boolean> {
+  const directories = await getLibraryDirectories();
+  if (directories.length === 0) return false;
+
+  let resolvedCandidate: string;
+  try {
+    resolvedCandidate = await realpath(candidate);
+  } catch {
+    resolvedCandidate = resolve(candidate);
+  }
+
+  for (const directory of directories) {
+    let resolvedDir: string;
+    try {
+      resolvedDir = await realpath(directory);
+    } catch {
+      resolvedDir = resolve(directory);
+    }
+    const prefix = resolvedDir.endsWith(sep)
+      ? resolvedDir
+      : `${resolvedDir}${sep}`;
+    if (
+      resolvedCandidate === resolvedDir ||
+      resolvedCandidate.startsWith(prefix)
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
 
 function extractFromArchive(
   archivePath: string,
