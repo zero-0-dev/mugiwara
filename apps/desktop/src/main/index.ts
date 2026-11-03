@@ -10,6 +10,41 @@ let serverManager: ServerManager | null = null;
 const isDev = process.env.NODE_ENV === "development" || !app.isPackaged;
 const DEV_SERVER_PORT = 3001;
 
+// Optional: point the desktop shell at a Mugiwara server running elsewhere on
+// the LAN instead of starting an embedded server.
+const EXTERNAL_SERVER_URL =
+  process.env.MUGIWARA_SERVER_URL?.replace(/\/+$/, "") || "";
+
+function getAppUrl(serverPort: number): string {
+  if (EXTERNAL_SERVER_URL) return EXTERNAL_SERVER_URL;
+  return isDev
+    ? "http://localhost:5173"
+    : `http://127.0.0.1:${serverPort}`;
+}
+
+function getApiBase(apiPath: string): string {
+  if (EXTERNAL_SERVER_URL) return `${EXTERNAL_SERVER_URL}${apiPath}`;
+  const port = isDev
+    ? DEV_SERVER_PORT
+    : serverManager?.getPort() || DEV_SERVER_PORT;
+  return `http://127.0.0.1:${port}${apiPath}`;
+}
+
+async function loadAppWindow(url: string) {
+  const attempts = isDev ? 20 : 1;
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      await mainWindow?.loadURL(url);
+      return;
+    } catch (error) {
+      if (attempt === attempts || !mainWindow) throw error;
+      // In dev, Vite and Electron start at the same time. Retry briefly
+      // instead of showing Chromium's connection error page.
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+  }
+}
+
 async function createWindow(serverPort: number) {
   // Create the browser window
   mainWindow = new BrowserWindow({
@@ -22,19 +57,16 @@ async function createWindow(serverPort: number) {
       nodeIntegration: false,
       contextIsolation: true,
       preload: path.join(__dirname, "../preload/index.js"),
-      webSecurity: false, // Allow loading local images
     },
   });
 
   // Store server port in window for renderer to access
   (mainWindow as any).serverPort = serverPort;
 
-  // Load the app
-  if (isDev) {
-    await mainWindow.loadURL("http://localhost:5173");
-  } else {
-    await mainWindow.loadFile(path.join(__dirname, "../renderer/index.html"));
-  }
+  // Load the shared web client. In production the local server serves it,
+  // which gives the renderer the same origin as the API and avoids file://
+  // security exceptions.
+  await loadAppWindow(getAppUrl(serverPort));
 
   // Handle window closed
   mainWindow.on("closed", () => {
@@ -45,6 +77,12 @@ async function createWindow(serverPort: number) {
 // Initialize application
 async function initialize() {
   try {
+    if (EXTERNAL_SERVER_URL) {
+      console.log(`[Main] Using external server: ${EXTERNAL_SERVER_URL}`);
+      await createWindow(0);
+      return;
+    }
+
     let serverPort: number;
 
     if (isDev) {
@@ -73,6 +111,13 @@ async function initialize() {
 
 // IPC handlers
 ipcMain.handle("get-server-port", () => {
+  if (EXTERNAL_SERVER_URL) {
+    try {
+      return Number(new URL(EXTERNAL_SERVER_URL).port) || 80;
+    } catch {
+      return 0;
+    }
+  }
   if (isDev) {
     return DEV_SERVER_PORT;
   }
@@ -80,10 +125,7 @@ ipcMain.handle("get-server-port", () => {
 });
 
 ipcMain.handle("get-api-url", (event, apiPath: string) => {
-  const port = isDev
-    ? DEV_SERVER_PORT
-    : serverManager?.getPort() || DEV_SERVER_PORT;
-  return `http://localhost:${port}${apiPath}`;
+  return getApiBase(apiPath);
 });
 
 ipcMain.handle("get-app-version", () => {
@@ -138,9 +180,11 @@ app.on("before-quit", async (event) => {
 
 app.on("activate", () => {
   if (mainWindow === null) {
-    const port = isDev
-      ? DEV_SERVER_PORT
-      : serverManager?.getPort() || DEV_SERVER_PORT;
+    const port = EXTERNAL_SERVER_URL
+      ? 0
+      : isDev
+        ? DEV_SERVER_PORT
+        : serverManager?.getPort() || DEV_SERVER_PORT;
     createWindow(port);
   }
 });

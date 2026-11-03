@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Mugiwara</string>
+    <string name="title_activity_main">Mugiwara</string>
+    <string name="package_name">dev.zero.mugiwara</string>
+    <string name="custom_url_scheme">dev.zero.mugiwara</string>
+</resources>

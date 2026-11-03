@@ -1,50 +1,149 @@
-# Welcome to your Expo app 👋
+# Mugiwara mobile shell (Capacitor)
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+`apps/mobile` packages the shared web client (`apps/web`) for iOS and Android.
+There is no second UI. The app bundles the web build locally and connects to a
+Mugiwara server on your LAN.
 
-## Get started
+On first launch it asks for the server address printed by the server, for
+example:
 
-1. Install dependencies
-
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```
+http://192.168.1.20:3001
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## Requirements
 
-## Learn more
+- Node 22+ (the repo is on Node 26)
+- Android: Android Studio / Android SDK, `ANDROID_HOME` set
+- iOS: macOS + Xcode 26+ (Capacitor 8)
 
-To learn more about developing your project with Expo, look at the following resources:
+## One-time setup
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+```sh
+pnpm install
+pnpm --filter @mugiwara-manga/mobile add:android
+pnpm --filter @mugiwara-manga/mobile add:ios
+```
 
-## Join the community
+The native projects are generated in `android/` and `ios/`.
 
-Join our community of developers creating universal apps.
+## Sync the web UI
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Every time `apps/web` changes:
+
+```sh
+pnpm cap:sync
+# or:
+pnpm --filter @mugiwara-manga/mobile sync:android
+pnpm --filter @mugiwara-manga/mobile sync:ios
+```
+
+`sync` builds `apps/web` and copies its `dist` into the native projects.
+
+## Android: build and install
+
+### Debug APK (easiest)
+
+```sh
+pnpm build:app:android
+```
+
+The APK is written to:
+
+```
+dist/app/android/mugiwara-<version>-debug.apk
+```
+
+Install over USB:
+
+```sh
+adb install -r dist/app/android/mugiwara-<version>-debug.apk
+```
+
+If an older Mugiwara build signed with a different key is installed (for example
+the old React Native debug app), remove it first:
+
+```sh
+adb uninstall dev.zero.mugiwara
+```
+
+Or copy the APK to the phone and open it. You may need to allow "Install unknown
+apps" for the app you use to open it.
+
+This APK is signed with the Android debug key, so it installs without a signing
+setup.
+
+### Release APK
+
+```sh
+pnpm build:app:android:release
+```
+
+Without a configured keystore this produces `app-release-unsigned.apk`, which
+cannot be installed. Sign it with `apksigner`:
+
+```sh
+keytool -genkey -v -keystore mugiwara.keystore \
+  -alias mugiwara -keyalg RSA -keysize 2048 -validity 10000
+
+$ANDROID_HOME/build-tools/36.0.0/apksigner sign \
+  --ks mugiwara.keystore \
+  --out dist/app/android/mugiwara-signed.apk \
+  apps/mobile/android/app/build/outputs/apk/release/app-release-unsigned.apk
+```
+
+Or use Android Studio: **Build → Generate Signed Bundle/APK**.
+
+### From Android Studio
+
+```sh
+pnpm --filter @mugiwara-manga/mobile sync:android
+pnpm --filter @mugiwara-manga/mobile open:android
+```
+
+Then Run (debug) or Build → Generate Signed Bundle/APK (release).
+
+## iOS: build and install
+
+iOS builds require macOS and Xcode.
+
+```sh
+pnpm --filter @mugiwara-manga/mobile sync:ios
+pnpm --filter @mugiwara-manga/mobile open:ios
+```
+
+In Xcode:
+
+1. Select the `App` target → **Signing & Capabilities**.
+2. Pick your Apple ID/team. A free Apple ID can sideload to a connected iPhone
+   (the build expires after 7 days). TestFlight/App Store needs a paid Apple
+   Developer account.
+3. Select the iPhone as the run destination and press **Run**.
+4. For distribution: **Product → Archive → Distribute App**.
+
+Alternative: let Capacitor pick a connected device:
+
+```sh
+pnpm --filter @mugiwara-manga/mobile run:ios
+```
+
+## Cleartext HTTP on the LAN
+
+The web client runs from `capacitor://localhost` / `https://localhost`, so
+calling a plain `http://` LAN server is cross-origin or mixed content.
+
+- **Android:** `android.allowMixedContent` and `server.cleartext` are enabled in
+  `capacitor.config.ts`, and `AndroidManifest.xml` has
+  `android:usesCleartextTraffic="true"`.
+- **iOS:** `ios/App/App/Info.plist` has an ATS exception
+  (`NSAllowsArbitraryLoads` + `NSAllowsLocalNetworking`) and a local-network
+  usage description.
+
+These are appropriate for a self-hosted LAN app. If you put the server behind
+HTTPS, remove them.
+
+## Why not set `server.url` to the LAN address?
+
+`server.url` makes the app a remote-code wrapper and requires rebuilding when
+the LAN address changes. Bundling the web client and asking for the server
+address at runtime keeps the app usable when the server moves.

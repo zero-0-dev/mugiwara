@@ -5,16 +5,20 @@
   "description": "Cross-platform manga reader with extensible plugin architecture",
   "scripts": {
     "build": "turbo build",
-    "dev": "turbo dev",
+    "dev": "turbo dev --filter=!@mugiwara-manga/mobile",
     "lint": "turbo lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "typecheck": "turbo typecheck",
     "clean": "turbo clean && rm -rf node_modules",
     "build:app:android": "node scripts/build.mjs app:android",
+    "build:app:android:release": "node scripts/build.mjs app:android:release",
     "build:desktop:linux": "node scripts/build.mjs desktop:linux",
     "build:desktop:win": "node scripts/build.mjs desktop:win",
     "build:desktop:osx": "node scripts/build.mjs desktop:mac",
-    "build:server:deploy": "turbo build --filter=@mugiwara-manga/server && rm -rf apps/server/deploy && pnpm --filter=@mugiwara-manga/server deploy --legacy apps/server/deploy"
+    "cap:sync": "pnpm --filter @mugiwara-manga/mobile sync",
+    "cap:android": "pnpm --filter @mugiwara-manga/mobile sync:android && pnpm --filter @mugiwara-manga/mobile open:android",
+    "cap:ios": "pnpm --filter @mugiwara-manga/mobile sync:ios && pnpm --filter @mugiwara-manga/mobile open:ios",
+    "build:server:deploy": "turbo build --filter=@mugiwara-manga/server --filter=@mugiwara-manga/web && rm -rf apps/server/deploy && pnpm --filter=@mugiwara-manga/server deploy --legacy apps/server/deploy && cp -R apps/web/dist apps/server/deploy/web"
   },
   "devDependencies": {
     "prettier": "^3.1.1",

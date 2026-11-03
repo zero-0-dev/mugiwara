@@ -1,5 +1,7 @@
 import express, { Request, Response } from "express";
 import cors from "cors";
+import { existsSync } from "fs";
+import { networkInterfaces } from "os";
 import { join } from "path";
 
 import { initDatabase, closeDatabase, db } from "./database";
@@ -27,8 +29,37 @@ import queueRoutes from "./api/queue";
 import discoverRoutes from "./api/discover";
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = Number(process.env.PORT) || 3001;
+const HOST = process.env.HOST || "0.0.0.0";
 const DATA_DIR = process.env.DATA_DIR || join(process.cwd(), "data");
+
+function findWebDir(): string | null {
+  const candidates = [
+    process.env.WEB_DIR,
+    join(process.cwd(), "web"),
+    join(process.cwd(), "public"),
+    join(process.cwd(), "apps/web/dist"),
+    join(__dirname, "../web"),
+    join(__dirname, "../public"),
+    join(__dirname, "../../web/dist"),
+  ].filter((candidate): candidate is string => Boolean(candidate));
+
+  return candidates.find((dir) => existsSync(join(dir, "index.html"))) ?? null;
+}
+
+function getLanUrls(port: number): string[] {
+  const urls: string[] = [];
+  for (const addresses of Object.values(networkInterfaces())) {
+    for (const address of addresses ?? []) {
+      if (address.family === "IPv4" && !address.internal) {
+        urls.push(`http://${address.address}:${port}`);
+      }
+    }
+  }
+  return urls;
+}
+
+const WEB_DIR = findWebDir();
 
 // Global service instances (injected into routes)
 declare global {
@@ -73,8 +104,54 @@ app.get("/api/health", (_req: Request, res: Response) => {
     status: "ok",
     timestamp: new Date().toISOString(),
     version: "2.0.0",
+    web: Boolean(WEB_DIR),
   });
 });
+
+// Unknown API routes should stay JSON, never return the app shell.
+app.use("/api", (_req: Request, res: Response) => {
+  res.status(404).json({ error: "Not found" });
+});
+
+// Serve the shared web client when it has been built. The same build is used
+// by the browser/PWA, the Electron shell, and the Capacitor shell.
+if (WEB_DIR) {
+  app.use(
+    express.static(WEB_DIR, {
+      index: false,
+      setHeaders: (res, filePath) => {
+        if (filePath.endsWith(".html")) {
+          res.setHeader("Cache-Control", "no-cache");
+        } else {
+          res.setHeader(
+            "Cache-Control",
+            "public, max-age=31536000, immutable",
+          );
+        }
+      },
+    }),
+  );
+
+  // SPA fallback. API 404s must stay JSON, not the app shell.
+  app.get("*", (req: Request, res: Response, next) => {
+    if (req.path === "/api" || req.path.startsWith("/api/")) {
+      next();
+      return;
+    }
+    // Do not return index.html for a missing asset; let it 404 normally.
+    if (/\.[^/]+$/.test(req.path)) {
+      next();
+      return;
+    }
+    res.setHeader("Cache-Control", "no-cache");
+    res.sendFile(join(WEB_DIR, "index.html"));
+  });
+} else {
+  console.warn(
+    "⚠️  Web client build not found. Serving API only. " +
+      "Run `pnpm --filter @mugiwara-manga/web build` or set WEB_DIR.",
+  );
+}
 
 // Error handling
 app.use(
@@ -151,8 +228,18 @@ async function startServer() {
     console.log("✅ Import queue processor started");
 
     // Step 8: Start HTTP server
-    server = app.listen(PORT, () => {
+    server = app.listen(PORT, HOST, () => {
       console.log(`\n🎉 Mugiwara server running on http://localhost:${PORT}`);
+      const lanUrls = getLanUrls(PORT);
+      if (lanUrls.length > 0) {
+        console.log("\n📱 LAN access:");
+        for (const url of lanUrls) {
+          console.log(`   - ${url}`);
+        }
+      }
+      if (WEB_DIR) {
+        console.log(`\n🖥️  Web client: ${WEB_DIR}`);
+      }
       console.log("\n📚 API Endpoints:");
       console.log("   - Legacy: /api/manga, /api/library, /api/settings");
       console.log("   - Storage: /api/storage/*");

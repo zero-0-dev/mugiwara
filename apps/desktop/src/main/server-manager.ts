@@ -49,6 +49,8 @@ export class ServerManager {
       ...process.env,
       PORT: this.config.port.toString(),
       DATA_DIR: this.config.dataDir,
+      WEB_DIR: path.join(process.resourcesPath, "web"),
+      HOST: "0.0.0.0",
       NODE_ENV: this.isDev ? "development" : "production",
     };
 

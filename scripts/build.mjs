@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { execSync } from 'node:child_process';
-import { existsSync, mkdirSync, copyFileSync, rmSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, copyFileSync, rmSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -32,7 +32,7 @@ function clean(dir) {
 const target = process.argv[2];
 if (!target) {
   console.error('Usage: node scripts/build.mjs <target>');
-  console.error('Targets: desktop:linux | desktop:win | desktop:mac | app:android');
+  console.error('Targets: desktop:linux | desktop:win | desktop:mac | app:android | app:android:release');
   process.exit(1);
 }
 
@@ -67,69 +67,87 @@ switch (target) {
     break;
   }
 
-  case 'app:android': {
-    if (!process.env.ANDROID_HOME) {
-      console.error('Error: ANDROID_HOME is not set. Make sure the Android SDK is installed and ANDROID_HOME is configured.');
+  case 'app:android':
+  case 'app:android:release': {
+    const release = target === 'app:android:release';
+    const androidHome = process.env.ANDROID_HOME || process.env.ANDROID_SDK_ROOT;
+
+    if (!androidHome) {
+      console.error(
+        'Error: ANDROID_HOME (or ANDROID_SDK_ROOT) is not set. Install the Android SDK and point ANDROID_HOME at it.',
+      );
       process.exit(1);
     }
 
+    const variant = release ? 'release' : 'debug';
     const distDir = join(ROOT, 'dist', 'app', 'android');
     clean(distDir);
 
-    if (!existsSync(join(ROOT, 'apps', 'mobile', 'android'))) {
-      run('npx expo prebuild --platform android', join(ROOT, 'apps', 'mobile'));
-    }
+    const mobileDir = join(ROOT, 'apps', 'mobile');
+    const androidDir = join(mobileDir, 'android');
+    const gradlew = process.platform === 'win32' ? 'gradlew.bat' : './gradlew';
 
-    const rnDir = execSync(
-      'node -e "console.log(path.dirname(require.resolve(\'react-native/package.json\')))"',
-      { cwd: join(ROOT, 'apps', 'mobile'), encoding: 'utf8' },
-    ).trim();
-
-    let gradleArgs = `-PREACT_NATIVE_NODE_MODULES_DIR="${rnDir}"`;
-
-    try {
-      const workletsDir = execSync(
-        'node -e "console.log(path.dirname(require.resolve(\'react-native-worklets/package.json\')))"',
-        { cwd: join(ROOT, 'apps', 'mobile', 'node_modules', 'react-native-reanimated'), encoding: 'utf8' },
-      ).trim();
-      gradleArgs += ` -PREACT_NATIVE_WORKLETS_NODE_MODULES_DIR="${workletsDir}"`;
-    } catch {
-      console.log('react-native-worklets not found (reanimated < 4.x), skipping worklets flag');
-    }
-
-    const buildGradle = join(ROOT, 'apps', 'mobile', 'android', 'app', 'build.gradle');
-    let gradleContent = readFileSync(buildGradle, 'utf8');
-    if (gradleContent.includes('// root = file("../../")')) {
-      gradleContent = gradleContent.replace('// root = file("../../")', 'root = file("../../")');
-      writeFileSync(buildGradle, gradleContent);
-    }
-
-    run(
-      `./gradlew assembleRelease ${gradleArgs}`,
-      join(ROOT, 'apps', 'mobile', 'android'),
-    );
-
-    const apkSource = join(ROOT, 'apps', 'mobile', 'android', 'app', 'build', 'outputs', 'apk', 'release', 'app-release.apk');
-    const apkDest = join(distDir, `mugiwara-${version}.apk`);
-
-    if (!existsSync(apkSource)) {
-      console.error(`Error: APK not found at ${apkSource}`);
+    if (!existsSync(join(androidDir, 'gradlew'))) {
+      console.error(
+        'Error: apps/mobile/android is missing. Run `pnpm --filter @mugiwara-manga/mobile add:android` first.',
+      );
       process.exit(1);
     }
 
+    // Build the shared web client and copy it into the native project.
+    run('pnpm --filter @mugiwara-manga/mobile sync:android');
+
+    run(
+      `${gradlew} assemble${release ? 'Release' : 'Debug'}`,
+      androidDir,
+    );
+
+    const apkDir = join(
+      androidDir,
+      'app',
+      'build',
+      'outputs',
+      'apk',
+      variant,
+    );
+    const apks = existsSync(apkDir)
+      ? readdirSync(apkDir).filter((file) => file.endsWith('.apk'))
+      : [];
+    const apkSource = apks
+      .map((file) => join(apkDir, file))
+      .sort((a, b) => {
+        // Prefer a signed/standard release APK over an unsigned one.
+        const score = (path) =>
+          path.endsWith('-unsigned.apk') ? 0 : path.endsWith('-debug.apk') ? 2 : 1;
+        return score(b) - score(a);
+      })[0];
+
+    if (!apkSource) {
+      console.error(`Error: no ${variant} APK found in ${apkDir}`);
+      process.exit(1);
+    }
+
+    const apkName = `mugiwara-${version}-${variant}.apk`;
+    const apkDest = join(distDir, apkName);
     copyFileSync(apkSource, apkDest);
 
-    const tarName = `mugiwara-android-${version}.tar.gz`;
+    const tarName = `mugiwara-android-${version}-${variant}.tar.gz`;
     const tarPath = join(distDir, '..', tarName);
     console.log(`\nCompressing to ${tarPath}...`);
-    run(`tar -czf "${tarPath}" --transform "s,^android,mugiwara," -C "${join(distDir, '..')}" "android"`);
+    run(`tar -czf "${tarPath}" -C "${distDir}" .`);
 
-    console.log(`\nDone: ${apkDest} (${tarName})`);
+    console.log(`\nDone: ${apkDest}`);
+    console.log(`       (${tarName})`);
+    if (release && /-unsigned\.apk$/.test(apkSource)) {
+      console.warn(
+        '\n⚠️  The release APK is unsigned. Configure a keystore or use the debug APK for sideloading.',
+      );
+    }
     break;
   }
 
   default:
     console.error(`Unknown target: "${target}"`);
-    console.error('Targets: desktop:linux | desktop:win | desktop:mac | app:android');
+    console.error('Targets: desktop:linux | desktop:win | desktop:mac | app:android | app:android:release');
     process.exit(1);
 }
