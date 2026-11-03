@@ -13,6 +13,7 @@ import { writeFile, mkdir } from "fs/promises";
 import { v4 as uuidv4 } from "uuid";
 
 const router: Router = Router();
+const DATA_DIR = process.env.DATA_DIR || join(process.cwd(), "data");
 
 // GET /api/library/sources - Get available manga sources
 router.get("/sources", async (_req: Request, res: Response) => {
@@ -256,118 +257,109 @@ router.post("/import", async (req: Request, res: Response) => {
 });
 
 // GET /api/library/import/:mangaId/progress - Get live import progress
-router.get(
-  "/import/:mangaId/progress",
-  async (req: Request, res: Response) => {
-    try {
-      const mangaId = req.params.mangaId;
-      if (!mangaId) {
-        res.status(400).json({ error: "mangaId is required" });
-        return;
-      }
-      const { chapterRepository } = await import("../database");
-      const chapters = await chapterRepository.findByMangaId(mangaId);
-
-      const total = chapters.length;
-      const completed = chapters.filter(
-        (c: any) => c.importStatus === "complete",
-      ).length;
-      const errored = chapters.filter(
-        (c: any) => c.importStatus === "error",
-      ).length;
-      const downloading = chapters.filter(
-        (c: any) => c.importStatus === "downloading",
-      ).length;
-      const queued = chapters.filter(
-        (c: any) => c.importStatus === "pending",
-      ).length;
-
-      let totalProgress = 0;
-      for (const ch of chapters as any[]) {
-        if (ch.importStatus === "complete") totalProgress += 100;
-        else if (ch.importStatus === "error") totalProgress += 100;
-        else totalProgress += ch.importProgress || 0;
-      }
-
-      const overallProgress =
-        total > 0 ? Math.round(totalProgress / total) : 0;
-      const isComplete = completed + errored >= total;
-
-      const chapterList = (chapters as any[])
-        .sort((a: any, b: any) => b.sortOrder - a.sortOrder)
-        .map((ch: any) => ({
-          chapterId: ch.chapterId,
-          title: ch.title,
-          sortOrder: ch.sortOrder,
-          status:
-            ch.importStatus === "pending" ? "queued" : ch.importStatus,
-          totalPages: ch.pagesCount,
-          completedPages:
-            ch.pagesCount && ch.importProgress
-              ? Math.round((ch.pagesCount * ch.importProgress) / 100)
-              : undefined,
-          errorMessage:
-            ch.importStatus === "error" ? "Import failed" : undefined,
-        }));
-
-      res.json({
-        mangaId,
-        totalChapters: total,
-        completedChapters: completed,
-        erroredChapters: errored,
-        downloadingChapters: downloading,
-        queuedChapters: queued,
-        overallProgress,
-        isComplete,
-        chapters: chapterList,
-      });
-    } catch (error) {
-      console.error("Error fetching import progress:", error);
-      res.status(500).json({ error: "Failed to fetch import progress" });
+router.get("/import/:mangaId/progress", async (req: Request, res: Response) => {
+  try {
+    const mangaId = req.params.mangaId;
+    if (!mangaId) {
+      res.status(400).json({ error: "mangaId is required" });
+      return;
     }
-  },
-);
+    const { chapterRepository } = await import("../database");
+    const chapters = await chapterRepository.findByMangaId(mangaId);
+
+    const total = chapters.length;
+    const completed = chapters.filter(
+      (c: any) => c.importStatus === "complete",
+    ).length;
+    const errored = chapters.filter(
+      (c: any) => c.importStatus === "error",
+    ).length;
+    const downloading = chapters.filter(
+      (c: any) => c.importStatus === "downloading",
+    ).length;
+    const queued = chapters.filter(
+      (c: any) => c.importStatus === "pending",
+    ).length;
+
+    let totalProgress = 0;
+    for (const ch of chapters as any[]) {
+      if (ch.importStatus === "complete") totalProgress += 100;
+      else if (ch.importStatus === "error") totalProgress += 100;
+      else totalProgress += ch.importProgress || 0;
+    }
+
+    const overallProgress = total > 0 ? Math.round(totalProgress / total) : 0;
+    const isComplete = completed + errored >= total;
+
+    const chapterList = (chapters as any[])
+      .sort((a: any, b: any) => b.sortOrder - a.sortOrder)
+      .map((ch: any) => ({
+        chapterId: ch.chapterId,
+        title: ch.title,
+        sortOrder: ch.sortOrder,
+        status: ch.importStatus === "pending" ? "queued" : ch.importStatus,
+        totalPages: ch.pagesCount,
+        completedPages:
+          ch.pagesCount && ch.importProgress
+            ? Math.round((ch.pagesCount * ch.importProgress) / 100)
+            : undefined,
+        errorMessage: ch.importStatus === "error" ? "Import failed" : undefined,
+      }));
+
+    res.json({
+      mangaId,
+      totalChapters: total,
+      completedChapters: completed,
+      erroredChapters: errored,
+      downloadingChapters: downloading,
+      queuedChapters: queued,
+      overallProgress,
+      isComplete,
+      chapters: chapterList,
+    });
+  } catch (error) {
+    console.error("Error fetching import progress:", error);
+    res.status(500).json({ error: "Failed to fetch import progress" });
+  }
+});
 
 // POST /api/library/import/:mangaId/cancel - Cancel pending chapters
-router.post(
-  "/import/:mangaId/cancel",
-  async (req: Request, res: Response) => {
-    try {
-      const mangaId = req.params.mangaId;
-      if (!mangaId) {
-        res.status(400).json({ error: "mangaId is required" });
-        return;
-      }
-      const { chapterRepository } = await import("../database");
-      const chapters = await chapterRepository.findByMangaId(mangaId);
-
-      for (const ch of chapters as any[]) {
-        if (ch.importStatus === "pending" || ch.importStatus === "downloading") {
-          await chapterRepository.update(ch.id, {
-            importStatus: "cancelled",
-          });
-        }
-      }
-
-      // Cancel all pending/running import tasks for this manga
-      const tasks = await global.taskRepository.getByManga(mangaId);
-      for (const task of tasks) {
-        if (task.status === "pending" || task.status === "running") {
-          await global.taskRepository.cancel(task.id);
-          // Also abort running tasks in the processor
-          if (global.queueProcessor) {
-            await global.queueProcessor.cancelTask(task.id);
-          }
-        }
-      }
-
-      res.json({ success: true });
-    } catch (error) {
-      console.error("Error cancelling import:", error);
-      res.status(500).json({ error: "Failed to cancel import" });
+router.post("/import/:mangaId/cancel", async (req: Request, res: Response) => {
+  try {
+    const mangaId = req.params.mangaId;
+    if (!mangaId) {
+      res.status(400).json({ error: "mangaId is required" });
+      return;
     }
-  },
-);
+    const { chapterRepository } = await import("../database");
+    const chapters = await chapterRepository.findByMangaId(mangaId);
+
+    for (const ch of chapters as any[]) {
+      if (ch.importStatus === "pending" || ch.importStatus === "downloading") {
+        await chapterRepository.update(ch.id, {
+          importStatus: "cancelled",
+        });
+      }
+    }
+
+    // Cancel all pending/running import tasks for this manga
+    const tasks = await global.taskRepository.getByManga(mangaId);
+    for (const task of tasks) {
+      if (task.status === "pending" || task.status === "running") {
+        await global.taskRepository.cancel(task.id);
+        // Also abort running tasks in the processor
+        if (global.queueProcessor) {
+          await global.queueProcessor.cancelTask(task.id);
+        }
+      }
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Error cancelling import:", error);
+    res.status(500).json({ error: "Failed to cancel import" });
+  }
+});
 
 // POST /api/library/scan - Scan all configured sources
 router.post("/scan", async (_req: Request, res: Response): Promise<void> => {
@@ -387,9 +379,8 @@ router.post(
     try {
       const mangaId = req.params.id as string;
 
-      const { mangaRepository, chapterRepository } = await import(
-        "../database"
-      );
+      const { mangaRepository, chapterRepository } =
+        await import("../database");
       const manga = await mangaRepository.findById(mangaId);
       if (!manga) {
         res.status(404).json({ error: "Manga not found" });
@@ -405,7 +396,9 @@ router.post(
 
       const source = global.pluginManager.getSource(sourceId);
       if (!source || !source.checkForUpdates) {
-        res.status(404).json({ error: "Source not found or does not support updates" });
+        res
+          .status(404)
+          .json({ error: "Source not found or does not support updates" });
         return;
       }
 
@@ -518,9 +511,8 @@ router.post(
     try {
       const mangaId = req.params.id as string;
 
-      const { mangaRepository, chapterRepository } = await import(
-        "../database"
-      );
+      const { mangaRepository, chapterRepository } =
+        await import("../database");
       const manga = await mangaRepository.findById(mangaId);
       if (!manga) {
         res.status(404).json({ error: "Manga not found" });
@@ -569,7 +561,10 @@ router.post(
             mangaId,
             chapter.chapterId,
           );
-          if (existingTask && ["pending", "running"].includes(existingTask.status)) {
+          if (
+            existingTask &&
+            ["pending", "running"].includes(existingTask.status)
+          ) {
             continue;
           }
 
@@ -615,31 +610,55 @@ async function checkSingleMangaForUpdates(manga: {
     const sourceMangaId = manga.sourceMangaId;
     const sourceId = manga.sourceId;
     if (!sourceMangaId || !sourceId) {
-      return { mangaId: manga.id, title: manga.title, newChapters: 0, error: "No source info" };
+      return {
+        mangaId: manga.id,
+        title: manga.title,
+        newChapters: 0,
+        error: "No source info",
+      };
     }
 
     const source = global.pluginManager.getSource(sourceId);
     if (!source || !source.checkForUpdates) {
-      return { mangaId: manga.id, title: manga.title, newChapters: 0, error: "Source not found or no update support" };
+      return {
+        mangaId: manga.id,
+        title: manga.title,
+        newChapters: 0,
+        error: "Source not found or no update support",
+      };
     }
 
     const { mangaRepository, chapterRepository } = await import("../database");
     const existingChapters = await chapterRepository.findByMangaId(manga.id);
-    const lastChapter = existingChapters.length > 0
-      ? existingChapters.reduce((a: any, b: any) => (a.sortOrder > b.sortOrder ? a : b))
-      : null;
+    const lastChapter =
+      existingChapters.length > 0
+        ? existingChapters.reduce((a: any, b: any) =>
+            a.sortOrder > b.sortOrder ? a : b,
+          )
+        : null;
     const lastChapterId = lastChapter?.chapterId;
 
-    const newSourceChapters = await source.checkForUpdates(sourceMangaId, lastChapterId);
+    const newSourceChapters = await source.checkForUpdates(
+      sourceMangaId,
+      lastChapterId,
+    );
     if (!newSourceChapters || newSourceChapters.length === 0) {
-      await mangaRepository.update(manga.id, { lastSourceCheck: new Date().toISOString() });
+      await mangaRepository.update(manga.id, {
+        lastSourceCheck: new Date().toISOString(),
+      });
       return { mangaId: manga.id, title: manga.title, newChapters: 0 };
     }
 
-    const existingChapterIds = new Set(existingChapters.map((c: any) => c.chapterId));
-    const trulyNew = newSourceChapters.filter((c: any) => !existingChapterIds.has(c.chapterId));
+    const existingChapterIds = new Set(
+      existingChapters.map((c: any) => c.chapterId),
+    );
+    const trulyNew = newSourceChapters.filter(
+      (c: any) => !existingChapterIds.has(c.chapterId),
+    );
     if (trulyNew.length === 0) {
-      await mangaRepository.update(manga.id, { lastSourceCheck: new Date().toISOString() });
+      await mangaRepository.update(manga.id, {
+        lastSourceCheck: new Date().toISOString(),
+      });
       return { mangaId: manga.id, title: manga.title, newChapters: 0 };
     }
 
@@ -674,15 +693,25 @@ async function checkSingleMangaForUpdates(manga: {
         created++;
       } catch (err: any) {
         if (!err.message?.includes("UNIQUE constraint failed")) {
-          console.error(`[LibraryUpdate] Failed for manga ${manga.id} chapter ${chapter.chapterId}:`, err);
+          console.error(
+            `[LibraryUpdate] Failed for manga ${manga.id} chapter ${chapter.chapterId}:`,
+            err,
+          );
         }
       }
     }
 
-    await mangaRepository.update(manga.id, { lastSourceCheck: new Date().toISOString() });
+    await mangaRepository.update(manga.id, {
+      lastSourceCheck: new Date().toISOString(),
+    });
     return { mangaId: manga.id, title: manga.title, newChapters: created };
   } catch (err) {
-    return { mangaId: manga.id, title: manga.title, newChapters: 0, error: (err as Error).message };
+    return {
+      mangaId: manga.id,
+      title: manga.title,
+      newChapters: 0,
+      error: (err as Error).message,
+    };
   }
 }
 
@@ -877,7 +906,7 @@ async function downloadCoverImage(
   url: string,
   mangaId: string,
 ): Promise<string> {
-  const coversDir = join(process.cwd(), "data", "covers");
+  const coversDir = join(DATA_DIR, "covers");
   await mkdir(coversDir, { recursive: true });
 
   const filename = `${mangaId}.jpg`;
