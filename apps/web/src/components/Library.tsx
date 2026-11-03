@@ -194,7 +194,7 @@ export function Library({ onMangaSelect }: LibraryProps) {
       ) : (
         <div className="manga-grid">
           {manga.map((m) => {
-            const cover = api.getAssetUrl(m.coverImageUrl);
+            const cover = api.getAssetUrl(m.coverImage);
             return (
             <div key={m.id} className="manga-card" onClick={() => onMangaSelect(m.id)}>
               <div className="manga-cover">

@@ -75,7 +75,7 @@ export interface BrowseResult {
 export interface MangaWithCount {
   id: string;
   title: string;
-  coverImageUrl?: string;
+  coverImage?: string;
   author?: string;
   artist?: string;
   unreadCount: number;
@@ -364,8 +364,10 @@ export class ApiClient {
   }
 
   // Queue
-  getQueueTasks(limit = 50): Promise<ImportTask[]> {
-    return this.request(`/api/queue/tasks?limit=${limit}`);
+  getQueueTasks(limit = 50, mangaId?: string): Promise<ImportTask[]> {
+    const params = new URLSearchParams({ limit: String(limit) });
+    if (mangaId) params.set("mangaId", mangaId);
+    return this.request(`/api/queue/tasks?${params.toString()}`);
   }
 
   getQueueStats(): Promise<QueueStats> {
