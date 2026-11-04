@@ -305,6 +305,22 @@ describe("CORS and CSRF", () => {
       .expect(200);
     expect(response.body).toEqual({ key: "ui.theme", value: "light" });
   });
+
+  it("accepts cross-site writes from an explicitly allowed origin", async () => {
+    const issued = await makeToken("Desktop dev");
+    const response = await request(app)
+      .put("/api/settings/ui.theme")
+      .set(bearer(issued.token))
+      .set("Content-Type", "application/json")
+      .set("Origin", "http://localhost:5173")
+      .set("Sec-Fetch-Site", "cross-site")
+      .send({ value: "dark" })
+      .expect(200);
+    expect(response.headers["access-control-allow-origin"]).toBe(
+      "http://localhost:5173",
+    );
+    expect(response.body).toEqual({ key: "ui.theme", value: "dark" });
+  });
 });
 
 describe("plugin install hardening", () => {

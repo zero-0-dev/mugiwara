@@ -171,19 +171,29 @@ export function createCsrfMiddleware(policy: OriginPolicy) {
     const origin = req.get("origin");
     const site = req.get("sec-fetch-site");
 
+    if (origin) {
+      if (!policy.isAllowed(origin, req)) {
+        res.status(403).json({ error: "Origin not allowed" });
+        return;
+      }
+
+      // A known app origin is trusted even when the browser labels the request
+      // cross-site. In desktop dev the UI runs on http://localhost:5173 while
+      // the API is on http://127.0.0.1:3001; Chromium treats localhost and
+      // 127.0.0.1 as different sites, which would otherwise reject every
+      // state-changing request (pairing, settings, content tokens, ...).
+      next();
+      return;
+    }
+
+    // Without an Origin header, Sec-Fetch-Site is the only browser signal we
+    // have. Reject cross-site writes, but keep allowing native clients and
+    // curl, which never carry ambient cookies.
     if (site === "cross-site") {
       res.status(403).json({ error: "Cross-site request rejected" });
       return;
     }
 
-    if (origin && !policy.isAllowed(origin, req)) {
-      res.status(403).json({ error: "Origin not allowed" });
-      return;
-    }
-
-    // Browser state-changing requests always carry Origin (or at least
-    // Sec-Fetch-Site). A missing origin is allowed for native clients and
-    // curl; those never carry ambient cookies.
     next();
   };
 }
