@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import { ImportTaskRepository } from "../queue/repository";
 import { ImportQueueProcessor } from "../queue/processor";
+import { recordAudit } from "../services/audit";
 
 const router: Router = Router();
 
@@ -112,6 +113,12 @@ router.post("/clear-complete", async (req: any, res: Response) => {
     const { mangaId } = req.body;
 
     const count = await repository.clearComplete(mangaId);
+    recordAudit({
+      event: "queue.clear_complete",
+      actor: req.auth?.id ?? null,
+      ip: req.ip ?? req.socket.remoteAddress ?? null,
+      details: { cleared: count, mangaId: mangaId ?? null },
+    });
     res.json({ message: `Cleared ${count} completed tasks` });
   } catch (error) {
     console.error("Error clearing completed tasks:", error);

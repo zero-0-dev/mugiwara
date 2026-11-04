@@ -7,6 +7,7 @@ import { writeFile, mkdir } from "fs/promises";
 import { existsSync } from "fs";
 
 const router: Router = Router({ mergeParams: true });
+const DATA_DIR = process.env.DATA_DIR || join(process.cwd(), "data");
 
 // POST /api/manga/:id/metadata/fetch - Fetch metadata from AniList
 router.post("/fetch", async (req: Request, res: Response): Promise<void> => {
@@ -39,7 +40,7 @@ router.post("/fetch", async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    console.log('[Metadata] Best match found:', {
+    console.log("[Metadata] Best match found:", {
       title: bestMatch.title.romaji,
       mediaType: bestMatch.mediaType,
       hasCoverImage: !!bestMatch.coverImage,
@@ -50,13 +51,16 @@ router.post("/fetch", async (req: Request, res: Response): Promise<void> => {
     let coverImagePath: string | undefined;
     if (bestMatch.coverImage?.large) {
       try {
-        coverImagePath = await downloadCoverImage(bestMatch.coverImage.large, id);
-        console.log('[Metadata] Cover image downloaded:', coverImagePath);
+        coverImagePath = await downloadCoverImage(
+          bestMatch.coverImage.large,
+          id,
+        );
+        console.log("[Metadata] Cover image downloaded:", coverImagePath);
       } catch (err) {
-        console.error('[Metadata] Failed to download cover image:', err);
+        console.error("[Metadata] Failed to download cover image:", err);
       }
     } else {
-      console.log('[Metadata] No cover image URL available');
+      console.log("[Metadata] No cover image URL available");
     }
 
     // Update manga with metadata
@@ -102,7 +106,7 @@ router.get("/search", async (req: Request, res: Response): Promise<void> => {
   try {
     const id = req.params.mangaId;
     const { query } = req.query;
-    
+
     if (!id) {
       res.status(400).json({ error: "ID is required" });
       return;
@@ -142,7 +146,7 @@ router.post("/apply", async (req: Request, res: Response): Promise<void> => {
   try {
     const id = req.params.mangaId;
     const { anilistId } = req.body;
-    
+
     if (!id || !anilistId) {
       res.status(400).json({ error: "ID and anilistId are required" });
       return;
@@ -160,7 +164,7 @@ router.post("/apply", async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    console.log('[Metadata] Got metadata from AniList:', {
+    console.log("[Metadata] Got metadata from AniList:", {
       title: metadata.title.romaji,
       hasCoverImage: !!metadata.coverImage,
       coverImageUrl: metadata.coverImage?.large,
@@ -170,13 +174,16 @@ router.post("/apply", async (req: Request, res: Response): Promise<void> => {
     let coverImagePath: string | undefined;
     if (metadata.coverImage?.large) {
       try {
-        coverImagePath = await downloadCoverImage(metadata.coverImage.large, id);
-        console.log('[Metadata] Cover image downloaded:', coverImagePath);
+        coverImagePath = await downloadCoverImage(
+          metadata.coverImage.large,
+          id,
+        );
+        console.log("[Metadata] Cover image downloaded:", coverImagePath);
       } catch (err) {
-        console.error('[Metadata] Failed to download cover image:', err);
+        console.error("[Metadata] Failed to download cover image:", err);
       }
     } else {
-      console.log('[Metadata] No cover image URL available');
+      console.log("[Metadata] No cover image URL available");
     }
 
     await mangaRepository.update(id, {
@@ -218,7 +225,7 @@ async function downloadCoverImage(
   url: string,
   mangaId: string,
 ): Promise<string> {
-  const coversDir = join(process.cwd(), "data", "covers");
+  const coversDir = join(DATA_DIR, "covers");
   await mkdir(coversDir, { recursive: true });
 
   const filename = `${mangaId}.jpg`;

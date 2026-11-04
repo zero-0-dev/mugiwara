@@ -1,10 +1,9 @@
-import express, { Request, Response } from "express";
-import cors from "cors";
-import { existsSync } from "fs";
 import { networkInterfaces } from "os";
 import { join } from "path";
 
 import { initDatabase, closeDatabase, db } from "./database";
+import { createApp, findWebDir } from "./app";
+import { AuthService } from "./auth/service";
 import { registerBuiltInPlugins } from "./plugins";
 import { PluginManager } from "./plugins/manager";
 import { PluginInstallationService } from "./plugins/installation";
@@ -12,40 +11,9 @@ import { PluginDiscoveryService } from "./plugins/discovery";
 import { StorageManager } from "./storage";
 import { ImportTaskRepository, ImportQueueProcessor } from "./queue";
 
-// API Routes
-import mangaRoutes from "./api/manga";
-import chapterRoutes from "./api/chapters";
-import libraryRoutes from "./api/library";
-import contentRoutes from "./api/content";
-import metadataRoutes from "./api/metadata";
-import filtersRoutes from "./api/filters";
-import settingsRoutes from "./api/settings";
-import categoriesRoutes from "./api/categories";
-
-// New API Routes
-import storageRoutes from "./api/storage";
-import pluginsRoutes from "./api/plugins";
-import queueRoutes from "./api/queue";
-import discoverRoutes from "./api/discover";
-
-const app = express();
 const PORT = Number(process.env.PORT) || 3001;
 const HOST = process.env.HOST || "0.0.0.0";
 const DATA_DIR = process.env.DATA_DIR || join(process.cwd(), "data");
-
-function findWebDir(): string | null {
-  const candidates = [
-    process.env.WEB_DIR,
-    join(process.cwd(), "web"),
-    join(process.cwd(), "public"),
-    join(process.cwd(), "apps/web/dist"),
-    join(__dirname, "../web"),
-    join(__dirname, "../public"),
-    join(__dirname, "../../web/dist"),
-  ].filter((candidate): candidate is string => Boolean(candidate));
-
-  return candidates.find((dir) => existsSync(join(dir, "index.html"))) ?? null;
-}
 
 function getLanUrls(port: number): string[] {
   const urls: string[] = [];
@@ -59,8 +27,6 @@ function getLanUrls(port: number): string[] {
   return urls;
 }
 
-const WEB_DIR = findWebDir();
-
 // Global service instances (injected into routes)
 declare global {
   var storageManager: StorageManager;
@@ -71,103 +37,14 @@ declare global {
   var queueProcessor: ImportQueueProcessor;
 }
 
-// Middleware
-app.use(cors());
-app.use(express.json({ limit: "50mb" }));
-app.use(express.urlencoded({ extended: true, limit: "50mb" }));
-
-// Request logging
-app.use((req, _res, next) => {
-  console.log(`${req.method} ${req.path}`);
-  next();
-});
-
-// Legacy API Routes
-app.use("/api/manga", mangaRoutes);
-app.use("/api/manga/:mangaId/chapters", chapterRoutes);
-app.use("/api/manga/:mangaId/metadata", metadataRoutes);
-app.use("/api/library", libraryRoutes);
-app.use("/api/library", filtersRoutes);
-app.use("/api/settings", settingsRoutes);
-app.use("/api/categories", categoriesRoutes);
-app.use("/api/content", contentRoutes);
-
-// New API Routes
-app.use("/api/storage", storageRoutes);
-app.use("/api/plugins", pluginsRoutes);
-app.use("/api/queue", queueRoutes);
-app.use("/api/discover", discoverRoutes);
-
-// Health check
-app.get("/api/health", (_req: Request, res: Response) => {
-  res.json({
-    status: "ok",
-    timestamp: new Date().toISOString(),
-    version: "2.0.0",
-    web: Boolean(WEB_DIR),
-  });
-});
-
-// Unknown API routes should stay JSON, never return the app shell.
-app.use("/api", (_req: Request, res: Response) => {
-  res.status(404).json({ error: "Not found" });
-});
-
-// Serve the shared web client when it has been built. The same build is used
-// by the browser/PWA, the Electron shell, and the Capacitor shell.
-if (WEB_DIR) {
-  app.use(
-    express.static(WEB_DIR, {
-      index: false,
-      setHeaders: (res, filePath) => {
-        if (filePath.endsWith(".html")) {
-          res.setHeader("Cache-Control", "no-cache");
-        } else {
-          res.setHeader(
-            "Cache-Control",
-            "public, max-age=31536000, immutable",
-          );
-        }
-      },
-    }),
-  );
-
-  // SPA fallback. API 404s must stay JSON, not the app shell.
-  app.get("*", (req: Request, res: Response, next) => {
-    if (req.path === "/api" || req.path.startsWith("/api/")) {
-      next();
-      return;
-    }
-    // Do not return index.html for a missing asset; let it 404 normally.
-    if (/\.[^/]+$/.test(req.path)) {
-      next();
-      return;
-    }
-    res.setHeader("Cache-Control", "no-cache");
-    res.sendFile(join(WEB_DIR, "index.html"));
-  });
-} else {
-  console.warn(
-    "⚠️  Web client build not found. Serving API only. " +
-      "Run `pnpm --filter @mugiwara-manga/web build` or set WEB_DIR.",
+function isLoopbackHost(host: string): boolean {
+  return ["127.0.0.1", "::1", "localhost", "[::1]"].includes(
+    host.trim().toLowerCase(),
   );
 }
 
-// Error handling
-app.use(
-  (
-    err: Error,
-    _req: express.Request,
-    res: express.Response,
-    _next: express.NextFunction,
-  ) => {
-    console.error("Error:", err);
-    res.status(500).json({ error: "Internal server error" });
-  },
-);
-
 // Initialize server
-let server: ReturnType<typeof app.listen> | null = null;
+let server: ReturnType<ReturnType<typeof createApp>["listen"]> | null = null;
 
 async function startServer() {
   try {
@@ -179,39 +56,85 @@ async function startServer() {
     initDatabase();
     console.log("✅ Database initialized");
 
-    // Step 2: Register built-in plugins (sources and storage)
+    // Step 2: Initialize authentication (before any request can be served)
+    console.log("🔐 Initializing authentication...");
+    const tokenTtlDays = Number(process.env.MUGIWARA_TOKEN_TTL_DAYS || "0");
+    const authService = new AuthService(db, {
+      tokenTtlMs:
+        Number.isFinite(tokenTtlDays) && tokenTtlDays > 0
+          ? tokenTtlDays * 24 * 60 * 60 * 1000
+          : null,
+    });
+    const bootstrapToken =
+      process.env.MUGIWARA_BOOTSTRAP_TOKEN || process.env.MUGIWARA_AUTH_TOKEN;
+    if (bootstrapToken) {
+      const record = await authService.ensureBootstrapToken(
+        bootstrapToken,
+        process.env.MUGIWARA_BOOTSTRAP_LABEL || "Bootstrap token",
+      );
+      if (record) {
+        console.log(
+          `✅ Bootstrap token provisioned for "${record.deviceLabel}" (value not logged)`,
+        );
+      } else {
+        console.warn(
+          "⚠️  MUGIWARA_BOOTSTRAP_TOKEN was ignored: tokens must be at least 24 characters.",
+        );
+      }
+    }
+
+    if ((await authService.countActiveTokens()) === 0) {
+      const issued = authService.createPairingCode();
+      console.log("\n🔑 First-run pairing code:", issued.code);
+      console.log(
+        `   Valid for ${Math.round(issued.ttlMs / 60000)} minutes. Enter it in the Mugiwara app to pair this device.`,
+      );
+      if (!isLoopbackHost(HOST)) {
+        console.log(
+          "   The server is reachable on the LAN; keep this code private.",
+        );
+      }
+    }
+
+    // Step 3: Register built-in plugins (sources and storage)
     console.log("🔌 Registering built-in plugins...");
     registerBuiltInPlugins();
     console.log("✅ Built-in plugins registered");
 
-    // Step 3: Initialize Storage Manager
+    // Step 4: Initialize Storage Manager
     console.log("💾 Initializing storage manager...");
     const storageManager = new StorageManager(db);
     await storageManager.initialize();
     global.storageManager = storageManager;
     console.log("✅ Storage manager initialized");
 
-    // Step 4: Initialize Plugin Manager
+    // Step 5: Initialize Plugin Manager
     console.log("🔧 Initializing plugin manager...");
     const pluginManager = new PluginManager(db, join(DATA_DIR, "plugins"));
     await pluginManager.initialize();
     global.pluginManager = pluginManager;
     console.log("✅ Plugin manager initialized");
 
-    // Step 5: Initialize Plugin Installation Service
+    // Step 6: Initialize Plugin Installation Service (hardened)
     console.log("📦 Initializing plugin installation service...");
-    const pluginInstaller = new PluginInstallationService(db, DATA_DIR);
+    const pluginInstaller = new PluginInstallationService(db, DATA_DIR, {
+      host: HOST,
+    });
     await pluginInstaller.initialize();
     global.pluginInstaller = pluginInstaller;
+    const installPolicy = pluginInstaller.getPolicy();
+    if (!installPolicy.installEnabled) {
+      console.log(`🔒 ${installPolicy.reason}`);
+    }
     console.log("✅ Plugin installation service initialized");
 
-    // Step 6: Initialize Plugin Discovery Service
+    // Step 7: Initialize Plugin Discovery Service
     console.log("🔍 Initializing plugin discovery service...");
     const pluginDiscovery = new PluginDiscoveryService();
     global.pluginDiscovery = pluginDiscovery;
     console.log("✅ Plugin discovery service initialized");
 
-    // Step 7: Initialize Import Queue
+    // Step 8: Initialize Import Queue
     console.log("📥 Initializing import queue...");
     const taskRepository = new ImportTaskRepository(db);
     global.taskRepository = taskRepository;
@@ -223,11 +146,13 @@ async function startServer() {
     });
     global.queueProcessor = queueProcessor;
 
-    // Start the queue processor
     await queueProcessor.start();
     console.log("✅ Import queue processor started");
 
-    // Step 8: Start HTTP server
+    // Step 9: Build the Express app and start HTTP server
+    const webDir = findWebDir();
+    const app = createApp({ authService, webDir, host: HOST });
+
     server = app.listen(PORT, HOST, () => {
       console.log(`\n🎉 Mugiwara server running on http://localhost:${PORT}`);
       const lanUrls = getLanUrls(PORT);
@@ -237,14 +162,20 @@ async function startServer() {
           console.log(`   - ${url}`);
         }
       }
-      if (WEB_DIR) {
-        console.log(`\n🖥️  Web client: ${WEB_DIR}`);
+      if (webDir) {
+        console.log(`\n🖥️  Web client: ${webDir}`);
+      } else {
+        console.warn(
+          "⚠️  Web client build not found. Serving API only. " +
+            "Run `pnpm --filter @mugiwara-manga/web build` or set WEB_DIR.",
+        );
       }
       console.log("\n📚 API Endpoints:");
       console.log("   - Legacy: /api/manga, /api/library, /api/settings");
       console.log("   - Storage: /api/storage/*");
       console.log("   - Plugins: /api/plugins/*");
       console.log("   - Queue: /api/queue/*");
+      console.log("   - Auth: POST /api/auth/pair, /api/auth/status");
 
       // Notify parent process (Electron) that we're ready
       if (process.send) {
@@ -256,29 +187,24 @@ async function startServer() {
     const shutdown = async () => {
       console.log("\n👋 Shutting down gracefully...");
 
-      // Stop queue processor
       if (global.queueProcessor) {
         console.log("⏹️  Stopping queue processor...");
         global.queueProcessor.stop();
       }
 
-      // Shutdown plugin manager
       if (global.pluginManager) {
         console.log("🔌 Shutting down plugin manager...");
         await global.pluginManager.shutdown();
       }
 
-      // Shutdown storage manager
       if (global.storageManager) {
         console.log("💾 Shutting down storage manager...");
         await global.storageManager.shutdown();
       }
 
-      // Close database
       console.log("📀 Closing database...");
       closeDatabase();
 
-      // Close HTTP server
       if (server) {
         console.log("🌐 Closing HTTP server...");
         server.close(() => {
@@ -293,7 +219,6 @@ async function startServer() {
     process.on("SIGINT", shutdown);
     process.on("SIGTERM", shutdown);
 
-    // Handle messages from parent process (Electron)
     process.on("message", (msg) => {
       if (msg === "shutdown") {
         shutdown();
@@ -305,4 +230,8 @@ async function startServer() {
   }
 }
 
-startServer();
+if (require.main === module) {
+  startServer();
+}
+
+export { startServer };

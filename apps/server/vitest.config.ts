@@ -4,6 +4,11 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["test/**/*.test.ts", "src/**/*.test.ts"],
+    setupFiles: ["./test/setup.ts"],
+    pool: "forks",
+    fileParallelism: false,
+    testTimeout: 20000,
+    hookTimeout: 30000,
     restoreMocks: true,
   },
 });

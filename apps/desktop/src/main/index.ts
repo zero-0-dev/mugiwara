@@ -1,5 +1,7 @@
 import { app, BrowserWindow, ipcMain, dialog, shell } from "electron";
 import path from "path";
+import { randomBytes } from "crypto";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { ServerManager } from "./server-manager";
 
 // Keep a global reference to prevent garbage collection
@@ -15,11 +17,134 @@ const DEV_SERVER_PORT = 3001;
 const EXTERNAL_SERVER_URL =
   process.env.MUGIWARA_SERVER_URL?.replace(/\/+$/, "") || "";
 
+// The embedded server is local-only from the renderer's perspective, but it
+// still requires authentication. The main process provisions a token through
+// loopback pairing (or MUGIWARA_AUTH_TOKEN) and hands it to the renderer via
+// the preload bridge. The token is never written to logs.
+let desktopAuthToken = "";
+
+function tokenStorePath(): string {
+  const dir = app.getPath("userData");
+  mkdirSync(dir, { recursive: true });
+  return path.join(dir, "auth-tokens.json");
+}
+
+function readTokenStore(): Record<string, string> {
+  try {
+    const file = tokenStorePath();
+    if (!existsSync(file)) return {};
+    return JSON.parse(readFileSync(file, "utf8")) as Record<string, string>;
+  } catch {
+    return {};
+  }
+}
+
+function writeTokenStore(store: Record<string, string>): void {
+  try {
+    writeFileSync(tokenStorePath(), JSON.stringify(store, null, 2), {
+      mode: 0o600,
+    });
+  } catch (error) {
+    console.warn(
+      "[Main] Could not persist auth token:",
+      error instanceof Error ? error.message : error,
+    );
+  }
+}
+
+function serverBaseUrl(serverPort: number): string {
+  if (EXTERNAL_SERVER_URL) return EXTERNAL_SERVER_URL;
+  const port = serverPort || serverManager?.getPort() || DEV_SERVER_PORT;
+  // In dev the web UI is served by Vite (:5173) and proxies /api to the server,
+  // but pairing calls go straight to the loopback server.
+  return `http://127.0.0.1:${port}`;
+}
+
+function isLoopbackUrl(value: string): boolean {
+  try {
+    const host = new URL(value).hostname;
+    return host === "localhost" || host === "127.0.0.1" || host === "::1";
+  } catch {
+    return false;
+  }
+}
+
+async function callJson(
+  url: string,
+  init: RequestInit,
+): Promise<{ response: Response; body: any }> {
+  const response = await fetch(url, init);
+  const body = await response.json().catch(() => ({}));
+  return { response, body };
+}
+
+async function validateAuthToken(
+  base: string,
+  token: string,
+): Promise<boolean> {
+  if (!token) return false;
+  try {
+    const { response } = await callJson(`${base}/api/auth/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function pairViaLoopback(base: string): Promise<string> {
+  if (!isLoopbackUrl(base)) return "";
+  try {
+    const init = await callJson(`${base}/api/auth/pairing/init`, {
+      method: "POST",
+    });
+    const code = init.body?.code;
+    if (!init.response.ok || typeof code !== "string") return "";
+    const paired = await callJson(`${base}/api/auth/pair`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code, deviceLabel: "Mugiwara Desktop" }),
+    });
+    if (!paired.response.ok || typeof paired.body?.token !== "string")
+      return "";
+    return paired.body.token;
+  } catch {
+    return "";
+  }
+}
+
+async function provisionAuthToken(base: string): Promise<string> {
+  // In dev the API server runs in another process and may still be starting.
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const token = await provisionAuthTokenOnce(base);
+    if (token) return token;
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  return "";
+}
+
+async function provisionAuthTokenOnce(base: string): Promise<string> {
+  const envToken = process.env.MUGIWARA_AUTH_TOKEN || "";
+  if (envToken) return envToken;
+
+  const store = readTokenStore();
+  const storedToken = store[base] ?? "";
+  if (await validateAuthToken(base, storedToken)) {
+    return storedToken;
+  }
+
+  const token = await pairViaLoopback(base);
+  if (token) {
+    store[base] = token;
+    writeTokenStore(store);
+  }
+  return token;
+}
+
 function getAppUrl(serverPort: number): string {
   if (EXTERNAL_SERVER_URL) return EXTERNAL_SERVER_URL;
-  return isDev
-    ? "http://localhost:5173"
-    : `http://127.0.0.1:${serverPort}`;
+  return isDev ? "http://localhost:5173" : `http://127.0.0.1:${serverPort}`;
 }
 
 function getApiBase(apiPath: string): string {
@@ -101,6 +226,15 @@ async function initialize() {
       );
     }
 
+    // Provision an auth token for the renderer. Packaged builds pair over
+    // loopback automatically; MUGIWARA_AUTH_TOKEN can override this.
+    desktopAuthToken = await provisionAuthToken(serverBaseUrl(serverPort));
+    if (!desktopAuthToken) {
+      console.warn(
+        "[Main] No desktop auth token available. The renderer will ask for pairing.",
+      );
+    }
+
     // Create the main window
     await createWindow(serverPort);
   } catch (error) {
@@ -126,6 +260,10 @@ ipcMain.handle("get-server-port", () => {
 
 ipcMain.handle("get-api-url", (event, apiPath: string) => {
   return getApiBase(apiPath);
+});
+
+ipcMain.handle("get-auth-token", () => {
+  return desktopAuthToken;
 });
 
 ipcMain.handle("get-app-version", () => {

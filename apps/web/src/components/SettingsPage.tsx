@@ -4,6 +4,7 @@ import { useToast } from "./Toast";
 import { StorageSection } from "./settings/StorageSection";
 import { PluginsSection } from "./settings/PluginsSection";
 import { QueueSection } from "./settings/QueueSection";
+import { SecuritySection } from "./settings/SecuritySection";
 import { useSettings, useSaveSetting } from "../api/hooks";
 import pkg from "../../package.json";
 import { Select } from "./Select";
@@ -71,7 +72,11 @@ const mediaTypes = [
   },
 ];
 
-export function SettingsPage({ onBack, serverLabel, onChangeServer }: SettingsPageProps) {
+export function SettingsPage({
+  onBack,
+  serverLabel,
+  onChangeServer,
+}: SettingsPageProps) {
   const [activeTab, setActiveTab] = React.useState<string>("reading");
   const { data: serverSettings, isLoading } = useSettings();
   const saveSetting = useSaveSetting();
@@ -86,14 +91,18 @@ export function SettingsPage({ onBack, serverLabel, onChangeServer }: SettingsPa
     return undefined;
   }, [saveSuccess]);
 
-  const settings: Settings = { ...defaultSettings, ...(serverSettings as Partial<Settings>) };
+  const settings: Settings = {
+    ...defaultSettings,
+    ...(serverSettings as Partial<Settings>),
+  };
 
   function updateSetting(key: keyof Settings, value: string) {
     saveSetting.mutate(
       { key, value },
       {
         onSuccess: () => setSaveSuccess("Saved"),
-        onError: (err) => toast.error(err instanceof Error ? err.message : "Failed to save"),
+        onError: (err) =>
+          toast.error(err instanceof Error ? err.message : "Failed to save"),
       },
     );
   }
@@ -120,7 +129,9 @@ export function SettingsPage({ onBack, serverLabel, onChangeServer }: SettingsPa
                     { value: "light", label: "Light" },
                   ]}
                 />
-                {saveSetting.isPending && <span className="saving-indicator">Saving...</span>}
+                {saveSetting.isPending && (
+                  <span className="saving-indicator">Saving...</span>
+                )}
               </div>
             </div>
 
@@ -163,7 +174,9 @@ export function SettingsPage({ onBack, serverLabel, onChangeServer }: SettingsPa
                     label: mode.label,
                   }))}
                 />
-                {saveSetting.isPending && <span className="saving-indicator">Saving...</span>}
+                {saveSetting.isPending && (
+                  <span className="saving-indicator">Saving...</span>
+                )}
               </div>
             </div>
 
@@ -190,7 +203,9 @@ export function SettingsPage({ onBack, serverLabel, onChangeServer }: SettingsPa
                         label: mode.label,
                       }))}
                     />
-                    {saveSetting.isPending && <span className="saving-indicator">Saving...</span>}
+                    {saveSetting.isPending && (
+                      <span className="saving-indicator">Saving...</span>
+                    )}
                   </div>
                 </div>
               );
@@ -207,14 +222,22 @@ export function SettingsPage({ onBack, serverLabel, onChangeServer }: SettingsPa
       case "queue":
         return <QueueSection />;
 
+      case "security":
+        return <SecuritySection />;
+
       case "about":
         return (
           <section className="settings-section">
             <h2>About</h2>
             <div className="about-info">
-              <p><strong>Mugiwara Manga Reader</strong></p>
+              <p>
+                <strong>Mugiwara Manga Reader</strong>
+              </p>
               <p>Version {pkg.version}</p>
-              <p>A cross-platform manga reader with extensible plugin architecture.</p>
+              <p>
+                A cross-platform manga reader with extensible plugin
+                architecture.
+              </p>
             </div>
             <div className="setting-divider" />
             <div className="setting-item">
@@ -224,7 +247,10 @@ export function SettingsPage({ onBack, serverLabel, onChangeServer }: SettingsPa
               </div>
               {onChangeServer && (
                 <div className="setting-control">
-                  <button className="btn btn-secondary" onClick={onChangeServer}>
+                  <button
+                    className="btn btn-secondary"
+                    onClick={onChangeServer}
+                  >
                     Change server
                   </button>
                 </div>
@@ -266,19 +292,46 @@ export function SettingsPage({ onBack, serverLabel, onChangeServer }: SettingsPa
           <button className="settings-mobile-back" onClick={onBack}>
             <ArrowLeft size={16} /> Back
           </button>
-          <button aria-current={activeTab === "reading" ? "page" : undefined} className={`nav-item ${activeTab === "reading" ? "active" : ""}`} onClick={() => setActiveTab("reading")}>
+          <button
+            aria-current={activeTab === "reading" ? "page" : undefined}
+            className={`nav-item ${activeTab === "reading" ? "active" : ""}`}
+            onClick={() => setActiveTab("reading")}
+          >
             Reading
           </button>
-          <button aria-current={activeTab === "storage" ? "page" : undefined} className={`nav-item ${activeTab === "storage" ? "active" : ""}`} onClick={() => setActiveTab("storage")}>
+          <button
+            aria-current={activeTab === "storage" ? "page" : undefined}
+            className={`nav-item ${activeTab === "storage" ? "active" : ""}`}
+            onClick={() => setActiveTab("storage")}
+          >
             Storage
           </button>
-          <button aria-current={activeTab === "plugins" ? "page" : undefined} className={`nav-item ${activeTab === "plugins" ? "active" : ""}`} onClick={() => setActiveTab("plugins")}>
+          <button
+            aria-current={activeTab === "plugins" ? "page" : undefined}
+            className={`nav-item ${activeTab === "plugins" ? "active" : ""}`}
+            onClick={() => setActiveTab("plugins")}
+          >
             Plugins
           </button>
-          <button aria-current={activeTab === "queue" ? "page" : undefined} className={`nav-item ${activeTab === "queue" ? "active" : ""}`} onClick={() => setActiveTab("queue")}>
+          <button
+            aria-current={activeTab === "queue" ? "page" : undefined}
+            className={`nav-item ${activeTab === "queue" ? "active" : ""}`}
+            onClick={() => setActiveTab("queue")}
+          >
             Queue
           </button>
-          <button aria-current={activeTab === "about" ? "page" : undefined} className={`nav-item ${activeTab === "about" ? "active" : ""}`} onClick={() => setActiveTab("about")}>
+          <button
+            aria-current={activeTab === "security" ? "page" : undefined}
+            className={`nav-item ${activeTab === "security" ? "active" : ""}`}
+            onClick={() => setActiveTab("security")}
+          >
+            Security
+          </button>
+          <button
+            aria-current={activeTab === "about" ? "page" : undefined}
+            className={`nav-item ${activeTab === "about" ? "active" : ""}`}
+            onClick={() => setActiveTab("about")}
+          >
             About
           </button>
           {saveSuccess && <span className="save-indicator settings-mobile-save" role="status">{saveSuccess}</span>}

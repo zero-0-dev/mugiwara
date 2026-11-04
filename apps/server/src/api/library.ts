@@ -15,6 +15,7 @@ import { writeFile, mkdir, stat } from "fs/promises";
 import { v4 as uuidv4 } from "uuid";
 
 const router: Router = Router();
+const DATA_DIR = process.env.DATA_DIR || join(process.cwd(), "data");
 
 function looksLikePath(value: string): boolean {
   const trimmed = value.trim();
@@ -508,9 +509,8 @@ router.post(
     try {
       const mangaId = req.params.id as string;
 
-      const { mangaRepository, chapterRepository } = await import(
-        "../database"
-      );
+      const { mangaRepository, chapterRepository } =
+        await import("../database");
       const manga = await mangaRepository.findById(mangaId);
       if (!manga) {
         res.status(404).json({ error: "Manga not found" });
@@ -526,7 +526,9 @@ router.post(
 
       const source = global.pluginManager.getSource(sourceId);
       if (!source || !source.checkForUpdates) {
-        res.status(404).json({ error: "Source not found or does not support updates" });
+        res
+          .status(404)
+          .json({ error: "Source not found or does not support updates" });
         return;
       }
 
@@ -639,9 +641,8 @@ router.post(
     try {
       const mangaId = req.params.id as string;
 
-      const { mangaRepository, chapterRepository } = await import(
-        "../database"
-      );
+      const { mangaRepository, chapterRepository } =
+        await import("../database");
       const manga = await mangaRepository.findById(mangaId);
       if (!manga) {
         res.status(404).json({ error: "Manga not found" });
@@ -690,7 +691,10 @@ router.post(
             mangaId,
             chapter.chapterId,
           );
-          if (existingTask && ["pending", "running"].includes(existingTask.status)) {
+          if (
+            existingTask &&
+            ["pending", "running"].includes(existingTask.status)
+          ) {
             continue;
           }
 
@@ -736,31 +740,55 @@ async function checkSingleMangaForUpdates(manga: {
     const sourceMangaId = manga.sourceMangaId;
     const sourceId = manga.sourceId;
     if (!sourceMangaId || !sourceId) {
-      return { mangaId: manga.id, title: manga.title, newChapters: 0, error: "No source info" };
+      return {
+        mangaId: manga.id,
+        title: manga.title,
+        newChapters: 0,
+        error: "No source info",
+      };
     }
 
     const source = global.pluginManager.getSource(sourceId);
     if (!source || !source.checkForUpdates) {
-      return { mangaId: manga.id, title: manga.title, newChapters: 0, error: "Source not found or no update support" };
+      return {
+        mangaId: manga.id,
+        title: manga.title,
+        newChapters: 0,
+        error: "Source not found or no update support",
+      };
     }
 
     const { mangaRepository, chapterRepository } = await import("../database");
     const existingChapters = await chapterRepository.findByMangaId(manga.id);
-    const lastChapter = existingChapters.length > 0
-      ? existingChapters.reduce((a: any, b: any) => (a.sortOrder > b.sortOrder ? a : b))
-      : null;
+    const lastChapter =
+      existingChapters.length > 0
+        ? existingChapters.reduce((a: any, b: any) =>
+            a.sortOrder > b.sortOrder ? a : b,
+          )
+        : null;
     const lastChapterId = lastChapter?.chapterId;
 
-    const newSourceChapters = await source.checkForUpdates(sourceMangaId, lastChapterId);
+    const newSourceChapters = await source.checkForUpdates(
+      sourceMangaId,
+      lastChapterId,
+    );
     if (!newSourceChapters || newSourceChapters.length === 0) {
-      await mangaRepository.update(manga.id, { lastSourceCheck: new Date().toISOString() });
+      await mangaRepository.update(manga.id, {
+        lastSourceCheck: new Date().toISOString(),
+      });
       return { mangaId: manga.id, title: manga.title, newChapters: 0 };
     }
 
-    const existingChapterIds = new Set(existingChapters.map((c: any) => c.chapterId));
-    const trulyNew = newSourceChapters.filter((c: any) => !existingChapterIds.has(c.chapterId));
+    const existingChapterIds = new Set(
+      existingChapters.map((c: any) => c.chapterId),
+    );
+    const trulyNew = newSourceChapters.filter(
+      (c: any) => !existingChapterIds.has(c.chapterId),
+    );
     if (trulyNew.length === 0) {
-      await mangaRepository.update(manga.id, { lastSourceCheck: new Date().toISOString() });
+      await mangaRepository.update(manga.id, {
+        lastSourceCheck: new Date().toISOString(),
+      });
       return { mangaId: manga.id, title: manga.title, newChapters: 0 };
     }
 
@@ -795,15 +823,25 @@ async function checkSingleMangaForUpdates(manga: {
         created++;
       } catch (err: any) {
         if (!err.message?.includes("UNIQUE constraint failed")) {
-          console.error(`[LibraryUpdate] Failed for manga ${manga.id} chapter ${chapter.chapterId}:`, err);
+          console.error(
+            `[LibraryUpdate] Failed for manga ${manga.id} chapter ${chapter.chapterId}:`,
+            err,
+          );
         }
       }
     }
 
-    await mangaRepository.update(manga.id, { lastSourceCheck: new Date().toISOString() });
+    await mangaRepository.update(manga.id, {
+      lastSourceCheck: new Date().toISOString(),
+    });
     return { mangaId: manga.id, title: manga.title, newChapters: created };
   } catch (err) {
-    return { mangaId: manga.id, title: manga.title, newChapters: 0, error: (err as Error).message };
+    return {
+      mangaId: manga.id,
+      title: manga.title,
+      newChapters: 0,
+      error: (err as Error).message,
+    };
   }
 }
 
@@ -998,7 +1036,7 @@ async function downloadCoverImage(
   url: string,
   mangaId: string,
 ): Promise<string> {
-  const coversDir = join(process.cwd(), "data", "covers");
+  const coversDir = join(DATA_DIR, "covers");
   await mkdir(coversDir, { recursive: true });
 
   const filename = `${mangaId}.jpg`;

@@ -1,10 +1,24 @@
 import { useEffect, useMemo, useRef } from "react";
-import { useQuery, useMutation, useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useQuery,
+  useMutation,
+  useInfiniteQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { useApiClient } from "./context";
 
 // ─── Library ───────────────────────────────────────────────────────────────
 
-export function useLibrary(filters?: { search?: string; status?: string; mediaType?: string; genre?: string; category?: string; readingStatus?: string; sortBy?: string; sortOrder?: string }) {
+export function useLibrary(filters?: {
+  search?: string;
+  status?: string;
+  mediaType?: string;
+  genre?: string;
+  category?: string;
+  readingStatus?: string;
+  sortBy?: string;
+  sortOrder?: string;
+}) {
   const api = useApiClient();
   return useQuery({
     queryKey: ["library", filters],
@@ -45,9 +59,7 @@ export function useChapters(mangaId: string) {
       const chapters = query.state.data as
         | Array<{ importStatus?: string }>
         | undefined;
-      return chapters?.some(
-        (chapter) => chapter.importStatus === "downloading",
-      )
+      return chapters?.some((chapter) => chapter.importStatus === "downloading")
         ? 3000
         : false;
     },
@@ -121,7 +133,10 @@ export function useSearchSource(sourceId: string | null, query: string) {
   });
 }
 
-export function useSourceManga(sourceId: string | null, sourceMangaId: string | null) {
+export function useSourceManga(
+  sourceId: string | null,
+  sourceMangaId: string | null,
+) {
   const api = useApiClient();
   return useQuery({
     queryKey: ["sourceManga", sourceId, sourceMangaId],
@@ -166,11 +181,20 @@ export function useReadingMode(mangaId: string) {
 
 // ─── Discover ──────────────────────────────────────────────────────────────
 
-export function useDiscoverBrowse(filters: { sort?: string; country?: string; search?: string; genre?: string; format?: string; status?: string; perPage?: number }) {
+export function useDiscoverBrowse(filters: {
+  sort?: string;
+  country?: string;
+  search?: string;
+  genre?: string;
+  format?: string;
+  status?: string;
+  perPage?: number;
+}) {
   const api = useApiClient();
   return useInfiniteQuery({
     queryKey: ["discover", "browse", filters],
-    queryFn: ({ pageParam = 1 }) => api.discoverBrowse({ ...filters, page: pageParam }),
+    queryFn: ({ pageParam = 1 }) =>
+      api.discoverBrowse({ ...filters, page: pageParam }),
     initialPageParam: 1,
     // AniList is remote and rate-limited; don't refetch on every screen mount.
     staleTime: 1000 * 60 * 5,
@@ -208,9 +232,7 @@ function useTaskQueue(
     // Poll only while there is work in flight. The web client invalidates this
     // query when a download is queued, which restarts the interval.
     refetchInterval: (query) => {
-      const tasks = query.state.data as
-        | Array<{ status?: string }>
-        | undefined;
+      const tasks = query.state.data as Array<{ status?: string }> | undefined;
       return tasks?.some(
         (task) => task.status === "pending" || task.status === "running",
       )
@@ -316,6 +338,58 @@ export function useAvailablePlugins() {
   });
 }
 
+export function usePluginPolicy() {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: ["pluginPolicy"],
+    queryFn: () => api.getPluginPolicy(),
+  });
+}
+
+// ─── Auth / devices ────────────────────────────────────────────────────────
+
+export function useAuthDevices() {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: ["authDevices"],
+    queryFn: () => api.getDevices(),
+  });
+}
+
+export function useRevokeDevice() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.revokeDevice(id),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["authDevices"] }),
+  });
+}
+
+export function useLogoutAllDevices() {
+  const api = useApiClient();
+  return useMutation({
+    mutationFn: () => api.logoutAll(),
+    onSuccess: () => {
+      window.dispatchEvent(new CustomEvent("mugiwara:unauthorized"));
+    },
+  });
+}
+
+export function useRotateToken() {
+  const api = useApiClient();
+  return useMutation({
+    mutationFn: () => api.rotateToken(),
+  });
+}
+
+export function useCreatePairingCode() {
+  const api = useApiClient();
+  return useMutation({
+    mutationFn: () => api.createPairingCode(),
+  });
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // MUTATIONS
 // ═══════════════════════════════════════════════════════════════════════════
@@ -332,7 +406,9 @@ export function useDeleteManga() {
       queryClient.invalidateQueries({ queryKey: ["filterOptions"] });
       queryClient.removeQueries({ queryKey: ["manga", mangaId] });
       queryClient.removeQueries({ queryKey: ["chapters", mangaId] });
-      queryClient.removeQueries({ queryKey: ["chapterProgress", "all", mangaId] });
+      queryClient.removeQueries({
+        queryKey: ["chapterProgress", "all", mangaId],
+      });
       queryClient.removeQueries({ queryKey: ["chapterProgress", mangaId] });
       queryClient.removeQueries({ queryKey: ["mangaCategories", mangaId] });
       queryClient.removeQueries({ queryKey: ["importProgress", mangaId] });
@@ -359,8 +435,13 @@ export function useMarkChapterComplete(mangaId: string) {
   const api = useApiClient();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ chapterId, markPrevious }: { chapterId: string; markPrevious?: boolean }) =>
-      api.markChapterComplete(mangaId, chapterId, { markPrevious }),
+    mutationFn: ({
+      chapterId,
+      markPrevious,
+    }: {
+      chapterId: string;
+      markPrevious?: boolean;
+    }) => api.markChapterComplete(mangaId, chapterId, { markPrevious }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["library"] });
       queryClient.invalidateQueries({ queryKey: ["chapterProgress"] });
@@ -372,8 +453,13 @@ export function useMarkChapterIncomplete(mangaId: string) {
   const api = useApiClient();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ chapterId, markFollowing }: { chapterId: string; markFollowing?: boolean }) =>
-      api.markChapterIncomplete(mangaId, chapterId, { markFollowing }),
+    mutationFn: ({
+      chapterId,
+      markFollowing,
+    }: {
+      chapterId: string;
+      markFollowing?: boolean;
+    }) => api.markChapterIncomplete(mangaId, chapterId, { markFollowing }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["library"] });
       queryClient.invalidateQueries({ queryKey: ["chapterProgress"] });
@@ -401,11 +487,18 @@ export function useUpdateChapterProgress(mangaId: string, chapterId: string) {
   const api = useApiClient();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: { pageNumber: number; totalPages: number; isCompleted: boolean }) =>
-      api.updateChapterProgress(mangaId, chapterId, body),
+    mutationFn: (body: {
+      pageNumber: number;
+      totalPages: number;
+      isCompleted: boolean;
+    }) => api.updateChapterProgress(mangaId, chapterId, body),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["chapterProgress", "all", mangaId] });
-      queryClient.invalidateQueries({ queryKey: ["chapterProgress", mangaId, chapterId] });
+      queryClient.invalidateQueries({
+        queryKey: ["chapterProgress", "all", mangaId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["chapterProgress", mangaId, chapterId],
+      });
       // Reading progress affects the library sorting ("last read") and the
       // per-card progress bar.
       queryClient.invalidateQueries({ queryKey: ["library"] });
@@ -432,7 +525,8 @@ export function useApplyMetadata(mangaId: string) {
   const api = useApiClient();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: { anilistId: number }) => api.applyMetadata(mangaId, body),
+    mutationFn: (body: { anilistId: number }) =>
+      api.applyMetadata(mangaId, body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["manga", mangaId] });
       queryClient.invalidateQueries({ queryKey: ["library"] });
@@ -447,7 +541,8 @@ export function useAddMangaToCategory(mangaId: string) {
   const api = useApiClient();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (categoryId: string) => api.addMangaToCategory(mangaId, categoryId),
+    mutationFn: (categoryId: string) =>
+      api.addMangaToCategory(mangaId, categoryId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["mangaCategories", mangaId] });
       queryClient.invalidateQueries({ queryKey: ["library"] });
@@ -460,7 +555,8 @@ export function useRemoveMangaFromCategory(mangaId: string) {
   const api = useApiClient();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (categoryId: string) => api.removeMangaFromCategory(mangaId, categoryId),
+    mutationFn: (categoryId: string) =>
+      api.removeMangaFromCategory(mangaId, categoryId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["mangaCategories", mangaId] });
       queryClient.invalidateQueries({ queryKey: ["library"] });
@@ -475,8 +571,18 @@ export function useImportManga() {
   const api = useApiClient();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: { sourceId: string; sourceMangaId: string; chapters: Array<{ sourceChapterId: string; chapterId: string; title?: string; sortOrder: number; language?: string; scanlationGroup?: string }> }) =>
-      api.importManga(body),
+    mutationFn: (body: {
+      sourceId: string;
+      sourceMangaId: string;
+      chapters: Array<{
+        sourceChapterId: string;
+        chapterId: string;
+        title?: string;
+        sortOrder: number;
+        language?: string;
+        scanlationGroup?: string;
+      }>;
+    }) => api.importManga(body),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["library"] });
       queryClient.invalidateQueries({ queryKey: ["filterOptions"] });
@@ -485,7 +591,9 @@ export function useImportManga() {
       if (data?.mangaId) {
         queryClient.invalidateQueries({ queryKey: ["manga", data.mangaId] });
         queryClient.invalidateQueries({ queryKey: ["chapters", data.mangaId] });
-        queryClient.invalidateQueries({ queryKey: ["importProgress", data.mangaId] });
+        queryClient.invalidateQueries({
+          queryKey: ["importProgress", data.mangaId],
+        });
       }
     },
   });
@@ -512,7 +620,8 @@ export function useSaveSetting() {
   const api = useApiClient();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ key, value }: { key: string; value: unknown }) => api.saveSetting(key, value),
+    mutationFn: ({ key, value }: { key: string; value: unknown }) =>
+      api.saveSetting(key, value),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["settings"] });
     },
@@ -594,7 +703,12 @@ export function useCreateStorageBackend() {
   const api = useApiClient();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: { type: string; name: string; config: Record<string, unknown>; isDefault?: boolean }) => api.createStorageBackend(body),
+    mutationFn: (body: {
+      type: string;
+      name: string;
+      config: Record<string, unknown>;
+      isDefault?: boolean;
+    }) => api.createStorageBackend(body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["storageBackends"] });
     },
@@ -605,7 +719,15 @@ export function useUpdateStorageBackend() {
   const api = useApiClient();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, config, isDefault }: { id: string; config: Record<string, unknown>; isDefault?: boolean }) => api.updateStorageBackend(id, { config, isDefault }),
+    mutationFn: ({
+      id,
+      config,
+      isDefault,
+    }: {
+      id: string;
+      config: Record<string, unknown>;
+      isDefault?: boolean;
+    }) => api.updateStorageBackend(id, { config, isDefault }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["storageBackends"] });
     },
@@ -645,7 +767,11 @@ export function useInstallPlugin() {
   const api = useApiClient();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: { packageName: string }) => api.installPlugin(body),
+    mutationFn: (body: {
+      packageName: string;
+      version?: string;
+      confirm: true;
+    }) => api.installPlugin(body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["pluginsInstalled"] });
       queryClient.invalidateQueries({ queryKey: ["pluginsAvailable"] });

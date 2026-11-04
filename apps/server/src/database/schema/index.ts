@@ -324,3 +324,40 @@ export const settings = sqliteTable("settings", {
     .notNull()
     .default(sql`(current_timestamp)`),
 });
+
+// Bearer tokens for paired devices. Only the SHA-256 hash is stored; the raw
+// token is returned exactly once when a device pairs or rotates its token.
+export const authTokens = sqliteTable(
+  "auth_tokens",
+  {
+    id: text("id").primaryKey(),
+    tokenHash: text("token_hash").notNull(),
+    deviceLabel: text("device_label").notNull(),
+    isAdmin: integer("is_admin", { mode: "boolean" }).notNull().default(true),
+    createdAt: text("created_at")
+      .notNull()
+      .default(sql`(current_timestamp)`),
+    lastUsedAt: text("last_used_at"),
+    // Optional expiry. Null means the token stays valid until revoked.
+    expiresAt: text("expires_at"),
+    revokedAt: text("revoked_at"),
+  },
+  (table) => ({
+    tokenHashUnique: uniqueIndex("auth_tokens_token_hash_idx").on(
+      table.tokenHash,
+    ),
+  }),
+);
+
+// Persistent security audit trail. Never store tokens, pairing codes,
+// passwords, or request bodies here.
+export const auditLogs = sqliteTable("audit_logs", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  event: text("event").notNull(),
+  actor: text("actor"),
+  ip: text("ip"),
+  details: text("details"),
+  createdAt: text("created_at")
+    .notNull()
+    .default(sql`(current_timestamp)`),
+});

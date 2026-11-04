@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   // Server info
   getServerPort: () => ipcRenderer.invoke("get-server-port"),
   getApiUrl: (path: string) => ipcRenderer.invoke("get-api-url", path),
+  getAuthToken: () => ipcRenderer.invoke("get-auth-token"),
 
   // App info
   getAppVersion: () => ipcRenderer.invoke("get-app-version"),
@@ -13,7 +14,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   selectFolder: () => ipcRenderer.invoke("select-folder"),
 
   // Folder operations
-  openFolder: (folderPath: string) => ipcRenderer.invoke("open-folder", folderPath),
+  openFolder: (folderPath: string) =>
+    ipcRenderer.invoke("open-folder", folderPath),
 
   // Platform
   platform: process.platform,
@@ -25,6 +27,7 @@ declare global {
     electronAPI: {
       getServerPort: () => Promise<number>;
       getApiUrl: (path: string) => Promise<string>;
+      getAuthToken: () => Promise<string>;
       getAppVersion: () => Promise<string>;
       selectFolder: () => Promise<string | null>;
       openFolder: (folderPath: string) => Promise<string>;
