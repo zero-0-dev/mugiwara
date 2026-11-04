@@ -1818,7 +1818,7 @@ body {
   width: 100%;
   max-width: 800px;
   height: auto;
-  margin-bottom: 1rem;
+  margin: 0 auto 1rem;
   display: block;
   opacity: 1;
 }

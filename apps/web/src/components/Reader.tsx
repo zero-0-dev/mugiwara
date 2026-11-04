@@ -62,6 +62,7 @@ const MAX_ZOOM = 4;
 const DOUBLE_TAP_ZOOM = 2.5;
 const PRELOAD_RADIUS = 2;
 const SCROLL_SETTLE_MS = 140;
+const FAST_SCROLL_MS = 90;
 const CONTROLS_HIDE_MS = 3000;
 
 function ReaderPage({
@@ -197,6 +198,7 @@ export function Reader({
   const previousModeRef = useRef<ReaderMode>(readingMode);
   const zoomRef = useRef(zoom);
   const preloadedImagesRef = useRef<HTMLImageElement[]>([]);
+  const scrollAnimationRef = useRef<number | null>(null);
 
   const tapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTapRef = useRef<TapPoint | null>(null);
@@ -371,6 +373,50 @@ export function Reader({
     }
   }, [readingMode, currentPage]);
 
+  const stopScrollAnimation = useCallback(() => {
+    if (scrollAnimationRef.current !== null) {
+      cancelAnimationFrame(scrollAnimationRef.current);
+      scrollAnimationRef.current = null;
+    }
+  }, []);
+
+  const animateScroll = useCallback(
+    (element: HTMLElement, left: number, top: number) => {
+      stopScrollAnimation();
+
+      const reduceMotion = window.matchMedia?.(
+        "(prefers-reduced-motion: reduce)",
+      ).matches;
+      const startLeft = element.scrollLeft;
+      const startTop = element.scrollTop;
+      const deltaLeft = left - startLeft;
+      const deltaTop = top - startTop;
+
+      if (
+        reduceMotion ||
+        (Math.abs(deltaLeft) < 1 && Math.abs(deltaTop) < 1)
+      ) {
+        element.scrollTo({ left, top, behavior: "auto" });
+        return;
+      }
+
+      const startedAt = performance.now();
+      const step = (now: number) => {
+        const progress = Math.min(1, (now - startedAt) / FAST_SCROLL_MS);
+        const eased = 1 - Math.pow(1 - progress, 3);
+        element.scrollTo({
+          left: startLeft + deltaLeft * eased,
+          top: startTop + deltaTop * eased,
+          behavior: "auto",
+        });
+        scrollAnimationRef.current =
+          progress < 1 ? requestAnimationFrame(step) : null;
+      };
+      scrollAnimationRef.current = requestAnimationFrame(step);
+    },
+    [stopScrollAnimation],
+  );
+
   const scrollToPage = useCallback(
     (pageIndex: number, behavior: ScrollBehavior = "smooth") => {
       const target = clamp(pageIndex, 0, Math.max(0, pages.length - 1));
@@ -395,9 +441,14 @@ export function Reader({
       if (!scroller) return;
       const display = displayIndexForPage(target, layout, slideCount);
       const width = scroller.clientWidth || window.innerWidth;
-      scroller.scrollTo({ left: display * width, behavior });
+      const left = display * width;
+      if (behavior === "smooth") {
+        animateScroll(scroller, left, scroller.scrollTop);
+      } else {
+        scroller.scrollTo({ left, behavior });
+      }
     },
-    [layout, pages.length, readingMode, slideCount],
+    [animateScroll, layout, pages.length, readingMode, slideCount],
   );
 
   // Apply the initial/reset position after the paged scroller exists.
@@ -675,6 +726,8 @@ export function Reader({
     };
   }, [showControlsTemporarily]);
 
+  useEffect(() => stopScrollAnimation, [stopScrollAnimation]);
+
   const goToNextPage = useCallback(() => {
     if (readingMode === "vertical") {
       verticalRef.current?.scrollBy({
@@ -781,6 +834,7 @@ export function Reader({
 
   const handlePointerDown = (event: React.PointerEvent) => {
     if (event.pointerType === "mouse" && event.button !== 0) return;
+    stopScrollAnimation();
     if ((event.target as HTMLElement).closest(".reader-controls")) return;
     if (pinchRef.current) {
       pointerStartRef.current = null;
