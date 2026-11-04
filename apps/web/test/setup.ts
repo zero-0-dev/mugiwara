@@ -10,10 +10,13 @@ afterEach(() => {
 });
 
 // jsdom does not implement matchMedia. Default to a desktop, hover-capable
-// device; individual tests override this for touch-only behavior.
+// device; individual tests override this for touch-only behavior. Keep this a
+// plain function rather than vi.fn: `restoreMocks` resets mock implementations
+// between tests, which would leave matchMedia() returning undefined.
 Object.defineProperty(window, "matchMedia", {
   writable: true,
-  value: vi.fn().mockImplementation((query: string) => ({
+  configurable: true,
+  value: (query: string): MediaQueryList => ({
     matches: false,
     media: query,
     onchange: null,
@@ -22,5 +25,5 @@ Object.defineProperty(window, "matchMedia", {
     addEventListener: vi.fn(),
     removeEventListener: vi.fn(),
     dispatchEvent: vi.fn(),
-  })),
+  } as unknown as MediaQueryList),
 });

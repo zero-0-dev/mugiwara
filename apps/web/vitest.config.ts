@@ -6,7 +6,9 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     setupFiles: ["./test/setup.ts"],
-    include: ["test/**/*.test.{ts,tsx}"],
+    // Component tests live under test/, pure helper tests next to the code
+    // they cover. Pick up both so neither suite is silently skipped.
+    include: ["test/**/*.test.{ts,tsx}", "src/**/*.test.{ts,tsx}"],
     restoreMocks: true,
   },
 });

@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { ArrowDown, ArrowUp, Circle, RefreshCw, X } from "lucide-react";
 import { useToast } from "./Toast";
 import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
+import { useDebounce } from "../hooks/useDebounce";
 import { AddMangaModal } from "./AddMangaModal";
 import { useLibrary, useFilterOptions, useDeleteManga, useCheckLibraryUpdates } from "../api/hooks";
 import { useApiClient } from "../api/context";
@@ -26,9 +27,10 @@ export function Library({ onMangaSelect }: LibraryProps) {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [showFilters, setShowFilters] = useState(false);
   const [showAddManga, setShowAddManga] = useState(false);
+  const debouncedSearch = useDebounce(searchQuery, 250);
 
   const queryFilters = {
-    search: searchQuery || undefined,
+    search: debouncedSearch || undefined,
     status: filters.status || undefined,
     mediaType: filters.mediaType || undefined,
     genre: filters.genre || undefined,
@@ -196,7 +198,21 @@ export function Library({ onMangaSelect }: LibraryProps) {
           {manga.map((m) => {
             const cover = api.getAssetUrl(m.coverImage);
             return (
-            <div key={m.id} className="manga-card" onClick={() => onMangaSelect(m.id)}>
+            <div
+              key={m.id}
+              className="manga-card"
+              onClick={() => onMangaSelect(m.id)}
+              role="button"
+              tabIndex={0}
+              aria-label={`Open ${m.title}`}
+              onKeyDown={(e) => {
+                if (e.target !== e.currentTarget) return;
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onMangaSelect(m.id);
+                }
+              }}
+            >
               <div className="manga-cover">
                 {cover ? (
                   <img src={cover} alt={m.title} loading="lazy" />
@@ -208,13 +224,21 @@ export function Library({ onMangaSelect }: LibraryProps) {
                     <div className="progress-fill" style={{ width: `${m.progress.percentComplete}%` }} />
                   </div>
                 )}
-                <button className="delete-manga-btn" onClick={(e) => handleDeleteManga(m.id, m.title, e)} disabled={deleteManga.isPending} title="Remove from library">
-                  {deleteManga.isPending ? "..." : <X size={16} />}
-                </button>
               </div>
               <div className="manga-info">
                 <h3 className="manga-title" title={m.title}>{m.title}</h3>
-                <span className="manga-chapters">{m.chapterCount || 0} chapters</span>
+                <div className="manga-card-footer">
+                  <span className="manga-chapters">{m.chapterCount || 0} chapters</span>
+                  <button
+                    className="delete-manga-btn"
+                    onClick={(e) => handleDeleteManga(m.id, m.title, e)}
+                    disabled={deleteManga.isPending}
+                    title="Remove from library"
+                    aria-label={`Remove ${m.title} from library`}
+                  >
+                    {deleteManga.isPending ? "..." : <X size={16} />}
+                  </button>
+                </div>
               </div>
             </div>
             );

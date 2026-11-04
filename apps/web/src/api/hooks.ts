@@ -594,7 +594,7 @@ export function useCreateStorageBackend() {
   const api = useApiClient();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: { type: string; name: string; config: Record<string, unknown> }) => api.createStorageBackend(body),
+    mutationFn: (body: { type: string; name: string; config: Record<string, unknown>; isDefault?: boolean }) => api.createStorageBackend(body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["storageBackends"] });
     },
@@ -605,7 +605,7 @@ export function useUpdateStorageBackend() {
   const api = useApiClient();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, config }: { id: string; config: Record<string, unknown> }) => api.updateStorageBackend(id, { config }),
+    mutationFn: ({ id, config, isDefault }: { id: string; config: Record<string, unknown>; isDefault?: boolean }) => api.updateStorageBackend(id, { config, isDefault }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["storageBackends"] });
     },

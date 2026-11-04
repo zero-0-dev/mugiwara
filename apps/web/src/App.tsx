@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { BookOpen, Compass, Settings } from "lucide-react";
+import { Capacitor, SystemBars, SystemBarsStyle } from "@capacitor/core";
 import { Library } from "./components/Library";
 import { MangaDetail } from "./components/MangaDetail";
 import { Reader } from "./components/Reader";
@@ -19,12 +20,40 @@ import {
   saveStoredServerUrl,
 } from "./platform/server";
 
+export const THEME_STORAGE_KEY = "mugiwara.theme";
+
+/** Keeps the browser theme-color and the native system bars in sync. */
+function applyThemeChrome(theme: string) {
+  const isDark = theme !== "light";
+  document.documentElement.dataset.theme = theme;
+
+  const themeColor = document.querySelector('meta[name="theme-color"]');
+  themeColor?.setAttribute("content", isDark ? "#1a1a1a" : "#f0ece8");
+
+  try {
+    window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+  } catch {
+    // Storage can be unavailable (private mode); the UI still works.
+  }
+
+  if (isCapacitor()) {
+    void SystemBars.setStyle({
+      style: isDark ? SystemBarsStyle.Dark : SystemBarsStyle.Light,
+    }).catch(() => {
+      // The browser and older native shells do not register this plugin.
+    });
+  }
+}
+
 function ThemeApplier() {
   const { data: settings } = useSettings();
+  const theme = (settings as Record<string, string> | undefined)?.["ui.theme"];
+
   useEffect(() => {
-    const theme = (settings as Record<string, string>)?.["ui.theme"] || "dark";
-    document.documentElement.dataset.theme = theme;
-  }, [settings]);
+    if (!theme) return;
+    applyThemeChrome(theme);
+  }, [theme]);
+
   return null;
 }
 
@@ -45,6 +74,7 @@ function App() {
   );
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [initialPage, setInitialPage] = useState<number | undefined>(undefined);
+  const [readerImmersive, setReaderImmersive] = useState(false);
   const canChangeServer = isCapacitor();
 
   useKeyboardShortcuts([
@@ -208,18 +238,28 @@ function App() {
             onReadChapter={handleReadChapter}
           />
         ) : null;
-      case "reader":
+      case "reader": {
+        const selectedChapterIndex = chapters.findIndex(
+          (chapter) => chapter.id === selectedChapterId,
+        );
+        const hasPrevChapter = selectedChapterIndex > 0;
+        const hasNextChapter =
+          selectedChapterIndex >= 0 &&
+          selectedChapterIndex < chapters.length - 1;
+
         return selectedMangaId && selectedChapterId ? (
           <Reader
             mangaId={selectedMangaId}
             chapterId={selectedChapterId}
             onBack={handleBackToDetail}
-            onNextChapter={handleNextChapter}
-            onPrevChapter={handlePrevChapter}
+            onNextChapter={hasNextChapter ? handleNextChapter : undefined}
+            onPrevChapter={hasPrevChapter ? handlePrevChapter : undefined}
             initialPage={initialPage}
             onInitialPageUsed={() => setInitialPage(undefined)}
+            onImmersiveChange={setReaderImmersive}
           />
         ) : null;
+      }
       case "settings":
         return (
           <SettingsPage
@@ -239,48 +279,58 @@ function App() {
     <ApiClientProvider baseUrl={apiBaseUrl}>
       <ThemeApplier />
       <ToastProvider>
-      <div className="app">
-        <header className="app-header">
-          <h1 onClick={handleBackToLibrary} style={{ cursor: "pointer" }}>
-            Mugiwara
-          </h1>
-          <div className="header-actions">
-            <button
-              onClick={handleBackToLibrary}
-              className={`nav-btn ${currentView === "library" || currentView === "manga-detail" || currentView === "reader" ? "active" : ""}`}
-            >
-              <BookOpen size={16} />
-              Library
-            </button>
-            <button
-              onClick={handleOpenDiscover}
-              className={`nav-btn ${currentView === "discover" || currentView === "discover-detail" ? "active" : ""}`}
-            >
-              <Compass size={16} />
-              Discover
-            </button>
-            <button
-              onClick={handleOpenSettings}
-              className="btn btn-icon"
-              title="Settings"
-            >
-              <Settings size={20} />
-            </button>
-            {canChangeServer ? (
+      <div
+        className={`app${currentView === "reader" ? " app-reader" : ""}${readerImmersive ? " reader-immersive" : ""}`}
+      >
+        {currentView !== "reader" && (
+          <header className="app-header">
+            <h1 onClick={handleBackToLibrary} style={{ cursor: "pointer" }}>
+              Mugiwara
+            </h1>
+            <div className="header-actions">
               <button
-                className="server-status"
-                title="Change server"
-                onClick={() => setShowServerSetup(true)}
+                onClick={handleBackToLibrary}
+                className={`nav-btn ${currentView === "library" || currentView === "manga-detail" ? "active" : ""}`}
+                aria-label="Library"
+                aria-current={currentView === "library" || currentView === "manga-detail" ? "page" : undefined}
               >
-                Server: {serverLabel || "not set"}
+                <BookOpen size={16} />
+                Library
               </button>
-            ) : (
-              <span className="server-status">
-                Server: {serverLabel || "local"}
-              </span>
-            )}
-          </div>
-        </header>
+              <button
+                onClick={handleOpenDiscover}
+                className={`nav-btn ${currentView === "discover" || currentView === "discover-detail" ? "active" : ""}`}
+                aria-label="Discover"
+                aria-current={currentView === "discover" || currentView === "discover-detail" ? "page" : undefined}
+              >
+                <Compass size={16} />
+                Discover
+              </button>
+              <button
+                onClick={handleOpenSettings}
+                className={`btn btn-icon ${currentView === "settings" ? "active" : ""}`}
+                title="Settings"
+                aria-label="Settings"
+                aria-current={currentView === "settings" ? "page" : undefined}
+              >
+                <Settings size={20} />
+              </button>
+              {canChangeServer ? (
+                <button
+                  className="server-status"
+                  title="Change server"
+                  onClick={() => setShowServerSetup(true)}
+                >
+                  Server: {serverLabel || "not set"}
+                </button>
+              ) : (
+                <span className="server-status">
+                  Server: {serverLabel || "local"}
+                </span>
+              )}
+            </div>
+          </header>
+        )}
         <main className="app-main">{renderContent()}</main>
       </div>
       </ToastProvider>

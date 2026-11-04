@@ -11,6 +11,8 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@capacitor/core": "^8.6.0",
+    "@capacitor/haptics": "^8.0.2",
     "@mugiwara-manga/types": "workspace:*",
     "@tanstack/react-query": "^5.97.0",
     "lucide-react": "^1.11.0",

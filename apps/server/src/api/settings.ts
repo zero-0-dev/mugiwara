@@ -13,6 +13,9 @@ const defaultSettings: Record<string, string> = {
   "reading.manhuaMode": "vertical",
   "reading.webtoonMode": "vertical",
 
+  // Reader preferences
+  "reader.haptics": "false",
+
   // UI preferences
   "ui.theme": "dark",
   "ui.showNSFW": "false",

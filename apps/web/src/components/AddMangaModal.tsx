@@ -8,6 +8,7 @@ import type {
   ImportProgressResponse,
 } from "./add-manga/types";
 import { useDebounce } from "../hooks/useDebounce";
+import { useFocusTrap } from "../hooks/useFocusTrap";
 import { AddMangaHeader } from "./add-manga/AddMangaHeader";
 import { ChapterSelect } from "./add-manga/ChapterSelect";
 import { ImportProgress } from "./add-manga/ImportProgress";
@@ -148,6 +149,7 @@ export function AddMangaModal({
   const queryClient = useQueryClient();
   const debouncedQuery = useDebounce(local.searchQuery, 300);
   const autoSelectRan = useRef(false);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
   const [detailSourceMangaId, setDetailSourceMangaId] = useState<string | null>(null);
   const [localSearchPath, setLocalSearchPath] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -326,6 +328,9 @@ export function AddMangaModal({
     onClose();
   }
 
+  // Escape is handled by the step-aware listener below.
+  useFocusTrap(dialogRef, true);
+
   function handleViewInLibrary(mangaId: string) {
     onSuccess(mangaId);
     onViewManga(mangaId);
@@ -377,8 +382,15 @@ export function AddMangaModal({
 
   return (
     <div className="add-manga-overlay" onClick={handleClose}>
-      <div className="add-manga-modal" onClick={(e) => e.stopPropagation()}>
-        <AddMangaHeader title={headerTitle} onClose={handleClose} canClose={!importMutation.isPending} />
+      <div
+        ref={dialogRef}
+        className="add-manga-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="add-manga-title"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <AddMangaHeader title={headerTitle} onClose={handleClose} canClose={!importMutation.isPending} titleId="add-manga-title" />
         <div className="add-manga-body">
           {local.step === "search" && (
             <>
