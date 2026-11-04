@@ -262,22 +262,26 @@ export function SettingsPage({ onBack, serverLabel, onChangeServer }: SettingsPa
       </div>
 
       <div className="settings-layout">
-        <nav className="settings-nav">
-          <button className={`nav-item ${activeTab === "reading" ? "active" : ""}`} onClick={() => setActiveTab("reading")}>
+        <nav className="settings-nav" aria-label="Settings sections">
+          <button className="settings-mobile-back" onClick={onBack}>
+            <ArrowLeft size={16} /> Back
+          </button>
+          <button aria-current={activeTab === "reading" ? "page" : undefined} className={`nav-item ${activeTab === "reading" ? "active" : ""}`} onClick={() => setActiveTab("reading")}>
             Reading
           </button>
-          <button className={`nav-item ${activeTab === "storage" ? "active" : ""}`} onClick={() => setActiveTab("storage")}>
+          <button aria-current={activeTab === "storage" ? "page" : undefined} className={`nav-item ${activeTab === "storage" ? "active" : ""}`} onClick={() => setActiveTab("storage")}>
             Storage
           </button>
-          <button className={`nav-item ${activeTab === "plugins" ? "active" : ""}`} onClick={() => setActiveTab("plugins")}>
+          <button aria-current={activeTab === "plugins" ? "page" : undefined} className={`nav-item ${activeTab === "plugins" ? "active" : ""}`} onClick={() => setActiveTab("plugins")}>
             Plugins
           </button>
-          <button className={`nav-item ${activeTab === "queue" ? "active" : ""}`} onClick={() => setActiveTab("queue")}>
+          <button aria-current={activeTab === "queue" ? "page" : undefined} className={`nav-item ${activeTab === "queue" ? "active" : ""}`} onClick={() => setActiveTab("queue")}>
             Queue
           </button>
-          <button className={`nav-item ${activeTab === "about" ? "active" : ""}`} onClick={() => setActiveTab("about")}>
+          <button aria-current={activeTab === "about" ? "page" : undefined} className={`nav-item ${activeTab === "about" ? "active" : ""}`} onClick={() => setActiveTab("about")}>
             About
           </button>
+          {saveSuccess && <span className="save-indicator settings-mobile-save" role="status">{saveSuccess}</span>}
         </nav>
 
         <div className="settings-content">{renderTabContent()}</div>

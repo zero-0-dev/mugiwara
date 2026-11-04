@@ -944,6 +944,8 @@ export function Reader({
   const handleContextMenu = (event: React.MouseEvent) => {
     if (readingMode === "vertical") return;
     event.preventDefault();
+    if (event.button !== 2) return;
+    if (window.matchMedia?.("(hover: none)").matches) return;
     if ((event.target as HTMLElement).closest(".reader-controls")) return;
     goToPrevPage();
   };

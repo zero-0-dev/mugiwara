@@ -41,10 +41,12 @@ export function QueueSection() {
       )}
 
       <div className="queue-actions">
-        {stats && (stats as { error?: number }).error && (stats as { error: number }).error > 0 && (
+        {(stats as { error?: number } | undefined)?.error !== undefined &&
+          ((stats as { error?: number }).error ?? 0) > 0 && (
           <button onClick={() => retryAll.mutate(undefined, { onError: (err) => setError(err.message) })} className="btn btn-secondary">Retry All Failed</button>
         )}
-        {stats && (stats as { complete?: number }).complete && (stats as { complete: number }).complete > 0 && (
+        {(stats as { complete?: number } | undefined)?.complete !== undefined &&
+          ((stats as { complete?: number }).complete ?? 0) > 0 && (
           <button onClick={() => clearComplete.mutate(undefined, { onError: (err) => setError(err.message) })} className="btn btn-secondary">Clear Completed</button>
         )}
       </div>

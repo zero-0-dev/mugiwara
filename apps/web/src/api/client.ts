@@ -390,11 +390,11 @@ export class ApiClient {
     return this.request("/api/storage/types");
   }
 
-  createStorageBackend(body: { type: string; name: string; config: Record<string, unknown> }): Promise<void> {
+  createStorageBackend(body: { type: string; name: string; config: Record<string, unknown>; isDefault?: boolean }): Promise<void> {
     return this.request("/api/storage/backends", { method: "POST", body: JSON.stringify(body) });
   }
 
-  updateStorageBackend(id: string, body: { config: Record<string, unknown> }): Promise<void> {
+  updateStorageBackend(id: string, body: { config: Record<string, unknown>; isDefault?: boolean }): Promise<void> {
     return this.request(`/api/storage/backends/${id}`, { method: "PUT", body: JSON.stringify(body) });
   }
 

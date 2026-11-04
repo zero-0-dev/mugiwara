@@ -3,6 +3,7 @@ import { ArrowLeft } from "lucide-react";
 import { useToast } from "./Toast";
 import type { ImportProgressResponse } from "./add-manga/types";
 import { useDebounce } from "../hooks/useDebounce";
+import { useFocusTrap } from "../hooks/useFocusTrap";
 import { AddMangaHeader } from "./add-manga/AddMangaHeader";
 import { ChapterSelect } from "./add-manga/ChapterSelect";
 import { ImportProgress } from "./add-manga/ImportProgress";
@@ -88,6 +89,7 @@ export function AddMangaModal({
   const toast = useToast();
   const debouncedQuery = useDebounce(local.searchQuery, 300);
   const autoSelectRan = useRef(false);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
   const [detailSourceMangaId, setDetailSourceMangaId] = useState<string | null>(null);
 
   const { data: sources = [], isLoading: isLoadingSources } = useSources();
@@ -163,6 +165,17 @@ export function AddMangaModal({
     if (!importMutation.isPending) onClose();
   }
 
+  useFocusTrap(dialogRef, true, handleClose);
+
+  async function handleBrowse() {
+    const selectFolder = window.electronAPI?.selectFolder;
+    if (!selectFolder) return;
+    const folder = await selectFolder();
+    if (folder) {
+      dispatch({ type: "SET_SEARCH_QUERY", query: folder });
+    }
+  }
+
   function handleImportCancelled() {
     if (importMutation.data) cancelImport.mutate(importMutation.data.mangaId);
     dispatch({ type: "IMPORT_SUCCESS" });
@@ -205,8 +218,15 @@ export function AddMangaModal({
 
   return (
     <div className="add-manga-overlay" onClick={handleClose}>
-      <div className="add-manga-modal" onClick={(e) => e.stopPropagation()}>
-        <AddMangaHeader title={headerTitle} onClose={handleClose} canClose={!importMutation.isPending} />
+      <div
+        ref={dialogRef}
+        className="add-manga-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="add-manga-title"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <AddMangaHeader title={headerTitle} onClose={handleClose} canClose={!importMutation.isPending} titleId="add-manga-title" />
         <div className="add-manga-body">
           {local.step === "search" && (
             <>
@@ -227,7 +247,7 @@ export function AddMangaModal({
                   if (local.searchQuery.trim()) dispatch({ type: "SET_SEARCH_QUERY", query: local.searchQuery });
                 }}
                 onClear={() => dispatch({ type: "SET_SEARCH_QUERY", query: "" })}
-                onBrowse={() => {}}
+                onBrowse={handleBrowse}
                 onResultClick={handleSelectManga}
                 isLoadingDetails={isLoadingDetails}
               />

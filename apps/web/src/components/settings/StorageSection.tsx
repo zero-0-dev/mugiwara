@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { HardDrive, X } from "lucide-react";
 import { useToast } from "../Toast";
+import { useFocusTrap } from "../../hooks/useFocusTrap";
 import { useStorageBackends, useStorageTypes, useCreateStorageBackend, useUpdateStorageBackend, useDeleteStorageBackend, useScanStorage } from "../../api/hooks";
 import { Select } from "../Select";
 
@@ -31,6 +32,7 @@ export function StorageSection() {
   const [scanResults, setScanResults] = useState<{ added: number; updated: number; errors: string[] } | null>(null);
   const [newBackend, setNewBackend] = useState({ name: "", type: "", config: {} as Record<string, unknown>, isDefault: false });
   const [editIsDefault, setEditIsDefault] = useState(false);
+  const modalRef = useRef<HTMLDivElement | null>(null);
 
   React.useEffect(() => {
     if (editingBackend) {
@@ -73,7 +75,7 @@ export function StorageSection() {
     if (!editingBackend) return;
     const config = validateConfig(configJson);
     if (!config) return;
-    updateBackend.mutate({ id: editingBackend.id, config: { ...config, isDefault: editIsDefault } as unknown as Record<string, unknown> }, {
+    updateBackend.mutate({ id: editingBackend.id, config, isDefault: editIsDefault }, {
       onSuccess: () => resetForm(),
       onError: (err) => toast.error(err.message),
     });
@@ -99,6 +101,8 @@ export function StorageSection() {
     setConfigError(null);
   }
 
+  useFocusTrap(modalRef, showAddForm || Boolean(editingBackend), resetForm);
+
   function resetForm() {
     setShowAddForm(false);
     setEditingBackend(null);
@@ -121,11 +125,11 @@ export function StorageSection() {
   }
 
   if (loading) {
-    return <div style={styles.container}><div style={styles.loading}>Loading storage backends...</div></div>;
+    return <div className="storage-section" style={styles.container}><div style={styles.loading}>Loading storage backends...</div></div>;
   }
 
   return (
-    <div style={styles.container}>
+    <div className="storage-section" style={styles.container}>
       <div style={styles.header}>
         <h2 style={styles.title}>Storage Backends</h2>
         <p style={styles.subtitle}>Configure where your manga files are stored</p>
@@ -151,7 +155,7 @@ export function StorageSection() {
                 <span style={styles.configPreview}>{formatConfigPreview(backend.config as Record<string, unknown>)}</span>
               </div>
             </div>
-            <div style={styles.cardFooter}>
+            <div className="storage-card-footer" style={styles.cardFooter}>
               {backend.type === "local" && window.electronAPI?.openFolder && (
                 <button onClick={() => window.electronAPI?.openFolder((backend.config as Record<string, unknown>).basePath as string)} style={styles.btnFolder}>Open Folder</button>
               )}
@@ -170,7 +174,7 @@ export function StorageSection() {
       )}
 
       {!showAddForm && !editingBackend && Array.isArray(availableTypes) && availableTypes.length > 0 && (
-        <div style={{ display: "flex", gap: "12px", marginBottom: "20px" }}>
+        <div className="storage-actions">
           <button onClick={() => setShowAddForm(true)} style={styles.btnPrimary}>+ Add Storage Backend</button>
           <button onClick={handleScan} disabled={scanStorage.isPending || backends.length === 0} style={{ ...styles.btnSecondary, backgroundColor: "#10b981", color: "#fff" }}>
             {scanStorage.isPending ? "Scanning..." : "Scan Storage"}
@@ -205,13 +209,13 @@ export function StorageSection() {
       )}
 
       {showAddForm && (
-        <div style={styles.modalOverlay}>
-          <div style={styles.modal}>
-            <div style={styles.modalHeader}>
-              <h3 style={styles.modalTitle}>Add Storage Backend</h3>
+        <div className="storage-modal-overlay">
+          <div ref={modalRef} className="storage-modal" role="dialog" aria-modal="true" aria-labelledby="storage-modal-title">
+            <div className="storage-modal-header">
+              <h3 id="storage-modal-title" style={styles.modalTitle}>Add Storage Backend</h3>
               <button onClick={resetForm} style={styles.modalClose}><X size={20} /></button>
             </div>
-            <form onSubmit={handleAddBackend} style={styles.form}>
+            <form onSubmit={handleAddBackend} className="storage-form">
               <div style={styles.formGroup}>
                 <label style={styles.label}>Name *</label>
                 <input type="text" value={newBackend.name} onChange={(e) => setNewBackend({ ...newBackend, name: e.target.value })} placeholder="My Storage" style={styles.input} required />
@@ -232,7 +236,7 @@ export function StorageSection() {
                 <input type="checkbox" checked={newBackend.isDefault} onChange={(e) => setNewBackend({ ...newBackend, isDefault: e.target.checked })} style={styles.checkbox} />
                 <span>Set as default backend{backends.length === 0 && <span style={styles.infoNote}> (first backend is always default)</span>}</span>
               </label>
-              <div style={styles.formActions}>
+              <div className="storage-form-actions">
                 <button type="submit" style={styles.btnPrimary} disabled={!!configError || createBackend.isPending}>Create</button>
                 <button type="button" onClick={resetForm} style={styles.btnSecondary}>Cancel</button>
               </div>
@@ -242,13 +246,13 @@ export function StorageSection() {
       )}
 
       {editingBackend && (
-        <div style={styles.modalOverlay}>
-          <div style={styles.modal}>
-            <div style={styles.modalHeader}>
-              <h3 style={styles.modalTitle}>Edit {editingBackend.name}</h3>
+        <div className="storage-modal-overlay">
+          <div ref={modalRef} className="storage-modal" role="dialog" aria-modal="true" aria-labelledby="storage-modal-title">
+            <div className="storage-modal-header">
+              <h3 id="storage-modal-title" style={styles.modalTitle}>Edit {editingBackend.name}</h3>
               <button onClick={resetForm} style={styles.modalClose}><X size={20} /></button>
             </div>
-            <form onSubmit={handleUpdateBackend} style={styles.form}>
+            <form onSubmit={handleUpdateBackend} className="storage-form">
               <div style={{ ...styles.formGroup, ...styles.readOnlyGroup }}>
                 <label style={styles.label}>Type</label>
                 <input type="text" value={getTypeName(editingBackend.type)} disabled style={styles.inputDisabled} />
@@ -264,7 +268,7 @@ export function StorageSection() {
                   Set as default backend
                 </label>
               )}
-              <div style={styles.formActions}>
+              <div className="storage-form-actions">
                 <button type="submit" style={styles.btnPrimary} disabled={!!configError || updateBackend.isPending}>Save Changes</button>
                 <button type="button" onClick={resetForm} style={styles.btnSecondary}>Cancel</button>
               </div>
@@ -315,10 +319,10 @@ const styles: Record<string, React.CSSProperties> = {
   form: { padding: "24px" },
   formGroup: { marginBottom: "20px" },
   label: { display: "block", fontSize: "14px", fontWeight: 500, color: "var(--text-primary)", marginBottom: "8px" },
-  input: { width: "100%", padding: "10px 14px", backgroundColor: "var(--bg-primary)", border: "1px solid var(--bg-tertiary)", borderRadius: "8px", color: "var(--text-primary)", fontSize: "14px", boxSizing: "border-box" },
-  inputDisabled: { width: "100%", padding: "10px 14px", backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--bg-tertiary)", borderRadius: "8px", color: "var(--text-secondary)", fontSize: "14px", boxSizing: "border-box", cursor: "not-allowed" },
-  select: { width: "100%", padding: "10px 14px", backgroundColor: "var(--bg-primary)", border: "1px solid var(--bg-tertiary)", borderRadius: "8px", color: "var(--text-primary)", fontSize: "14px", boxSizing: "border-box", cursor: "pointer" },
-  textarea: { width: "100%", padding: "12px 14px", backgroundColor: "var(--bg-primary)", border: "1px solid var(--bg-tertiary)", borderRadius: "8px", color: "var(--text-primary)", fontSize: "13px", fontFamily: "monospace", boxSizing: "border-box", resize: "vertical" },
+  input: { width: "100%", padding: "10px 14px", backgroundColor: "var(--bg-primary)", border: "1px solid var(--bg-tertiary)", borderRadius: "8px", color: "var(--text-primary)", fontSize: "var(--input-font-size, 14px)", boxSizing: "border-box" },
+  inputDisabled: { width: "100%", padding: "10px 14px", backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--bg-tertiary)", borderRadius: "8px", color: "var(--text-secondary)", fontSize: "var(--input-font-size, 14px)", boxSizing: "border-box", cursor: "not-allowed" },
+  select: { width: "100%", padding: "10px 14px", backgroundColor: "var(--bg-primary)", border: "1px solid var(--bg-tertiary)", borderRadius: "8px", color: "var(--text-primary)", fontSize: "var(--input-font-size, 14px)", boxSizing: "border-box", cursor: "pointer" },
+  textarea: { width: "100%", padding: "12px 14px", backgroundColor: "var(--bg-primary)", border: "1px solid var(--bg-tertiary)", borderRadius: "8px", color: "var(--text-primary)", fontSize: "var(--input-font-size, 14px)", fontFamily: "monospace", boxSizing: "border-box", resize: "vertical" },
   textareaError: { border: "1px solid #ef4444" },
   hint: { display: "block", fontSize: "12px", color: "var(--text-secondary)", marginTop: "6px" },
   errorText: { display: "block", fontSize: "12px", color: "#ef4444", marginTop: "6px" },

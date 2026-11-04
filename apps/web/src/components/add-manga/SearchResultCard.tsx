@@ -24,7 +24,7 @@ export function SearchResultCard({
       ref={cardRef}
       onClick={() => onClick(result)}
       role="button"
-      tabIndex={-1}
+      tabIndex={0}
       onFocus={onFocus}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {

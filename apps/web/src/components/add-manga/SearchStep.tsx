@@ -40,9 +40,10 @@ export function SearchStep({
   }
 
   const placeholder = isLocal
-    ? "Enter folder path or browse..."
+    ? "Enter server folder path or browse..."
     : "Search manga by title...";
 
+  const canBrowse = isLocal && Boolean(window.electronAPI?.selectFolder);
   const hasContent = searchQuery.trim().length > 0;
 
   return (
@@ -54,12 +55,13 @@ export function SearchStep({
             <input
               type="text"
               value={searchQuery}
-              readOnly={isLocal}
+              readOnly={canBrowse}
               onChange={(e) => onQueryChange(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder={placeholder}
               className="add-manga-search-input"
               autoFocus
+              aria-label={isLocal ? "Folder path" : "Search manga"}
             />
             {hasContent && (
               <button
@@ -72,7 +74,7 @@ export function SearchStep({
               </button>
             )}
           </div>
-          {isLocal ? (
+          {canBrowse ? (
             <button type="button" className="btn btn-secondary" onClick={onBrowse}>
               Browse…
             </button>
@@ -87,7 +89,7 @@ export function SearchStep({
             </button>
           )}
         </div>
-        <p className="add-manga-search-hint">⌨ Enter to search</p>
+        {!isLocal && <p className="add-manga-search-hint">⌨ Enter to search</p>}
       </div>
 
       <SearchResultsGrid
