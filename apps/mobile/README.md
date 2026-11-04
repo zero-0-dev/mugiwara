@@ -46,6 +46,17 @@ pnpm --filter @mugiwara-manga/mobile sync:ios
 
 `sync` builds `apps/web` and copies its `dist` into the native projects.
 
+## Reader plugins
+
+The shared web reader uses two Capacitor plugins:
+
+- `SystemBars` is bundled with `@capacitor/core` (Capacitor 8+), so hiding the
+  status/navigation bars in immersive reading needs no extra sync.
+- `@capacitor/haptics` is a separate native plugin. It is listed in
+  `apps/mobile/package.json`; run `pnpm cap:sync` (or the normal
+  `build:app:*` scripts) after changing it so the native implementation is
+  installed. On the web the plugin is a no-op and page turns stay silent.
+
 ## Android: build and install
 
 ### Debug APK (easiest)

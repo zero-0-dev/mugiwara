@@ -28,7 +28,7 @@ export interface ImportChapterProgress {
   chapterId: string;
   title?: string;
   sortOrder: number;
-  status: "queued" | "downloading" | "complete" | "error";
+  status: "queued" | "downloading" | "complete" | "error" | "cancelled";
   totalPages?: number;
   completedPages?: number;
   errorMessage?: string;
@@ -41,9 +41,26 @@ export interface ImportProgressResponse {
   erroredChapters: number;
   downloadingChapters: number;
   queuedChapters: number;
+  cancelledChapters?: number;
   overallProgress: number;
   isComplete: boolean;
   chapters: ImportChapterProgress[];
+}
+
+export interface ImportMangaResult {
+  success: boolean;
+  mangaId: string;
+  reusedExistingManga: boolean;
+  chaptersAdded: number;
+  chaptersQueued: number;
+  chaptersReused: number;
+}
+
+export interface CancelImportResult {
+  success: boolean;
+  cancelledChapters: number;
+  cancelledTasks: number;
+  message?: string;
 }
 
 export type Step = "search" | "select" | "importing" | "success";

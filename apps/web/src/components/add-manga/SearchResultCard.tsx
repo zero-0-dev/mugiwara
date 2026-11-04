@@ -1,4 +1,5 @@
 import type { RefCallback } from "react";
+import { useApiClient } from "../../api/context";
 import type { SearchResult } from "./types";
 
 interface SearchResultCardProps {
@@ -16,7 +17,9 @@ export function SearchResultCard({
   cardRef,
   onFocus,
 }: SearchResultCardProps) {
+  const api = useApiClient();
   const firstLetter = result.title.charAt(0).toUpperCase();
+  const coverUrl = api.getAssetUrl(result.coverImageUrl);
 
   return (
     <div
@@ -24,7 +27,7 @@ export function SearchResultCard({
       ref={cardRef}
       onClick={() => onClick(result)}
       role="button"
-      tabIndex={-1}
+      tabIndex={0}
       onFocus={onFocus}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
@@ -33,9 +36,9 @@ export function SearchResultCard({
         }
       }}
     >
-      {result.coverImageUrl ? (
+      {coverUrl ? (
         <img
-          src={result.coverImageUrl}
+          src={coverUrl}
           alt={result.title}
           className="add-manga-result-cover"
           loading="lazy"

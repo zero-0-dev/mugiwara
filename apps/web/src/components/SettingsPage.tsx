@@ -21,6 +21,7 @@ interface Settings {
   "reading.manhwaMode": string;
   "reading.manhuaMode": string;
   "reading.webtoonMode": string;
+  "reader.haptics": string;
   "ui.theme": string;
 }
 
@@ -30,6 +31,7 @@ const defaultSettings: Settings = {
   "reading.manhwaMode": "vertical",
   "reading.manhuaMode": "vertical",
   "reading.webtoonMode": "vertical",
+  "reader.haptics": "false",
   "ui.theme": "dark",
 };
 
@@ -125,6 +127,30 @@ export function SettingsPage({
                   options={[
                     { value: "dark", label: "Dark" },
                     { value: "light", label: "Light" },
+                  ]}
+                />
+                {saveSetting.isPending && (
+                  <span className="saving-indicator">Saving...</span>
+                )}
+              </div>
+            </div>
+
+            <div className="setting-item">
+              <div className="setting-info">
+                <label>Page-turn haptics</label>
+                <p>
+                  Light vibration when a page settles. Native builds only; the
+                  web reader always stays silent.
+                </p>
+              </div>
+              <div className="setting-control">
+                <Select
+                  value={settings["reader.haptics"]}
+                  onChange={(v) => updateSetting("reader.haptics", v)}
+                  disabled={saveSetting.isPending}
+                  options={[
+                    { value: "false", label: "Off" },
+                    { value: "true", label: "On" },
                   ]}
                 />
                 {saveSetting.isPending && (
@@ -262,43 +288,53 @@ export function SettingsPage({
       </div>
 
       <div className="settings-layout">
-        <nav className="settings-nav">
+        <nav className="settings-nav" aria-label="Settings sections">
+          <button className="settings-mobile-back" onClick={onBack}>
+            <ArrowLeft size={16} /> Back
+          </button>
           <button
+            aria-current={activeTab === "reading" ? "page" : undefined}
             className={`nav-item ${activeTab === "reading" ? "active" : ""}`}
             onClick={() => setActiveTab("reading")}
           >
             Reading
           </button>
           <button
+            aria-current={activeTab === "storage" ? "page" : undefined}
             className={`nav-item ${activeTab === "storage" ? "active" : ""}`}
             onClick={() => setActiveTab("storage")}
           >
             Storage
           </button>
           <button
+            aria-current={activeTab === "plugins" ? "page" : undefined}
             className={`nav-item ${activeTab === "plugins" ? "active" : ""}`}
             onClick={() => setActiveTab("plugins")}
           >
             Plugins
           </button>
           <button
+            aria-current={activeTab === "queue" ? "page" : undefined}
             className={`nav-item ${activeTab === "queue" ? "active" : ""}`}
             onClick={() => setActiveTab("queue")}
           >
             Queue
           </button>
           <button
+            aria-current={activeTab === "security" ? "page" : undefined}
             className={`nav-item ${activeTab === "security" ? "active" : ""}`}
             onClick={() => setActiveTab("security")}
           >
             Security
           </button>
           <button
+            aria-current={activeTab === "about" ? "page" : undefined}
             className={`nav-item ${activeTab === "about" ? "active" : ""}`}
             onClick={() => setActiveTab("about")}
           >
             About
           </button>
+          {saveSuccess && <span className="save-indicator settings-mobile-save" role="status">{saveSuccess}</span>}
         </nav>
 
         <div className="settings-content">{renderTabContent()}</div>
