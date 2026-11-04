@@ -26,6 +26,8 @@ import {
   useDownloadQueueSync,
   useSources,
 } from "../api/hooks";
+import { useFocusTrap } from "../hooks/useFocusTrap";
+import { useMobileLayout } from "../hooks/useMobileLayout";
 
 interface MangaDetailProps {
   mangaId: string;
@@ -57,6 +59,12 @@ interface ChapterMenuProps {
   menuRef: React.MutableRefObject<HTMLDivElement | null>;
   onMarkComplete: (chapterId: string, markPrevious?: boolean) => void;
   onMarkIncomplete: (chapterId: string, markFollowing?: boolean) => void;
+}
+
+function chapterLabel(chapter: { title?: string; chapterId: string }): string {
+  const title = chapter.title?.trim();
+  if (title) return title;
+  return `Chapter ${chapter.chapterId}`;
 }
 
 function ChapterMenu({ chapter, isActive, position, menuRef, onMarkComplete, onMarkIncomplete }: ChapterMenuProps) {
@@ -138,7 +146,14 @@ export function MangaDetail({ mangaId, onBack, onReadChapter }: MangaDetailProps
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
   const [activeChapterMenu, setActiveChapterMenu] = useState<string | null>(null);
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(null);
+  const [categoryPosition, setCategoryPosition] = useState<{ top?: number; bottom?: number; left: number; width: number } | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const categoryButtonRef = useRef<HTMLButtonElement | null>(null);
+  const categoryDropdownRef = useRef<HTMLDivElement | null>(null);
+  const searchDialogRef = useRef<HTMLDivElement | null>(null);
+  const isMobile = useMobileLayout();
+
+  useFocusTrap(searchDialogRef, showSearch, () => setShowSearch(false));
 
   const enrichedChapters = useMemo(() => {
     const progressMap = allProgress.reduce((acc, p) => {
@@ -168,8 +183,9 @@ export function MangaDetail({ mangaId, onBack, onReadChapter }: MangaDetailProps
   const getContinueReadingText = () => {
     const firstIncomplete = enrichedChapters.find((c) => !c.isRead);
     if (!firstIncomplete) return chapters.length > 0 ? "Read Again" : "Start Reading";
-    if (firstIncomplete.progress && firstIncomplete.progress.percentComplete > 0) return `Continue Chapter ${firstIncomplete.chapterId}`;
-    return `Start Chapter ${firstIncomplete.chapterId}`;
+    const label = chapterLabel(firstIncomplete);
+    if (firstIncomplete.progress && firstIncomplete.progress.percentComplete > 0) return `Continue reading ${label}`;
+    return `Start reading ${label}`;
   };
 
   const handleEditTitle = () => {
@@ -237,6 +253,53 @@ export function MangaDetail({ mangaId, onBack, onReadChapter }: MangaDetailProps
     addToCategory.mutate(categoryId, { onError: (err) => toast.error(err.message) });
     setShowCategoryDropdown(false);
   };
+
+  const toggleCategoryDropdown = () => {
+    if (showCategoryDropdown) {
+      setShowCategoryDropdown(false);
+      return;
+    }
+    const rect = categoryButtonRef.current?.getBoundingClientRect();
+    if (rect) {
+      const width = Math.min(Math.max(rect.width, 220), Math.max(220, window.innerWidth - 16));
+      const left = Math.max(8, Math.min(rect.left, window.innerWidth - width - 8));
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      if (spaceBelow < 280 && spaceAbove > spaceBelow) {
+        setCategoryPosition({ bottom: window.innerHeight - rect.top + 4, left, width });
+      } else {
+        setCategoryPosition({ top: rect.bottom + 4, left, width });
+      }
+    }
+    setShowCategoryDropdown(true);
+  };
+
+  useEffect(() => {
+    if (!showCategoryDropdown) return undefined;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (
+        !categoryButtonRef.current?.contains(target) &&
+        !categoryDropdownRef.current?.contains(target)
+      ) {
+        setShowCategoryDropdown(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setShowCategoryDropdown(false);
+    };
+    const timer = window.setTimeout(
+      () => document.addEventListener("pointerdown", handlePointerDown),
+      0,
+    );
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.clearTimeout(timer);
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [showCategoryDropdown]);
 
   const handleRemoveFromCategory = (categoryId: string) => {
     removeFromCategory.mutate(categoryId, { onError: (err) => toast.error(err.message) });
@@ -367,16 +430,44 @@ export function MangaDetail({ mangaId, onBack, onReadChapter }: MangaDetailProps
                 <div className="categories-header">
                   <strong>Categories:</strong>
                   <div className="category-dropdown-container">
-                    <button onClick={() => setShowCategoryDropdown(!showCategoryDropdown)} className="category-add-btn">+ Add to Category</button>
-                    {showCategoryDropdown && (
-                      <div className="category-dropdown">
-                        {categories.filter((cat) => !mangaCategories.some((mc) => mc.id === cat.id)).map((category) => (
-                          <button key={category.id} onClick={() => handleAddToCategory(category.id)} className="category-dropdown-item">
-                            <span className="category-dot-small" style={{ backgroundColor: category.color || "#6366f1" }} />{category.name}
-                          </button>
-                        ))}
-                        {categories.filter((cat) => !mangaCategories.some((mc) => mc.id === cat.id)).length === 0 && <span className="category-dropdown-empty">No more categories</span>}
-                      </div>
+                    <button
+                      ref={categoryButtonRef}
+                      onClick={toggleCategoryDropdown}
+                      className="category-add-btn"
+                      aria-haspopup="menu"
+                      aria-expanded={showCategoryDropdown}
+                    >
+                      + Add to Category
+                    </button>
+                    {showCategoryDropdown && createPortal(
+                      <>
+                        {isMobile && (
+                          <div
+                            className="category-dropdown-backdrop"
+                            onClick={() => setShowCategoryDropdown(false)}
+                          />
+                        )}
+                        <div
+                          ref={categoryDropdownRef}
+                          className={`category-dropdown${isMobile ? " sheet" : ""}`}
+                          role="menu"
+                          aria-label="Add to category"
+                          style={{
+                            "--dropdown-top": categoryPosition?.top !== undefined ? `${categoryPosition.top}px` : "auto",
+                            "--dropdown-bottom": categoryPosition?.bottom !== undefined ? `${categoryPosition.bottom}px` : "auto",
+                            "--dropdown-left": `${categoryPosition?.left ?? 0}px`,
+                            "--dropdown-width": `${categoryPosition?.width ?? 220}px`,
+                          } as React.CSSProperties}
+                        >
+                          {categories.filter((cat) => !mangaCategories.some((mc) => mc.id === cat.id)).map((category) => (
+                            <button key={category.id} onClick={() => handleAddToCategory(category.id)} className="category-dropdown-item" role="menuitem">
+                              <span className="category-dot-small" style={{ backgroundColor: category.color || "#6366f1" }} />{category.name}
+                            </button>
+                          ))}
+                          {categories.filter((cat) => !mangaCategories.some((mc) => mc.id === cat.id)).length === 0 && <span className="category-dropdown-empty">No more categories</span>}
+                        </div>
+                      </>,
+                      document.body,
                     )}
                   </div>
                 </div>
@@ -396,12 +487,31 @@ export function MangaDetail({ mangaId, onBack, onReadChapter }: MangaDetailProps
             <button onClick={() => setShowMore(!showMore)} className="btn btn-text show-more-btn">{showMore ? <>Show less <ChevronUp size={14} /></> : <>Show more <ChevronDown size={14} /></>}</button>
 
             {showSearch && (
-              <div className="search-results-overlay">
-                <div className="search-results-modal">
-                  <h4>Select from AniList results:</h4>
+              <div className="search-results-overlay" onClick={() => setShowSearch(false)}>
+                <div
+                  ref={searchDialogRef}
+                  className="search-results-modal"
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="metadata-search-title"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <h4 id="metadata-search-title">Select from AniList results:</h4>
                   <div className="results-grid">
                     {searchResults.map((result) => (
-                      <div key={result.id} className="result-card" onClick={() => handleApplyMetadata(result.id)}>
+                      <div
+                        key={result.id}
+                        className="result-card"
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => handleApplyMetadata(result.id)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            handleApplyMetadata(result.id);
+                          }
+                        }}
+                      >
                         {result.coverImage && <img src={result.coverImage.medium} alt={result.title.romaji} className="result-cover" />}
                         <div className="result-info">
                           <h5>{result.title.english || result.title.romaji}</h5>
@@ -444,12 +554,26 @@ export function MangaDetail({ mangaId, onBack, onReadChapter }: MangaDetailProps
               {enrichedChapters.map((chapter) => {
                 const downloadStatus = getChapterDownloadStatus(chapter);
                 return (
-                  <div key={chapter.id} className={`chapter-item ${chapter.isRead ? "read" : ""} ${chapter.isCurrent ? "current" : ""}`} onClick={() => onReadChapter(chapter.id, chapters)}>
+                  <div
+                    key={chapter.id}
+                    className={`chapter-item ${chapter.isRead ? "read" : ""} ${chapter.isCurrent ? "current" : ""}`}
+                    onClick={() => onReadChapter(chapter.id, chapters)}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Read ${chapterLabel(chapter)}`}
+                    onKeyDown={(e) => {
+                      if (e.target !== e.currentTarget) return;
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        onReadChapter(chapter.id, chapters);
+                      }
+                    }}
+                  >
                     <div className="chapter-status-icon">
                       {chapter.isRead ? <span className="status-read"><Check size={14} /></span> : chapter.isCurrent ? <span className="status-current"><Play size={14} /></span> : <span className="status-unread"><Circle size={14} /></span>}
                     </div>
                     <div className="chapter-info">
-                      <span className="chapter-title">{chapter.title || `Chapter ${chapter.chapterId}`}</span>
+                      <span className="chapter-title">{chapterLabel(chapter)}</span>
                     </div>
                     <div className="chapter-meta">
                       {chapter.progressPercent !== undefined && chapter.progressPercent > 0 && !chapter.isRead && (
@@ -461,14 +585,16 @@ export function MangaDetail({ mangaId, onBack, onReadChapter }: MangaDetailProps
                       {chapter.isRead && <span className="chapter-read-badge">Read</span>}
                       <span className="chapter-pages">{chapter.pagesCount > 0 ? `${chapter.pagesCount} pages` : "Not downloaded"}</span>
 
-                      <div className="chapter-actions">
-                        <button className="chapter-menu-btn" onClick={(e) => handleChapterMenuClick(e, chapter.id)} title="Chapter options"><EllipsisVertical size={16} /></button>
-                        <ChapterMenu chapter={chapter} isActive={activeChapterMenu === chapter.id} position={menuPosition} menuRef={menuRef} onMarkComplete={handleMarkChapterComplete} onMarkIncomplete={handleMarkChapterIncomplete} />
-                      </div>
+                      <div className="chapter-row-actions">
+                        <div className="chapter-actions">
+                          <button className="chapter-menu-btn" onClick={(e) => handleChapterMenuClick(e, chapter.id)} title="Chapter options"><EllipsisVertical size={16} /></button>
+                          <ChapterMenu chapter={chapter} isActive={activeChapterMenu === chapter.id} position={menuPosition} menuRef={menuRef} onMarkComplete={handleMarkChapterComplete} onMarkIncomplete={handleMarkChapterIncomplete} />
+                        </div>
 
-                      <button className={`chapter-download-btn ${downloadStatus}`} onClick={(e) => handleDownloadChapter(chapter.chapterId, e)} disabled={downloadStatus === "downloading" || downloadStatus === "pending"} title={downloadStatus === "complete" ? "Downloaded" : downloadStatus === "downloading" ? "Downloading..." : downloadStatus === "error" ? "Download failed" : downloadStatus === "pending" ? "Queued" : "Download chapter"}>
-                        {downloadStatus === "complete" ? <span className="download-icon complete"><Check size={14} /></span> : downloadStatus === "downloading" ? <span className="download-icon downloading"><Loader size={14} /></span> : downloadStatus === "error" ? <span className="download-icon error"><AlertCircle size={14} /></span> : downloadStatus === "pending" ? <span className="download-icon pending"><Clock size={14} /></span> : <span className="download-icon"><Download size={14} /></span>}
-                      </button>
+                        <button className={`chapter-download-btn ${downloadStatus}`} onClick={(e) => handleDownloadChapter(chapter.chapterId, e)} disabled={downloadStatus === "downloading" || downloadStatus === "pending"} title={downloadStatus === "complete" ? "Downloaded" : downloadStatus === "downloading" ? "Downloading..." : downloadStatus === "error" ? "Download failed" : downloadStatus === "pending" ? "Queued" : "Download chapter"}>
+                          {downloadStatus === "complete" ? <span className="download-icon complete"><Check size={14} /></span> : downloadStatus === "downloading" ? <span className="download-icon downloading"><Loader size={14} /></span> : downloadStatus === "error" ? <span className="download-icon error"><AlertCircle size={14} /></span> : downloadStatus === "pending" ? <span className="download-icon pending"><Clock size={14} /></span> : <span className="download-icon"><Download size={14} /></span>}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );

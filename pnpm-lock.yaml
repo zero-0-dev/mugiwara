@@ -156,6 +156,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@capacitor/core':
+        specifier: ^8.0.0
+        version: 8.6.0
       '@mugiwara-manga/types':
         specifier: workspace:*
         version: link:../../packages/shared
