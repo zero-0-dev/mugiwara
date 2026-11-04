@@ -1505,7 +1505,6 @@ body {
   position: relative;
   overflow: hidden;
   overscroll-behavior: none;
-  touch-action: manipulation;
   user-select: none;
   -webkit-user-select: none;
 }
@@ -1513,6 +1512,15 @@ body {
 .reader img {
   -webkit-user-drag: none;
   user-select: none;
+}
+
+/* Immersive reading hides the global chrome and lets the reader own the view. */
+.app.reader-immersive .app-header {
+  display: none;
+}
+
+.app.reader-immersive .app-main {
+  min-height: 0;
 }
 
 .reader-loading,
@@ -1534,12 +1542,12 @@ body {
   right: 0;
   display: flex;
   align-items: center;
-  gap: 1rem;
-  padding: 1rem;
-  background: rgba(0, 0, 0, 0.8);
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: rgba(0, 0, 0, 0.82);
   backdrop-filter: blur(10px);
   z-index: 100;
-  transition: opacity 0.3s;
+  transition: opacity 0.25s ease;
   opacity: 0;
   pointer-events: none;
   box-sizing: border-box;
@@ -1553,9 +1561,9 @@ body {
 
 .top-controls {
   top: 0;
+  padding-top: max(1rem, var(--safe-top));
   padding-left: max(1rem, var(--titlebar-inset-left, 0px), var(--safe-left));
   padding-right: max(1rem, var(--safe-right));
-  padding-top: max(1rem, var(--safe-top));
 }
 
 .bottom-controls {
@@ -1566,6 +1574,7 @@ body {
   display: flex;
   align-items: center;
   gap: 1rem;
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
 }
 
 .bottom-controls .progress-bar-container {
@@ -1591,9 +1600,21 @@ body {
   color: var(--text-primary);
 }
 
+.reader-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-left: auto;
+}
+
+.reader-zoom-reset:disabled {
+  opacity: 0.35;
+}
+
 .page-indicator {
   color: var(--text-secondary);
   font-size: 0.875rem;
+  white-space: nowrap;
 }
 
 .progress-bar-container {
@@ -1610,8 +1631,137 @@ body {
   transition: width 0.3s;
 }
 
+/* The paged reader is a native scroll container: one slide per viewport,
+   scroll-snap for paging, and no JS animation loop. */
+.paged-reader {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  overscroll-behavior: contain;
+  overscroll-behavior-x: contain;
+  overscroll-behavior-y: contain;
+  touch-action: pan-x;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  background: #000;
+}
+
+.paged-reader::-webkit-scrollbar {
+  display: none;
+}
+
+.page-slide {
+  flex: 0 0 100%;
+  width: 100%;
+  height: 100%;
+  scroll-snap-align: center;
+  scroll-snap-stop: always;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+}
+
+.page-frame {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.page-frame .manga-page {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  opacity: 0;
+  transition: opacity 0.12s ease-out;
+  will-change: transform;
+}
+
+.page-frame.loaded .manga-page {
+  opacity: 1;
+}
+
+.page-frame.error .manga-page {
+  display: none;
+}
+
+.page-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  color: #9ca3af;
+  font-size: 0.8125rem;
+  pointer-events: none;
+}
+
+.page-loading .loading-spinner {
+  width: 28px;
+  height: 28px;
+  border-width: 2px;
+}
+
+.page-error {
+  max-width: 18rem;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 0.875rem;
+}
+
+.page-error small {
+  opacity: 0.7;
+  font-size: 0.75rem;
+}
+
+.chapter-sentinel {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  color: #9ca3af;
+  text-align: center;
+  padding: 2rem;
+  box-sizing: border-box;
+}
+
+.chapter-sentinel-arrow {
+  font-size: 4rem;
+  line-height: 1;
+  opacity: 0.55;
+}
+
+.chapter-sentinel-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #e5e7eb;
+}
+
+.chapter-sentinel p {
+  margin: 0;
+  font-size: 0.8125rem;
+  opacity: 0.7;
+}
+
 .reader-content {
   flex: 1;
+  min-height: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1626,19 +1776,17 @@ body {
   align-items: flex-start;
   justify-content: center;
   padding: 2rem 0;
+  overscroll-behavior: contain;
+  overscroll-behavior-y: contain;
+  overscroll-behavior-x: contain;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
 }
 
 .manga-page {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
-}
-
-.manga-page.vertical {
-  width: 100%;
-  max-width: 800px;
-  margin-bottom: 1rem;
-  display: block;
 }
 
 .vertical-pages {
@@ -1650,19 +1798,38 @@ body {
   width: 100%;
 }
 
-.click-zones {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+.vertical-page-frame {
+  width: 100%;
   display: flex;
-  z-index: 50;
-  pointer-events: none;
+  justify-content: center;
 }
 
-.click-zone {
-  flex: 1;
+.vertical-page-frame .page-frame.vertical {
+  width: 100%;
+}
+
+.page-frame.vertical {
+  height: auto;
+  display: block;
+}
+
+.page-frame.vertical .manga-page.vertical,
+.manga-page.vertical {
+  width: 100%;
+  max-width: 800px;
+  height: auto;
+  margin: 0 auto 1rem;
+  display: block;
+  opacity: 1;
+}
+
+.page-frame.vertical .manga-page {
+  opacity: 1;
+  max-height: none;
+}
+
+.reader-vertical-scroller {
+  position: relative;
 }
 
 .manga-detail-loading {
@@ -4205,10 +4372,20 @@ button.server-status {
     font-size: 0.8125rem;
   }
 
+  .reader-settings {
+    min-width: 0;
+  }
+
   .reader-settings select {
+    max-width: 34vw;
     padding: 0.375rem;
     min-height: var(--touch-target);
     font-size: var(--mobile-input-font);
+  }
+
+  .reader-actions .btn-icon {
+    width: 32px;
+    height: 32px;
   }
 
   .page-indicator {

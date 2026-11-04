@@ -74,6 +74,7 @@ function App() {
   );
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [initialPage, setInitialPage] = useState<number | undefined>(undefined);
+  const [readerImmersive, setReaderImmersive] = useState(false);
   const canChangeServer = isCapacitor();
 
   useKeyboardShortcuts([
@@ -237,18 +238,28 @@ function App() {
             onReadChapter={handleReadChapter}
           />
         ) : null;
-      case "reader":
+      case "reader": {
+        const selectedChapterIndex = chapters.findIndex(
+          (chapter) => chapter.id === selectedChapterId,
+        );
+        const hasPrevChapter = selectedChapterIndex > 0;
+        const hasNextChapter =
+          selectedChapterIndex >= 0 &&
+          selectedChapterIndex < chapters.length - 1;
+
         return selectedMangaId && selectedChapterId ? (
           <Reader
             mangaId={selectedMangaId}
             chapterId={selectedChapterId}
             onBack={handleBackToDetail}
-            onNextChapter={handleNextChapter}
-            onPrevChapter={handlePrevChapter}
+            onNextChapter={hasNextChapter ? handleNextChapter : undefined}
+            onPrevChapter={hasPrevChapter ? handlePrevChapter : undefined}
             initialPage={initialPage}
             onInitialPageUsed={() => setInitialPage(undefined)}
+            onImmersiveChange={setReaderImmersive}
           />
         ) : null;
+      }
       case "settings":
         return (
           <SettingsPage
@@ -268,7 +279,9 @@ function App() {
     <ApiClientProvider baseUrl={apiBaseUrl}>
       <ThemeApplier />
       <ToastProvider>
-      <div className={`app${currentView === "reader" ? " app-reader" : ""}`}>
+      <div
+        className={`app${currentView === "reader" ? " app-reader" : ""}${readerImmersive ? " reader-immersive" : ""}`}
+      >
         {currentView !== "reader" && (
           <header className="app-header">
             <h1 onClick={handleBackToLibrary} style={{ cursor: "pointer" }}>

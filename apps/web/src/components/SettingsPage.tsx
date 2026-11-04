@@ -20,6 +20,7 @@ interface Settings {
   "reading.manhwaMode": string;
   "reading.manhuaMode": string;
   "reading.webtoonMode": string;
+  "reader.haptics": string;
   "ui.theme": string;
 }
 
@@ -29,6 +30,7 @@ const defaultSettings: Settings = {
   "reading.manhwaMode": "vertical",
   "reading.manhuaMode": "vertical",
   "reading.webtoonMode": "vertical",
+  "reader.haptics": "false",
   "ui.theme": "dark",
 };
 
@@ -119,6 +121,30 @@ export function SettingsPage({ onBack, serverLabel, onChangeServer }: SettingsPa
                   ]}
                 />
                 {saveSetting.isPending && <span className="saving-indicator">Saving...</span>}
+              </div>
+            </div>
+
+            <div className="setting-item">
+              <div className="setting-info">
+                <label>Page-turn haptics</label>
+                <p>
+                  Light vibration when a page settles. Native builds only; the
+                  web reader always stays silent.
+                </p>
+              </div>
+              <div className="setting-control">
+                <Select
+                  value={settings["reader.haptics"]}
+                  onChange={(v) => updateSetting("reader.haptics", v)}
+                  disabled={saveSetting.isPending}
+                  options={[
+                    { value: "false", label: "Off" },
+                    { value: "true", label: "On" },
+                  ]}
+                />
+                {saveSetting.isPending && (
+                  <span className="saving-indicator">Saving...</span>
+                )}
               </div>
             </div>
 
