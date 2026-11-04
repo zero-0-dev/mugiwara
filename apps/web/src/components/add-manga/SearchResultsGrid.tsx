@@ -10,6 +10,7 @@ interface SearchResultsGridProps {
   searchQuery: string;
   onSelect: (manga: SearchResult) => void;
   isLoadingDetails?: boolean;
+  isLocal?: boolean;
 }
 
 export function SearchResultsGrid({
@@ -19,6 +20,7 @@ export function SearchResultsGrid({
   searchQuery,
   onSelect,
   isLoadingDetails,
+  isLocal = false,
 }: SearchResultsGridProps) {
   const [focusIndex, setFocusIndex] = useState(-1);
   const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -64,6 +66,17 @@ export function SearchResultsGrid({
 
   if (results.length === 0) {
     if (!hasSearched) return null;
+    if (isLocal) {
+      return (
+        <div className="add-manga-empty">
+          <p>No manga found at "{searchQuery}".</p>
+          <p>
+            Choose a folder that contains chapter subfolders, image files, or
+            CBZ/ZIP archives. The folder must exist on the server machine.
+          </p>
+        </div>
+      );
+    }
     return (
       <div className="add-manga-empty">
         <p>No manga found for "{searchQuery}".</p>

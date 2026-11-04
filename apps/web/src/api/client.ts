@@ -40,13 +40,14 @@ export interface ImportProgressResponse {
   erroredChapters: number;
   downloadingChapters: number;
   queuedChapters: number;
+  cancelledChapters?: number;
   overallProgress: number;
   isComplete: boolean;
   chapters: Array<{
     chapterId: string;
     title?: string;
     sortOrder: number;
-    status: "queued" | "downloading" | "complete" | "error";
+    status: "queued" | "downloading" | "complete" | "error" | "cancelled";
     totalPages?: number;
     completedPages?: number;
     errorMessage?: string;
@@ -176,19 +177,42 @@ export class ApiClient {
 
   getAssetUrl(path?: string, cacheBuster?: number): string | undefined {
     if (!path) return undefined;
-    const url = /^https?:\/\//i.test(path) ? path : `${this.baseUrl}${path}`;
+    let url: string;
+    if (/^https?:\/\//i.test(path)) {
+      url = path;
+    } else if (path.startsWith("file://")) {
+      // Local sources report files by absolute path. The browser (including
+      // the Electron renderer served over http) cannot load file:// URLs, so
+      // route them through the server's local content endpoint.
+      let filePath = decodeURIComponent(path.slice("file://".length));
+      if (/^\/[A-Za-z]:[\\/]/.test(filePath)) filePath = filePath.slice(1);
+      url = `${this.baseUrl}/api/content/local/chapter?path=${encodeURIComponent(filePath)}`;
+    } else {
+      url = `${this.baseUrl}${path}`;
+    }
     if (!cacheBuster) return url;
     return `${url}${url.includes("?") ? "&" : "?"}t=${cacheBuster}`;
   }
 
   private async request<T>(path: string, options?: RequestInit): Promise<T> {
-    const response = await fetch(`${this.baseUrl}${path}`, {
-      ...options,
-      headers: {
-        "Content-Type": "application/json",
-        ...options?.headers,
-      },
-    });
+    let response: Response;
+    try {
+      response = await fetch(`${this.baseUrl}${path}`, {
+        ...options,
+        headers: {
+          "Content-Type": "application/json",
+          ...options?.headers,
+        },
+      });
+    } catch (error) {
+      // A failed fetch here means the browser could not reach the server at
+      // all. Surface that as an actionable message instead of "Failed to
+      // fetch", which gives the user nothing to fix.
+      const detail = error instanceof Error ? error.message : String(error);
+      throw new Error(
+        `Cannot reach the Mugiwara server. Check that the server is running and that this device is on the same network. (${detail})`,
+      );
+    }
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ error: response.statusText }));
       throw new Error(errorData.error || response.statusText);
@@ -307,7 +331,7 @@ export class ApiClient {
   }
 
   // Import
-  importManga(body: { sourceId: string; sourceMangaId: string; chapters: MangaDetails["chapters"] }): Promise<{ mangaId: string }> {
+  importManga(body: { sourceId: string; sourceMangaId: string; chapters: MangaDetails["chapters"] }): Promise<import("../components/add-manga/types").ImportMangaResult> {
     return this.request("/api/library/import", { method: "POST", body: JSON.stringify(body) });
   }
 
@@ -315,7 +339,7 @@ export class ApiClient {
     return this.request(`/api/library/import/${mangaId}/progress`);
   }
 
-  cancelImport(mangaId: string): Promise<void> {
+  cancelImport(mangaId: string): Promise<import("../components/add-manga/types").CancelImportResult> {
     return this.request(`/api/library/import/${mangaId}/cancel`, { method: "POST" });
   }
 

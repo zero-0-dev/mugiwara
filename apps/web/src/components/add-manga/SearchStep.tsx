@@ -14,6 +14,14 @@ interface SearchStepProps {
   onBrowse: () => void;
   onResultClick: (manga: SearchResult) => void;
   isLoadingDetails?: boolean;
+  searchError?: string | null;
+  /** Electron only: whether a native folder picker exists. */
+  nativeFolderPicker?: boolean;
+  /** Context-specific copy for local imports (server path vs. this machine). */
+  localHint?: string;
+  /** Hide keyboard-specific hints on touch-only devices. */
+  showKeyboardHints?: boolean;
+  inputRef?: React.RefObject<HTMLInputElement | null>;
 }
 
 export function SearchStep({
@@ -28,6 +36,11 @@ export function SearchStep({
   onBrowse,
   onResultClick,
   isLoadingDetails,
+  searchError,
+  nativeFolderPicker = false,
+  localHint,
+  showKeyboardHints = true,
+  inputRef,
 }: SearchStepProps) {
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === "Enter") {
@@ -40,11 +53,19 @@ export function SearchStep({
   }
 
   const placeholder = isLocal
-    ? "Enter server folder path or browse..."
+    ? nativeFolderPicker
+      ? "Enter a folder path or browse..."
+      : "Enter a folder path on the server..."
     : "Search manga by title...";
 
-  const canBrowse = isLocal && Boolean(window.electronAPI?.selectFolder);
   const hasContent = searchQuery.trim().length > 0;
+  const hintParts: string[] = [];
+  if (isLocal) {
+    hintParts.push(localHint || "Enter a folder path on the server machine.");
+    if (showKeyboardHints) hintParts.push("Press Enter to search.");
+  } else if (showKeyboardHints) {
+    hintParts.push("Press Enter to search.");
+  }
 
   return (
     <>
@@ -53,15 +74,15 @@ export function SearchStep({
           <div className="add-manga-search-input-wrapper">
             <span className="add-manga-search-icon"><Search size={16} /></span>
             <input
+              ref={inputRef}
               type="text"
               value={searchQuery}
-              readOnly={canBrowse}
               onChange={(e) => onQueryChange(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder={placeholder}
               className="add-manga-search-input"
+              aria-label={isLocal ? "Local folder path" : "Search manga"}
               autoFocus
-              aria-label={isLocal ? "Folder path" : "Search manga"}
             />
             {hasContent && (
               <button
@@ -74,7 +95,7 @@ export function SearchStep({
               </button>
             )}
           </div>
-          {canBrowse ? (
+          {isLocal && nativeFolderPicker ? (
             <button type="button" className="btn btn-secondary" onClick={onBrowse}>
               Browse…
             </button>
@@ -85,11 +106,26 @@ export function SearchStep({
               onClick={onSearchImmediate}
               disabled={isSearching || !hasContent}
             >
-              {isSearching ? "Searching..." : "Search"}
+              {isSearching ? "Searching..." : isLocal ? "Find manga" : "Search"}
             </button>
           )}
         </div>
-        {!isLocal && <p className="add-manga-search-hint">⌨ Enter to search</p>}
+        {isLocal && !nativeFolderPicker && (
+          <button
+            type="button"
+            className="add-manga-path-link"
+            onClick={onBrowse}
+          >
+            Enter server path
+          </button>
+        )}
+        {searchError ? (
+          <p className="add-manga-search-error" role="alert">{searchError}</p>
+        ) : (
+          hintParts.length > 0 && (
+            <p className="add-manga-search-hint">{hintParts.join(" ")}</p>
+          )
+        )}
       </div>
 
       <SearchResultsGrid
@@ -99,6 +135,7 @@ export function SearchStep({
         searchQuery={searchQuery}
         onSelect={onResultClick}
         isLoadingDetails={isLoadingDetails}
+        isLocal={isLocal}
       />
     </>
   );

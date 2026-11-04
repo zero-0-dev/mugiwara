@@ -7,12 +7,58 @@ import { scanLibrary } from "../services/library-scan";
 import { LocalSource } from "@mugiwara-manga/source-local";
 import { getRegisteredSourceIds } from "../plugins/registry";
 import { anilistService } from "../services/anilist";
+import { buildImportPlan } from "../services/import-plan";
 import axios from "axios";
-import { join } from "path";
-import { writeFile, mkdir } from "fs/promises";
+import { homedir } from "os";
+import { isAbsolute, join, resolve } from "path";
+import { writeFile, mkdir, stat } from "fs/promises";
 import { v4 as uuidv4 } from "uuid";
 
 const router: Router = Router();
+
+function looksLikePath(value: string): boolean {
+  const trimmed = value.trim();
+  return (
+    trimmed.startsWith("/") ||
+    trimmed.startsWith("~") ||
+    /^[A-Za-z]:[\\/]/.test(trimmed) ||
+    /^\\\\/.test(trimmed) ||
+    trimmed.includes("/") ||
+    trimmed.includes("\\")
+  );
+}
+
+function resolveLocalPath(value: string): string {
+  const trimmed = value.trim();
+  if (trimmed === "~") return homedir();
+  if (trimmed.startsWith("~/") || trimmed.startsWith("~\\")) {
+    return resolve(homedir(), trimmed.slice(2));
+  }
+  if (isAbsolute(trimmed)) return resolve(trimmed);
+  return resolve(process.cwd(), trimmed);
+}
+
+async function validateLocalDirectory(rawPath: string): Promise<
+  { ok: true; path: string } | { ok: false; error: string }
+> {
+  const resolvedPath = resolveLocalPath(rawPath);
+  try {
+    const info = await stat(resolvedPath);
+    if (!info.isDirectory()) {
+      return {
+        ok: false,
+        error: `"${rawPath}" is a file, not a folder. Choose a folder inside the server's filesystem.`,
+      };
+    }
+    return { ok: true, path: resolvedPath };
+  } catch {
+    return {
+      ok: false,
+      error: `Folder not found on the server: "${rawPath}". Check the path and that the server process can read it.`,
+    };
+  }
+}
+
 
 // GET /api/library/sources - Get available manga sources
 router.get("/sources", async (_req: Request, res: Response) => {
@@ -55,7 +101,21 @@ router.get("/sources/:sourceId/search", async (req: Request, res: Response) => {
       return;
     }
 
-    const results = await source.search(q);
+    let query = q;
+
+    // For local files, a path-shaped query is validated before scanning. This
+    // turns an unreadable folder into an actionable API error instead of an
+    // empty result list.
+    if (sourceId === "local" && looksLikePath(q)) {
+      const validated = await validateLocalDirectory(q);
+      if (!validated.ok) {
+        res.status(400).json({ error: validated.error });
+        return;
+      }
+      query = validated.path;
+    }
+
+    const results = await source.search(query);
     res.json(results);
   } catch (error) {
     console.error("Error searching manga in source:", error);
@@ -112,12 +172,40 @@ router.post("/import", async (req: Request, res: Response) => {
     }
 
     // Get manga details from source
-    const mangaDetails = await source.getMangaDetails(sourceMangaId);
+    let mangaDetails;
+    try {
+      mangaDetails = await source.getMangaDetails(sourceMangaId);
+    } catch (error) {
+      if (sourceId === "local" && looksLikePath(sourceMangaId)) {
+        const validated = await validateLocalDirectory(sourceMangaId);
+        if (!validated.ok) {
+          res.status(400).json({ error: validated.error });
+          return;
+        }
+        res.status(400).json({
+          error:
+            "No chapters were found in this folder. Add chapter subfolders, image files, or CBZ/ZIP archives, then try again.",
+        });
+        return;
+      }
+      throw error;
+    }
+
+    if (!mangaDetails.chapters || mangaDetails.chapters.length === 0) {
+      res.status(400).json({
+        error:
+          "No chapters were found in this folder. Add chapter subfolders, image files, or CBZ/ZIP archives, then try again.",
+      });
+      return;
+    }
 
     // Get default storage backend
     const defaultBackendId = global.storageManager.getDefaultBackendId();
     if (!defaultBackendId) {
-      res.status(400).json({ error: "No default storage backend configured" });
+      res.status(400).json({
+        error:
+          "No storage backend is configured. Open Settings → Storage, add or enable a backend, then import again.",
+      });
       return;
     }
 
@@ -129,6 +217,7 @@ router.post("/import", async (req: Request, res: Response) => {
     );
 
     let mangaId: string;
+    const reusedExistingManga = Boolean(existing);
     if (existing) {
       mangaId = existing.id;
     } else {
@@ -157,39 +246,34 @@ router.post("/import", async (req: Request, res: Response) => {
       }
     }
 
-    // Get existing chapters
+    // Get existing chapters and active queue tasks so a re-import reuses the
+    // existing manga/chapter rows and does not enqueue duplicate work.
     const { chapterRepository } = await import("../database");
     const existingChapters = await chapterRepository.findByMangaId(mangaId);
-    const existingChapterIds = new Set(
-      existingChapters.map((c: any) => c.chapterId),
+    const activeTasks = await global.taskRepository.getByManga(mangaId);
+    const activeChapterIds = new Set(
+      activeTasks
+        .filter(
+          (task) => task.status === "pending" || task.status === "running",
+        )
+        .map((task) => task.chapterId)
+        .filter((chapterId): chapterId is string => Boolean(chapterId)),
     );
 
-    // Build set of selected chapter IDs for download queuing
     const selectedChapterIds = chapters
-      ? new Set(chapters.map((c: any) => c.chapterId))
+      ? new Set<string>(chapters.map((c: any) => c.chapterId))
       : null;
 
-    // Use ALL chapters from source for DB creation
-    const allChapters = mangaDetails.chapters;
-
-    // Deduplicate chapters from source (some sources may return duplicates)
-    const seenChapterIds = new Set<string>();
-    const uniqueChapters = allChapters.filter((c: any) => {
-      if (seenChapterIds.has(c.chapterId)) {
-        return false;
-      }
-      seenChapterIds.add(c.chapterId);
-      return true;
+    const plan = buildImportPlan({
+      sourceChapters: mangaDetails.chapters,
+      existingChapters: existingChapters as any[],
+      selectedChapterIds,
+      activeChapterIds,
     });
 
-    // Filter out already existing chapters
-    const newChapters = uniqueChapters.filter(
-      (c: any) => !existingChapterIds.has(c.chapterId),
-    );
-
-    // Add ALL new chapters to database with pending status
+    // Add only chapters that are not already in the library.
     let chaptersAdded = 0;
-    for (const chapter of newChapters) {
+    for (const chapter of plan.chaptersToCreate) {
       try {
         await chapterRepository.create({
           id: uuidv4(),
@@ -216,14 +300,30 @@ router.post("/import", async (req: Request, res: Response) => {
       }
     }
 
-    // Determine which chapters to queue for download
-    const chaptersToQueue = selectedChapterIds
-      ? newChapters.filter((c: any) => selectedChapterIds.has(c.chapterId))
-      : newChapters;
+    // A retried import may reuse chapters left as cancelled/error by an
+    // earlier cancel. Mark them pending again before queueing so progress and
+    // chapter status reflect the new import instead of the old terminal state.
+    const existingByChapterId = new Map(
+      (existingChapters as any[]).map((chapter) => [chapter.chapterId, chapter]),
+    );
+    for (const chapter of plan.chaptersToQueue) {
+      const existingChapter = existingByChapterId.get(chapter.chapterId) as any;
+      if (
+        existingChapter &&
+        existingChapter.importStatus !== "pending" &&
+        existingChapter.importStatus !== "downloading" &&
+        existingChapter.importStatus !== "complete"
+      ) {
+        await chapterRepository.update(existingChapter.id, {
+          importStatus: "pending",
+          importProgress: 0,
+        });
+      }
+    }
 
-    // Queue chapters for import
+    // Queue selected chapters that are not complete and have no active task.
     let chaptersQueued = 0;
-    for (const chapter of chaptersToQueue) {
+    for (const chapter of plan.chaptersToQueue) {
       try {
         await global.taskRepository.create({
           type: "chapter",
@@ -246,8 +346,10 @@ router.post("/import", async (req: Request, res: Response) => {
     res.json({
       success: true,
       mangaId,
+      reusedExistingManga,
       chaptersAdded,
       chaptersQueued,
+      chaptersReused: plan.uniqueChapters.length - chaptersAdded,
     });
   } catch (error) {
     console.error("Error importing manga:", error);
@@ -281,17 +383,20 @@ router.get(
       const queued = chapters.filter(
         (c: any) => c.importStatus === "pending",
       ).length;
+      const cancelled = chapters.filter(
+        (c: any) => c.importStatus === "cancelled",
+      ).length;
 
       let totalProgress = 0;
       for (const ch of chapters as any[]) {
-        if (ch.importStatus === "complete") totalProgress += 100;
-        else if (ch.importStatus === "error") totalProgress += 100;
+        if (ch.importStatus === "complete" || ch.importStatus === "error")
+          totalProgress += 100;
         else totalProgress += ch.importProgress || 0;
       }
 
       const overallProgress =
         total > 0 ? Math.round(totalProgress / total) : 0;
-      const isComplete = completed + errored >= total;
+      const isComplete = completed + errored + cancelled >= total;
 
       const chapterList = (chapters as any[])
         .sort((a: any, b: any) => b.sortOrder - a.sortOrder)
@@ -307,7 +412,11 @@ router.get(
               ? Math.round((ch.pagesCount * ch.importProgress) / 100)
               : undefined,
           errorMessage:
-            ch.importStatus === "error" ? "Import failed" : undefined,
+            ch.importStatus === "error"
+              ? "Import failed"
+              : ch.importStatus === "cancelled"
+                ? "Cancelled by user"
+                : undefined,
         }));
 
       res.json({
@@ -317,6 +426,7 @@ router.get(
         erroredChapters: errored,
         downloadingChapters: downloading,
         queuedChapters: queued,
+        cancelledChapters: cancelled,
         overallProgress,
         isComplete,
         chapters: chapterList,
@@ -341,27 +451,38 @@ router.post(
       const { chapterRepository } = await import("../database");
       const chapters = await chapterRepository.findByMangaId(mangaId);
 
+      let cancelledChapters = 0;
       for (const ch of chapters as any[]) {
         if (ch.importStatus === "pending" || ch.importStatus === "downloading") {
           await chapterRepository.update(ch.id, {
             importStatus: "cancelled",
           });
+          cancelledChapters++;
         }
       }
 
-      // Cancel all pending/running import tasks for this manga
+      // Cancel all pending/running import tasks for this manga. For running
+      // tasks the processor aborts its worker; the row is then removed so a
+      // later retry starts from a clean queue.
       const tasks = await global.taskRepository.getByManga(mangaId);
+      let cancelledTasks = 0;
       for (const task of tasks) {
         if (task.status === "pending" || task.status === "running") {
+          await global.queueProcessor?.cancelTask(task.id);
           await global.taskRepository.cancel(task.id);
-          // Also abort running tasks in the processor
-          if (global.queueProcessor) {
-            await global.queueProcessor.cancelTask(task.id);
-          }
+          cancelledTasks++;
         }
       }
 
-      res.json({ success: true });
+      res.json({
+        success: true,
+        cancelledChapters,
+        cancelledTasks,
+        message:
+          cancelledChapters + cancelledTasks === 0
+            ? "No active import work to cancel."
+            : `Cancelled ${cancelledChapters} pending chapter${cancelledChapters === 1 ? "" : "s"} and ${cancelledTasks} queue task${cancelledTasks === 1 ? "" : "s"}.`,
+      });
     } catch (error) {
       console.error("Error cancelling import:", error);
       res.status(500).json({ error: "Failed to cancel import" });
