@@ -1600,6 +1600,46 @@ body {
   color: var(--text-primary);
 }
 
+.reader-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.reader-info {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.reader-manga-title,
+.reader-chapter-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reader-manga-title {
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.reader-chapter-title {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.reader-info-separator {
+  color: var(--text-secondary);
+  opacity: 0.6;
+}
+
 .reader-actions {
   display: flex;
   align-items: center;
@@ -4356,6 +4396,8 @@ button.server-status {
     padding-top: max(0.5rem, var(--safe-top));
     padding-left: max(0.5rem, var(--titlebar-inset-left, 0px), var(--safe-left));
     padding-right: max(0.5rem, var(--safe-right));
+    flex-wrap: wrap;
+    row-gap: 0.35rem;
   }
 
   .bottom-controls {
@@ -4381,6 +4423,21 @@ button.server-status {
     padding: 0.375rem;
     min-height: var(--touch-target);
     font-size: var(--mobile-input-font);
+  }
+
+  .reader-meta {
+    order: 10;
+    flex: 1 1 100%;
+    gap: 0.5rem;
+  }
+
+  .reader-info {
+    flex: 1;
+  }
+
+  .reader-manga-title,
+  .reader-chapter-title {
+    font-size: 0.8125rem;
   }
 
   .reader-actions .btn-icon {

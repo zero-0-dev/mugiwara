@@ -12,6 +12,8 @@ import { useApiClient } from "../api/context";
 import {
   useChapterPages,
   useChapterProgress,
+  useChapters,
+  useManga,
   useReadingMode,
   useSetReadingMode,
   useSettings,
@@ -169,10 +171,18 @@ export function Reader({
     useChapterPages(mangaId, chapterId);
   const { data: chapterProgress, isLoading: progressLoading } =
     useChapterProgress(mangaId, chapterId);
+  const { data: manga } = useManga(mangaId);
+  const { data: chapterList = [] } = useChapters(mangaId);
   const { data: serverReadingModeData } = useReadingMode(mangaId);
   const { data: serverSettings } = useSettings();
   const { mutate: saveProgress } = useUpdateChapterProgress(mangaId, chapterId);
   const setReadingModeMutation = useSetReadingMode(mangaId);
+
+  const currentChapter = chapterList.find((chapter) => chapter.id === chapterId);
+  const mangaTitle = manga?.title?.trim();
+  const chapterTitle = currentChapter
+    ? currentChapter.title?.trim() || `Chapter ${currentChapter.chapterId}`
+    : undefined;
 
   const [currentPage, setCurrentPage] = useState(0);
   const [readingMode, setReadingMode] = useState<ReaderMode>("rtl");
@@ -1058,8 +1068,27 @@ export function Reader({
             <option value="vertical">Vertical</option>
           </select>
         </div>
-        <div className="page-indicator">
-          {currentPage + 1} / {pages.length}
+        <div className="reader-meta">
+          <div className="reader-info">
+            {mangaTitle ? (
+              <span className="reader-manga-title" title={mangaTitle}>
+                {mangaTitle}
+              </span>
+            ) : null}
+            {mangaTitle && chapterTitle ? (
+              <span className="reader-info-separator" aria-hidden="true">
+                ·
+              </span>
+            ) : null}
+            {chapterTitle ? (
+              <span className="reader-chapter-title" title={chapterTitle}>
+                {chapterTitle}
+              </span>
+            ) : null}
+          </div>
+          <div className="page-indicator">
+            {currentPage + 1} / {pages.length}
+          </div>
         </div>
         <div className="reader-actions">
           {zoom.scale > 1 ? (
