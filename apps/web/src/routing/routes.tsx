@@ -36,6 +36,7 @@ function MangaDetailRoute() {
       onReadChapter={(chapterId) =>
         navigate(`/read/${mangaId}/${chapterId}`)
       }
+      onOpenSettings={() => navigate("/settings/tracking")}
     />
   );
 }

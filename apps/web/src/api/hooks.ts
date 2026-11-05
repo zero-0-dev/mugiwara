@@ -6,6 +6,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { useApiClient } from "./context";
+import type { TrackerProviderId } from "./client";
 
 // ─── Library ───────────────────────────────────────────────────────────────
 
@@ -1007,5 +1008,182 @@ export function useDownloadAllChapters(mangaId: string) {
       queryClient.invalidateQueries({ queryKey: ["queueTasks"] });
       queryClient.invalidateQueries({ queryKey: ["queueStats"] });
     },
+  });
+}
+
+// ─── Tracker sync ──────────────────────────────────────────────────────────
+
+export function useTrackerStatus() {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: ["trackerStatus"],
+    queryFn: () => api.getTrackerStatus(),
+    staleTime: 5000,
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      if (!data) return false;
+      const queueBusy = Boolean(
+        data.queue?.pending || data.queue?.running,
+      );
+      return queueBusy ? 4000 : false;
+    },
+  });
+}
+
+export function useMangaTracking(mangaId: string) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: ["mangaTracking", mangaId],
+    queryFn: () => api.getMangaTracking(mangaId),
+    enabled: !!mangaId,
+  });
+}
+
+export function useTrackerCandidates(
+  mangaId: string,
+  provider: TrackerProviderId | null,
+  query: string,
+) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: ["trackerCandidates", mangaId, provider, query],
+    queryFn: () =>
+      api.searchTrackerCandidates(mangaId, provider!, query || undefined),
+    enabled: !!mangaId && !!provider,
+    staleTime: 60_000,
+  });
+}
+
+function invalidateTracking(
+  queryClient: ReturnType<typeof useQueryClient>,
+  mangaId?: string,
+) {
+  queryClient.invalidateQueries({ queryKey: ["trackerStatus"] });
+  queryClient.invalidateQueries({ queryKey: ["trackerAccounts"] });
+  if (mangaId) {
+    queryClient.invalidateQueries({ queryKey: ["mangaTracking", mangaId] });
+    queryClient.invalidateQueries({ queryKey: ["library"] });
+    queryClient.invalidateQueries({
+      queryKey: ["chapterProgress", "all", mangaId],
+    });
+  } else {
+    queryClient.invalidateQueries({ queryKey: ["mangaTracking"] });
+    queryClient.invalidateQueries({ queryKey: ["library"] });
+    queryClient.invalidateQueries({ queryKey: ["chapterProgress"] });
+  }
+}
+
+export function useStartTrackerAuth() {
+  const api = useApiClient();
+  return useMutation({
+    mutationFn: (provider: TrackerProviderId) => api.startTrackerAuth(provider),
+  });
+}
+
+export function useCompleteTrackerCode() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: {
+      provider: TrackerProviderId;
+      code: string;
+      state: string;
+    }) => api.completeTrackerCode(input.provider, input),
+    onSuccess: () => invalidateTracking(queryClient),
+  });
+}
+
+export function useDisconnectTracker() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (provider: TrackerProviderId) => api.disconnectTracker(provider),
+    onSuccess: () => invalidateTracking(queryClient),
+  });
+}
+
+export function useSetTrackerReadOnly() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { provider: TrackerProviderId; readOnly: boolean }) =>
+      api.setTrackerReadOnly(input.provider, input.readOnly),
+    onSuccess: () => invalidateTracking(queryClient),
+  });
+}
+
+export function useSyncTracker() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: {
+      provider: TrackerProviderId;
+      mangaId?: string;
+      direction?: "push" | "pull";
+    }) => api.syncTracker(input.provider, input),
+    onSuccess: (_data, input) => invalidateTracking(queryClient, input.mangaId),
+  });
+}
+
+export function useLinkMangaTracker(mangaId: string) {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: {
+      provider: TrackerProviderId;
+      trackerMangaId: string;
+    }) => api.linkMangaTracker(mangaId, input.provider, input.trackerMangaId),
+    onSuccess: () => invalidateTracking(queryClient, mangaId),
+  });
+}
+
+export function useUnlinkMangaTracker(mangaId: string) {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (provider: TrackerProviderId) =>
+      api.unlinkMangaTracker(mangaId, provider),
+    onSuccess: () => invalidateTracking(queryClient, mangaId),
+  });
+}
+
+export function useUpdateMangaTracking(mangaId: string) {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: {
+      provider: TrackerProviderId;
+      status?: string;
+      score?: number | null;
+    }) =>
+      api.updateMangaTracking(mangaId, input.provider, {
+        status: input.status,
+        score: input.score,
+      }),
+    onSuccess: () => invalidateTracking(queryClient, mangaId),
+  });
+}
+
+export function useSyncMangaTracker(mangaId: string) {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: {
+      provider: TrackerProviderId;
+      direction: "push" | "pull";
+    }) => api.syncMangaTracker(mangaId, input.provider, input.direction),
+    onSuccess: () => invalidateTracking(queryClient, mangaId),
+  });
+}
+
+export function useResolveTrackerConflict(mangaId: string) {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: {
+      provider: TrackerProviderId;
+      resolution: "local" | "remote";
+    }) => api.resolveTrackerConflict(mangaId, input.provider, input.resolution),
+    onSuccess: () => invalidateTracking(queryClient, mangaId),
   });
 }

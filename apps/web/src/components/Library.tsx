@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
 import {
+  AlertCircle,
   ArrowDown,
   ArrowUp,
   Plus,
@@ -19,6 +20,7 @@ import {
   useFilterOptions,
   useDeleteManga,
   useCheckLibraryUpdates,
+  useTrackerStatus,
 } from "../api/hooks";
 import { useApiClient } from "../api/context";
 import { Select } from "./Select";
@@ -123,6 +125,7 @@ export function Library({ onMangaSelect }: LibraryProps) {
 
   const { data: manga = [], isLoading } = useLibrary(queryFilters);
   const { data: filterOptions } = useFilterOptions();
+  const { data: trackerStatus } = useTrackerStatus();
   const deleteManga = useDeleteManga();
 
   // A deleted category must not keep filtering the library invisibly.
@@ -144,6 +147,14 @@ export function Library({ onMangaSelect }: LibraryProps) {
     setSearchParams,
   ]);
   const checkLibraryUpdates = useCheckLibraryUpdates();
+
+  const connectedTrackers = (trackerStatus?.accounts ?? []).filter(
+    (account) => account.connected,
+  );
+  const syncIssues = new Map(
+    (trackerStatus?.issues ?? []).map((issue) => [issue.mangaId, issue]),
+  );
+  const syncIssueCount = syncIssues.size;
 
   const handleCheckUpdates = () => {
     checkLibraryUpdates.mutate(undefined, {
@@ -239,6 +250,22 @@ export function Library({ onMangaSelect }: LibraryProps) {
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          {connectedTrackers.length > 0 && (
+            <Badge
+              variant={syncIssueCount > 0 ? "warning" : "success"}
+              className="hidden sm:inline-flex"
+              title={
+                syncIssueCount > 0
+                  ? `${syncIssueCount} manga need tracker attention. Reading is unaffected.`
+                  : "Tracker sync is up to date"
+              }
+            >
+              {syncIssueCount > 0 && <AlertCircle className="size-3" />}
+              {syncIssueCount > 0
+                ? `${syncIssueCount} sync issue${syncIssueCount === 1 ? "" : "s"}`
+                : "Trackers synced"}
+            </Badge>
+          )}
           <Button
             variant="outline"
             onClick={handleCheckUpdates}
@@ -464,6 +491,7 @@ export function Library({ onMangaSelect }: LibraryProps) {
         <div className="mt-4 grid grid-cols-2 gap-x-3 gap-y-6 sm:mt-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
           {manga.map((m) => {
             const cover = api.getAssetUrl(m.coverImage);
+            const syncIssue = syncIssues.get(m.id);
             return (
               <div
                 key={m.id}
@@ -505,6 +533,16 @@ export function Library({ onMangaSelect }: LibraryProps) {
                   >
                     <Trash2 className="size-3.5" />
                   </Button>
+                  {syncIssue && (
+                    <Badge
+                      variant={syncIssue.syncState === "conflict" ? "warning" : "destructive"}
+                      className="pointer-events-none absolute left-1.5 top-1.5 z-10 bg-black/60 text-white backdrop-blur"
+                      title={syncIssue.error ?? "Tracker sync needs attention"}
+                    >
+                      <AlertCircle className="size-3" />
+                      {syncIssue.syncState === "conflict" ? "Conflict" : "Sync"}
+                    </Badge>
+                  )}
                   {m.progress && m.progress.percentComplete > 0 && (
                     <div className="absolute inset-x-0 bottom-0 p-1.5">
                       <Progress
