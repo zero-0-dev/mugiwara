@@ -325,6 +325,7 @@ export class ApiClient {
       const detail = error instanceof Error ? error.message : String(error);
       throw new Error(
         `Cannot reach the Mugiwara server. Check that the server is running and that this device is on the same network. (${detail})`,
+        { cause: error },
       );
     }
     if (!response.ok) {

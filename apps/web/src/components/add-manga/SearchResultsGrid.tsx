@@ -33,7 +33,7 @@ export function SearchResultsGrid({
     if (results.length > 0 && focusIndex === -1) {
       setFocusIndex(0);
     }
-  }, [results]);
+  }, [results, focusIndex]);
 
   useEffect(() => {
     cardRefs.current[focusIndex]?.focus();

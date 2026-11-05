@@ -14,7 +14,6 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Alert, AlertDescription } from "./ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
-import { cn } from "@/lib/utils";
 
 interface ServerSetupProps {
   initialUrl?: string;

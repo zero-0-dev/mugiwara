@@ -164,7 +164,7 @@ export class ServerManager {
         if (response.ok) {
           return;
         }
-      } catch (error) {
+      } catch {
         // Server not ready yet, wait and retry
         await new Promise((resolve) => setTimeout(resolve, 100));
       }

@@ -3,7 +3,6 @@ import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import Database from "better-sqlite3";
 import { join } from "path";
 import { mkdirSync } from "fs";
-import { eq } from "drizzle-orm";
 import * as schema from "./schema";
 
 const DATA_DIR = process.env.DATA_DIR || join(process.cwd(), "data");

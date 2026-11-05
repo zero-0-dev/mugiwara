@@ -1,4 +1,4 @@
-import { eq, and, gt, lt, asc, desc, sql } from "drizzle-orm";
+import { eq, and, gt, lt, asc, desc } from "drizzle-orm";
 import { db, chapters } from "../index";
 
 export const chapterRepository = {

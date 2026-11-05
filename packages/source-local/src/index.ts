@@ -13,13 +13,6 @@ interface LocalSourceConfig {
   directories?: string[];
 }
 
-interface LocalMangaInfo {
-  path: string;
-  title: string;
-  coverImage?: string;
-  chapters: LocalChapterInfo[];
-}
-
 interface LocalChapterInfo {
   path: string;
   chapterId: string;
@@ -390,7 +383,7 @@ class LocalSource extends BaseSource {
           }
         }
       }
-    } catch (error) {
+    } catch {
       // Ignore errors
     }
 
@@ -484,7 +477,7 @@ class LocalSource extends BaseSource {
 }
 
 // Factory function
-export default function createLocalSource(options: {
+export default function createLocalSource(_options: {
   config: PluginConfig;
 }): LocalSource {
   return new LocalSource();

@@ -1,4 +1,4 @@
-function readPackage(pkg, context) {
+function readPackage(pkg, _context) {
   if (pkg.name === "dmg-builder") {
     if (pkg.optionalDependencies?.["dmg-license"]) {
       pkg.dependencies = pkg.dependencies || {};

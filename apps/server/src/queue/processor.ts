@@ -1,6 +1,6 @@
 import { EventEmitter } from "events";
 import { ImportTaskRepository } from "./repository";
-import { ImportTask, TaskStatus } from "./types";
+import { ImportTask } from "./types";
 import { getBooleanSetting } from "../services/settings";
 import { maybeCompressPageData } from "../services/image-compression";
 

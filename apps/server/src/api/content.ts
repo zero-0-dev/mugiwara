@@ -275,12 +275,6 @@ function extractFromArchive(
   });
 }
 
-function extractFirstImageFromArchive(
-  archivePath: string,
-): Promise<Buffer | null> {
-  return extractImageFromArchiveByIndex(archivePath, 0);
-}
-
 function extractImageFromArchiveByIndex(
   archivePath: string,
   index: number,

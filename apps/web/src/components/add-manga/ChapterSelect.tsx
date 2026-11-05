@@ -13,6 +13,8 @@ interface ChapterSelectProps {
   onImport: () => void;
 }
 
+const EMPTY_CHAPTERS: MangaDetails["chapters"] = [];
+
 export function ChapterSelect({
   mangaDetails,
   selectedChapters,
@@ -22,6 +24,7 @@ export function ChapterSelect({
   const [languageFilter, setLanguageFilter] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const selectAllRef = useRef<HTMLInputElement>(null);
+  const allChapters = mangaDetails?.chapters ?? EMPTY_CHAPTERS;
 
   useKeyboardShortcuts([
     {
@@ -66,19 +69,16 @@ export function ChapterSelect({
     selectAllRef.current?.focus();
   }, []);
 
-  if (!mangaDetails) return null;
-  const details = mangaDetails;
-
   const languages = useMemo(() => {
     const set = new Set<string>();
-    mangaDetails.chapters.forEach((ch) => {
+    allChapters.forEach((ch) => {
       if (ch.language) set.add(ch.language);
     });
     return Array.from(set).sort();
-  }, [mangaDetails.chapters]);
+  }, [allChapters]);
 
   const visibleChapters = useMemo(() => {
-    let chapters = [...mangaDetails.chapters];
+    let chapters = [...allChapters];
     if (languageFilter) {
       chapters = chapters.filter((ch) => ch.language === languageFilter);
     }
@@ -88,7 +88,7 @@ export function ChapterSelect({
         : b.sortOrder - a.sortOrder,
     );
     return chapters;
-  }, [mangaDetails.chapters, languageFilter, sortOrder]);
+  }, [allChapters, languageFilter, sortOrder]);
 
   const visibleSelectedCount = useMemo(
     () =>
@@ -105,6 +105,9 @@ export function ChapterSelect({
         !allVisibleSelected && !noneVisibleSelected;
     }
   }, [allVisibleSelected, noneVisibleSelected]);
+
+  if (!mangaDetails) return null;
+  const details = mangaDetails;
 
   function handleSelectAllChange() {
     if (allVisibleSelected) {

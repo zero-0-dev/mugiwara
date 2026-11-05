@@ -429,14 +429,6 @@ router.post(
         return;
       }
 
-      // Check if chapter is already downloaded or queued
-      const storage = await global.storageManager.getBackendForManga(mangaId);
-      const storedPageCount = await storage.listChapterPages(
-        mangaId,
-        chapterId,
-      );
-      const pageCount = Math.max(storedPageCount, chapter.pagesCount || 0);
-
       // Check if there's already a pending or running task for this chapter
       const existingTask = await global.taskRepository.getByChapter(
         mangaId,

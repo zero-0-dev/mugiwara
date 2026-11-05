@@ -221,7 +221,7 @@ export function AddMangaModal({
     if (initialSearchQuery && local.selectedSource && !local.hasSearched) {
       dispatch({ type: "SET_SEARCH_QUERY", query: initialSearchQuery });
     }
-  }, [initialSearchQuery, local.selectedSource]);
+  }, [initialSearchQuery, local.selectedSource, local.hasSearched]);
 
   useEffect(() => {
     if (!initialSearchResult) return;

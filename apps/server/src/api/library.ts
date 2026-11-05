@@ -649,9 +649,6 @@ router.post(
         return;
       }
 
-      const sourceId = manga.sourceId;
-      const sourceMangaId = manga.sourceMangaId;
-
       // Get all pending chapters
       const allChapters = await chapterRepository.findByMangaId(mangaId);
       const pendingChapters = allChapters.filter(
@@ -666,7 +663,7 @@ router.post(
       // Resolve source to get sourceChapterId for each pending chapter
       const dlSourceId = manga.sourceId;
       const dlSourceMangaId = manga.sourceMangaId;
-      let chapterSourceMap = new Map<string, string>();
+      const chapterSourceMap = new Map<string, string>();
 
       if (dlSourceMangaId) {
         const source = global.pluginManager.getSource(dlSourceId || "unknown");

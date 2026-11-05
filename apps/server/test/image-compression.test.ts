@@ -15,7 +15,7 @@ async function makeImage(
 ): Promise<Buffer> {
   const width = options.width ?? 128;
   const height = options.height ?? 96;
-  let image = sharp({
+  const image = sharp({
     create: {
       width,
       height,

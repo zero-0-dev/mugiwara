@@ -11,6 +11,7 @@
     "dev:main": "npm run build:main && npm run build:preload && electron dist/main/index.js --inspect=5858",
     "dev:web": "pnpm --filter @mugiwara-manga/web dev",
     "clean": "rm -rf dist release",
+    "lint": "eslint src",
     "typecheck": "tsc --noEmit",
     "package:linux": "pnpm --filter @mugiwara-manga/web build && npm run build && electron-builder --linux",
     "package:mac": "pnpm --filter @mugiwara-manga/web build && npm run build && electron-builder --mac",

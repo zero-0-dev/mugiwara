@@ -144,8 +144,6 @@ router.delete("/backends/:id", async (req: any, res: Response) => {
 // POST /api/storage/backends/:id/migrate - Start migration to another backend
 router.post("/backends/:id/migrate", async (req: any, res: Response) => {
   try {
-    const manager: StorageManager = req.storageManager;
-    const { id } = req.params;
     const { targetBackendId } = req.body;
 
     if (!targetBackendId) {

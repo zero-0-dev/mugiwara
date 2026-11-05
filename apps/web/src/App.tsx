@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { BookOpen, Compass, Settings, Server } from "lucide-react";
-import { Capacitor, SystemBars, SystemBarsStyle } from "@capacitor/core";
+import { BookOpen, Compass, Settings } from "lucide-react";
+import { SystemBars, SystemBarsStyle } from "@capacitor/core";
 import { Library } from "./components/Library";
 import { MangaDetail } from "./components/MangaDetail";
 import { Reader } from "./components/Reader";
@@ -9,7 +9,7 @@ import { DiskSpacePage } from "./components/DiskSpacePage";
 import { Discover } from "./components/Discover";
 import { DiscoverDetail } from "./components/DiscoverDetail";
 import { ServerSetup } from "./components/ServerSetup";
-import { Manga, Chapter } from "@mugiwara-manga/types";
+import { Chapter } from "@mugiwara-manga/types";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useSettings } from "./api/hooks";
 import { ApiClientProvider } from "./api/context";
@@ -136,7 +136,7 @@ function App() {
   );
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [initialPage, setInitialPage] = useState<number | undefined>(undefined);
-  const [readerImmersive, setReaderImmersive] = useState(false);
+  const [, setReaderImmersive] = useState(false);
   const canChangeServer = isCapacitor();
 
   useKeyboardShortcuts([

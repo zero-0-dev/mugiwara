@@ -267,8 +267,6 @@ async function loadPluginFromDB(
   storage: Map<string, LoadedPlugin>,
   pluginsDir: string,
 ): Promise<void> {
-  let instance: MangaSource | StorageBackend;
-
   // Load plugin module via CJS require (handles .jsx/.tsx via tsx hooks)
   const pluginRequire = createRequire(pluginsDir + "/package.json");
   const mod = pluginRequire(record.id);
@@ -279,7 +277,7 @@ async function loadPluginFromDB(
   }
 
   // Create instance directly from the dynamically imported factory
-  instance = factory(record.config);
+  const instance: MangaSource | StorageBackend = factory(record.config);
 
   // Initialize the plugin
   await instance.initialize(record.config);

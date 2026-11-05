@@ -63,7 +63,7 @@ class LocalStorage extends BaseStorage {
 
   private getExtensionFromContentType(
     contentType: string,
-    pageNumber?: number,
+    _pageNumber?: number,
   ): string {
     switch (contentType) {
       case "image/jpeg":
@@ -164,7 +164,7 @@ class LocalStorage extends BaseStorage {
       // Count files that match the page pattern (###.*)
       const pageFiles = files.filter((f: string) => /^\d{3}\./.test(f));
       return pageFiles.length;
-    } catch (error) {
+    } catch {
       // Chapter directory doesn't exist
       return 0;
     }
@@ -272,7 +272,7 @@ class LocalStorage extends BaseStorage {
     const chapterPath = this.getChapterPath(mangaId, chapterId);
     try {
       await fs.rm(chapterPath, { recursive: true, force: true });
-    } catch (error) {
+    } catch {
       // Ignore if doesn't exist
     }
   }
@@ -281,7 +281,7 @@ class LocalStorage extends BaseStorage {
     const mangaPath = this.getMangaPath(mangaId);
     try {
       await fs.rm(mangaPath, { recursive: true, force: true });
-    } catch (error) {
+    } catch {
       // Ignore if doesn't exist
     }
   }
@@ -293,7 +293,7 @@ class LocalStorage extends BaseStorage {
       return entries
         .filter((entry: Dirent) => entry.isDirectory())
         .map((entry: Dirent) => entry.name);
-    } catch (error) {
+    } catch {
       return [];
     }
   }
@@ -329,7 +329,7 @@ class LocalStorage extends BaseStorage {
       }
 
       return path.join(chapterPath, pageFile);
-    } catch (error) {
+    } catch {
       return null;
     }
   }
@@ -449,7 +449,7 @@ class LocalStorage extends BaseStorage {
           });
         }
       }
-    } catch (error) {
+    } catch {
       // Chapters directory doesn't exist or can't be read
     }
 
@@ -599,7 +599,7 @@ class LocalStorage extends BaseStorage {
 }
 
 // Factory function - default export
-export default function createLocalStorage(options: {
+export default function createLocalStorage(_options: {
   config: PluginConfig;
 }): LocalStorage {
   return new LocalStorage();

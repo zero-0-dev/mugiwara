@@ -20,7 +20,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { Manga, Chapter, ReadingProgress } from "@mugiwara-manga/types";
+import { Chapter, ReadingProgress } from "@mugiwara-manga/types";
 import { useApiClient } from "../api/context";
 import { useToast } from "./Toast";
 import {

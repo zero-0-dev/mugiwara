@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import {
   ArrowDown,
   ArrowUp,
-  Circle,
   Plus,
   RefreshCw,
   Search,

@@ -296,7 +296,7 @@ export function DiscoverDetail({
         <AddMangaModal
           onClose={() => setShowAddModal(false)}
           onSuccess={handleAddMangaSuccess}
-          onViewManga={(mangaId) => setShowAddModal(false)}
+          onViewManga={() => setShowAddModal(false)}
           initialSourceId={addModalSource}
           initialSearchResult={addModalResult}
         />

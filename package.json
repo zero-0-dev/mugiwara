@@ -6,9 +6,11 @@
   "scripts": {
     "build": "turbo build",
     "dev": "turbo dev --filter=!@mugiwara-manga/mobile",
-    "lint": "turbo lint",
+    "lint": "turbo lint && eslint scripts eslint.config.mjs .pnpmfile.cjs",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
+    "test": "turbo test",
     "typecheck": "turbo typecheck",
+    "verify": "pnpm typecheck && pnpm lint && pnpm test && pnpm build",
     "screens": "node scripts/capture-ui-screens.mjs",
     "clean": "turbo clean && rm -rf node_modules",
     "build:app:android": "node scripts/build.mjs app:android",
@@ -22,12 +24,17 @@
     "build:server:deploy": "turbo build --filter=@mugiwara-manga/server --filter=@mugiwara-manga/web && rm -rf apps/server/deploy && pnpm --filter=@mugiwara-manga/server deploy --legacy apps/server/deploy && cp -R apps/web/dist apps/server/deploy/web"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.64.1",
+    "eslint": "^10.14.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^15.15.0",
     "prettier": "^3.1.1",
     "turbo": "^1.11.2",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "typescript-eslint": "^8.72.1"
   },
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=20.19.0"
   }
 }

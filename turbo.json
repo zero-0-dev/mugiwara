@@ -17,6 +17,9 @@
     "typecheck": {
       "cache": false
     },
+    "test": {
+      "cache": false
+    },
     "clean": {
       "cache": false
     }

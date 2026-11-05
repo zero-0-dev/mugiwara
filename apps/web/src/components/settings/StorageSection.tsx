@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { HardDrive, Plus, RefreshCw, X } from "lucide-react";
+import { HardDrive, Plus, RefreshCw } from "lucide-react";
 import { useToast } from "../Toast";
 import {
   useStorageBackends,

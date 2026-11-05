@@ -12,6 +12,9 @@ coverage
 *.tsbuildinfo
 .agents
 
+# UI evidence is attached to pull request comments, never committed.
+screenshots/
+
 data
 apps/server/deploy
 apps/desktop/release

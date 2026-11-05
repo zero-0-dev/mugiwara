@@ -4,7 +4,6 @@ import { anilistService } from "../services/anilist";
 import axios from "axios";
 import { join } from "path";
 import { writeFile, mkdir } from "fs/promises";
-import { existsSync } from "fs";
 
 const router: Router = Router({ mergeParams: true });
 const DATA_DIR = process.env.DATA_DIR || join(process.cwd(), "data");

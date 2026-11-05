@@ -1,6 +1,5 @@
 import { app, BrowserWindow, ipcMain, dialog, shell } from "electron";
 import path from "path";
-import { randomBytes } from "crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { ServerManager } from "./server-manager";
 
