@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import { StorageManager } from "../storage";
 import { getRegisteredStorageIds } from "../plugins/registry";
 import { recordAudit } from "../services/audit";
+import { getStorageUsage } from "../services/downloads";
 
 const router: Router = Router();
 
@@ -22,6 +23,20 @@ router.get("/types", async (_req: Request, res: Response) => {
   } catch (error) {
     console.error("Error listing storage types:", error);
     res.status(500).json({ error: "Failed to list storage types" });
+  }
+});
+
+// GET /api/storage/usage - Disk usage per library manga
+router.get("/usage", async (req: Request, res: Response) => {
+  try {
+    const sort = req.query.sort === "lastRead" ? "lastRead" : "size";
+    const order = req.query.order === "asc" ? "asc" : "desc";
+
+    const usage = await getStorageUsage({ sort, order });
+    res.json(usage);
+  } catch (error) {
+    console.error("Error calculating storage usage:", error);
+    res.status(500).json({ error: "Failed to calculate storage usage" });
   }
 });
 

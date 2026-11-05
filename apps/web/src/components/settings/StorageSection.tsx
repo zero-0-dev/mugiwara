@@ -38,7 +38,11 @@ interface Backend {
   isDefault: boolean;
 }
 
-export function StorageSection() {
+export function StorageSection({
+  onOpenDiskSpace,
+}: {
+  onOpenDiskSpace?: () => void;
+}) {
   const toast = useToast();
   const { data: backends = [], isLoading: loading } = useStorageBackends();
   const { data: availableTypes = [] } = useStorageTypes();
@@ -205,6 +209,26 @@ export function StorageSection() {
           Configure where your manga files are stored.
         </p>
       </div>
+
+      {onOpenDiskSpace && (
+        <div className="mt-5 flex flex-col gap-3 rounded-xl border border-border/70 bg-background/40 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-sm font-medium">Disk space manager</p>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              See how much each downloaded manga uses, sort by size or last
+              read, and reclaim space without losing reading progress.
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onOpenDiskSpace}
+            className="shrink-0"
+          >
+            <HardDrive className="size-4" /> Manage disk space
+          </Button>
+        </div>
+      )}
 
       <div className="mt-5 space-y-3">
         {backends.map((backend) => (

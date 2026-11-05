@@ -2,6 +2,7 @@ import {
   BaseStorage,
   PluginMetadata,
   PluginConfig,
+  MangaStorageUsage,
 } from "@mugiwara-manga/plugin-api";
 import * as fs from "fs/promises";
 import { Dirent } from "fs";
@@ -172,6 +173,99 @@ class LocalStorage extends BaseStorage {
   getPageUrl(mangaId: string, chapterId: string, pageNumber: number): string {
     // Return API endpoint URL - the server will handle serving the file
     return `/api/content/manga/${encodeURIComponent(mangaId)}/chapters/${encodeURIComponent(chapterId)}/pages/${pageNumber}`;
+  }
+
+  // Disk usage from filesystem metadata. Archives count as a single file and
+  // directory chapters count as the sum of their page files, so nothing is
+  // read into memory just to measure it.
+  async getChapterSize(mangaId: string, chapterId: string): Promise<number> {
+    const usage = await this.getChapterUsage(mangaId, chapterId);
+    return usage.bytes;
+  }
+
+  async getMangaUsage(
+    mangaId: string,
+    chapterIds?: string[],
+  ): Promise<MangaStorageUsage> {
+    // A manga is a directory: <basePath>/<mangaId>. Listing its chapters folder
+    // once is enough to avoid one readdir per chapter.
+    const ids = chapterIds ?? (await this.listMangaChapters(mangaId));
+    const chapters = await Promise.all(
+      ids.map(async (chapterId) => {
+        const usage = await this.getChapterUsage(mangaId, chapterId);
+        return { chapterId, bytes: usage.bytes, exists: usage.exists };
+      }),
+    );
+
+    return {
+      mangaId,
+      totalBytes: chapters.reduce((sum, chapter) => sum + chapter.bytes, 0),
+      chapters,
+    };
+  }
+
+  private async getChapterUsage(
+    mangaId: string,
+    chapterId: string,
+  ): Promise<{ bytes: number; exists: boolean }> {
+    const chapterPath = this.getChapterPath(mangaId, chapterId);
+    let entries: Dirent[];
+
+    try {
+      entries = await fs.readdir(chapterPath, { withFileTypes: true });
+    } catch {
+      // Missing chapters are normal on an idempotent delete path.
+      return { bytes: 0, exists: false };
+    }
+
+    let bytes = 0;
+    let exists = false;
+
+    for (const entry of entries) {
+      // Temporary files from an interrupted write are not part of a chapter.
+      if (entry.name.startsWith(".") || entry.name.endsWith(".tmp")) continue;
+
+      const entryPath = path.join(chapterPath, entry.name);
+      try {
+        const stat = await fs.stat(entryPath);
+        // An archive is a single file; a directory chapter contributes every
+        // image file inside it.
+        bytes += stat.isDirectory()
+          ? await this.getDirectorySize(entryPath)
+          : stat.size;
+        exists = true;
+      } catch {
+        // A file can disappear between readdir and stat; ignore it.
+      }
+    }
+
+    return { bytes, exists };
+  }
+
+  private async getDirectorySize(directoryPath: string): Promise<number> {
+    let bytes = 0;
+    let entries: Dirent[];
+
+    try {
+      entries = await fs.readdir(directoryPath, { withFileTypes: true });
+    } catch {
+      return 0;
+    }
+
+    for (const entry of entries) {
+      if (entry.name.startsWith(".") || entry.name.endsWith(".tmp")) continue;
+      const entryPath = path.join(directoryPath, entry.name);
+      try {
+        const stat = await fs.stat(entryPath);
+        bytes += stat.isDirectory()
+          ? await this.getDirectorySize(entryPath)
+          : stat.size;
+      } catch {
+        // Ignore files that vanish mid-scan.
+      }
+    }
+
+    return bytes;
   }
 
   async deleteChapter(mangaId: string, chapterId: string): Promise<void> {
