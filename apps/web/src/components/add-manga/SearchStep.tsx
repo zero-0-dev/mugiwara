@@ -1,6 +1,8 @@
 import { Search, X } from "lucide-react";
 import type { SearchResult } from "./types";
 import { SearchResultsGrid } from "./SearchResultsGrid";
+import { Button } from "../ui/button";
+import { Input } from "../ui/input";
 
 interface SearchStepProps {
   isLocal: boolean;
@@ -15,11 +17,8 @@ interface SearchStepProps {
   onResultClick: (manga: SearchResult) => void;
   isLoadingDetails?: boolean;
   searchError?: string | null;
-  /** Electron only: whether a native folder picker exists. */
   nativeFolderPicker?: boolean;
-  /** Context-specific copy for local imports (server path vs. this machine). */
   localHint?: string;
-  /** Hide keyboard-specific hints on touch-only devices. */
   showKeyboardHints?: boolean;
   inputRef?: React.RefObject<HTMLInputElement | null>;
 }
@@ -69,61 +68,69 @@ export function SearchStep({
 
   return (
     <>
-      <div className="add-manga-search">
-        <div className="add-manga-search-row">
-          <div className="add-manga-search-input-wrapper">
-            <span className="add-manga-search-icon"><Search size={16} /></span>
-            <input
+      <div className="mt-4">
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+              <Search className="size-4" />
+            </span>
+            <Input
               ref={inputRef}
               type="text"
               value={searchQuery}
               onChange={(e) => onQueryChange(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder={placeholder}
-              className="add-manga-search-input"
+              className="pl-9 pr-9"
               aria-label={isLocal ? "Local folder path" : "Search manga"}
               autoFocus
             />
             {hasContent && (
               <button
                 type="button"
-                className="add-manga-search-clear"
+                className="absolute right-2 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
                 onClick={onClear}
                 aria-label="Clear search"
               >
-                <X size={16} />
+                <X className="size-4" />
               </button>
             )}
           </div>
           {isLocal && nativeFolderPicker ? (
-            <button type="button" className="btn btn-secondary" onClick={onBrowse}>
+            <Button type="button" variant="outline" onClick={onBrowse}>
               Browse…
-            </button>
+            </Button>
           ) : (
-            <button
+            <Button
               type="button"
-              className="btn btn-primary"
+              variant="brand"
               onClick={onSearchImmediate}
               disabled={isSearching || !hasContent}
             >
               {isSearching ? "Searching..." : isLocal ? "Find manga" : "Search"}
-            </button>
+            </Button>
           )}
         </div>
         {isLocal && !nativeFolderPicker && (
-          <button
+          <Button
             type="button"
-            className="add-manga-path-link"
+            variant="link"
+            size="sm"
+            className="mt-1 h-auto px-0"
             onClick={onBrowse}
           >
             Enter server path
-          </button>
+          </Button>
         )}
         {searchError ? (
-          <p className="add-manga-search-error" role="alert">{searchError}</p>
+          <p className="mt-2 text-xs text-destructive-text" role="alert">
+            {searchError}
+          </p>
         ) : (
           hintParts.length > 0 && (
-            <p className="add-manga-search-hint">{hintParts.join(" ")}</p>
+            <p className="mt-2 text-xs text-muted-foreground">
+              {hintParts.join(" ")}
+            </p>
           )
         )}
       </div>

@@ -1,60 +1,89 @@
-import React, { createContext, useContext, useState, useCallback, useRef } from "react";
-import { AlertCircle, Check, X } from "lucide-react";
-
-interface ToastItem {
-  id: number;
-  type: "success" | "error" | "info";
-  message: string;
-}
+import React, {
+  createContext,
+  useContext,
+  useCallback,
+  useEffect,
+  useState,
+} from "react";
+import { Toaster, toast as sonnerToast } from "sonner";
 
 interface ToastContextValue {
-  toast: (message: string, type?: ToastItem["type"]) => void;
+  toast: (message: string, type?: "success" | "error" | "info") => void;
   error: (message: string) => void;
   success: (message: string) => void;
 }
 
 const ToastContext = createContext<ToastContextValue | null>(null);
 
-let nextId = 0;
+function useDocumentTheme(): "dark" | "light" {
+  const [theme, setTheme] = useState<"dark" | "light">(() => {
+    if (typeof document === "undefined") return "dark";
+    return document.documentElement.dataset.theme === "light"
+      ? "light"
+      : "dark";
+  });
 
-export function ToastProvider({ children }: { children: React.ReactNode }) {
-  const [toasts, setToasts] = useState<ToastItem[]>([]);
-  const timers = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
-
-  const removeToast = useCallback((id: number) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
-    const timer = timers.current.get(id);
-    if (timer) {
-      clearTimeout(timer);
-      timers.current.delete(id);
-    }
+  useEffect(() => {
+    const root = document.documentElement;
+    const update = () =>
+      setTheme(root.dataset.theme === "light" ? "light" : "dark");
+    update();
+    const observer = new MutationObserver(update);
+    observer.observe(root, {
+      attributes: true,
+      attributeFilter: ["data-theme"],
+    });
+    return () => observer.disconnect();
   }, []);
 
-  const addToast = useCallback((message: string, type: ToastItem["type"] = "info") => {
-    const id = nextId++;
-    setToasts((prev) => [...prev, { id, type, message }]);
-    const timer = setTimeout(() => removeToast(id), 4000);
-    timers.current.set(id, timer);
-  }, [removeToast]);
+  return theme;
+}
 
-  const toast = useCallback((message: string, type?: ToastItem["type"]) => addToast(message, type), [addToast]);
-  const error = useCallback((message: string) => addToast(message, "error"), [addToast]);
-  const success = useCallback((message: string) => addToast(message, "success"), [addToast]);
+export function ToastProvider({ children }: { children: React.ReactNode }) {
+  const theme = useDocumentTheme();
+
+  const addToast = useCallback(
+    (message: string, type: "success" | "error" | "info" = "info") => {
+      if (type === "success") sonnerToast.success(message);
+      else if (type === "error") sonnerToast.error(message);
+      else sonnerToast(message);
+    },
+    [],
+  );
+
+  const toast = useCallback(
+    (message: string, type?: "success" | "error" | "info") =>
+      addToast(message, type),
+    [addToast],
+  );
+  const error = useCallback(
+    (message: string) => addToast(message, "error"),
+    [addToast],
+  );
+  const success = useCallback(
+    (message: string) => addToast(message, "success"),
+    [addToast],
+  );
 
   return (
     <ToastContext.Provider value={{ toast, error, success }}>
       {children}
-      <div className="toast-container" role="status" aria-live="polite">
-        {toasts.map((t) => (
-          <div key={t.id} className={`toast toast-${t.type}`} role={t.type === "error" ? "alert" : "status"}>
-            <span className="toast-icon">
-              {t.type === "success" ? <Check size={16} /> : t.type === "error" ? <AlertCircle size={16} /> : null}
-            </span>
-            <span className="toast-message">{t.message}</span>
-            <button className="toast-close" onClick={() => removeToast(t.id)}><X size={14} /></button>
-          </div>
-        ))}
-      </div>
+      <Toaster
+        theme={theme}
+        position="bottom-right"
+        closeButton
+        richColors
+        offset={{ bottom: 24, right: 24 }}
+        toastOptions={{
+          classNames: {
+            toast:
+              "!rounded-xl !border !border-border !bg-popover !text-popover-foreground !shadow-2xl",
+            description: "!text-muted-foreground",
+            actionButton: "!bg-primary !text-primary-foreground",
+            cancelButton: "!bg-secondary !text-secondary-foreground",
+          },
+        }}
+      />
     </ToastContext.Provider>
   );
 }

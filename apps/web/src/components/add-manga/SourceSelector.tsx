@@ -1,4 +1,5 @@
 import type { Source } from "./types";
+import { cn } from "@/lib/utils";
 
 interface SourceSelectorProps {
   sources: Source[];
@@ -7,23 +8,20 @@ interface SourceSelectorProps {
   isLoading: boolean;
 }
 
-export function SourceSelector({ sources, selectedSource, onSelect, isLoading }: SourceSelectorProps) {
+export function SourceSelector({
+  sources,
+  selectedSource,
+  onSelect,
+  isLoading,
+}: SourceSelectorProps) {
   if (isLoading) {
     return null;
   }
 
   if (sources.length === 0) {
     return (
-      <div className="add-manga-empty">
+      <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
         <p>No manga sources installed.</p>
-        <button
-          className="btn btn-secondary"
-          onClick={() => {
-            // Navigate to settings is handled externally; for now just a visual hint
-          }}
-        >
-          Install more...
-        </button>
       </div>
     );
   }
@@ -31,12 +29,17 @@ export function SourceSelector({ sources, selectedSource, onSelect, isLoading }:
   const activeSource = sources.find((s) => s.id === selectedSource);
 
   return (
-    <div className="source-selector">
-      <div className="source-tabs">
+    <div>
+      <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
         {sources.map((source) => (
           <button
             key={source.id}
-            className={`source-tab${selectedSource === source.id ? " active" : ""}`}
+            className={cn(
+              "shrink-0 rounded-full border px-3.5 py-1.5 text-[13px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+              selectedSource === source.id
+                ? "border-transparent bg-primary text-primary-foreground"
+                : "border-border/70 bg-card text-muted-foreground hover:bg-accent hover:text-foreground",
+            )}
             onClick={() => onSelect(source.id)}
           >
             {source.name}
@@ -44,7 +47,9 @@ export function SourceSelector({ sources, selectedSource, onSelect, isLoading }:
         ))}
       </div>
       {activeSource?.description && (
-        <p className="source-description">{activeSource.description}</p>
+        <p className="mt-2 text-xs text-muted-foreground">
+          {activeSource.description}
+        </p>
       )}
     </div>
   );

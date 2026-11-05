@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { BookOpen, Compass, Settings } from "lucide-react";
+import { BookOpen, Compass, Settings, Server } from "lucide-react";
 import { Capacitor, SystemBars, SystemBarsStyle } from "@capacitor/core";
 import { Library } from "./components/Library";
 import { MangaDetail } from "./components/MangaDetail";
@@ -13,6 +13,8 @@ import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useSettings } from "./api/hooks";
 import { ApiClientProvider } from "./api/context";
 import { ToastProvider } from "./components/Toast";
+import { Button } from "./components/ui/button";
+import { cn } from "./lib/utils";
 import {
   clearStoredAuthToken,
   getStoredServerUrl,
@@ -30,7 +32,7 @@ function applyThemeChrome(theme: string) {
   document.documentElement.dataset.theme = theme;
 
   const themeColor = document.querySelector('meta[name="theme-color"]');
-  themeColor?.setAttribute("content", isDark ? "#1a1a1a" : "#f0ece8");
+  themeColor?.setAttribute("content", isDark ? "#171717" : "#f4f1ed");
 
   try {
     window.localStorage.setItem(THEME_STORAGE_KEY, theme);
@@ -66,6 +68,52 @@ type View =
   | "settings"
   | "discover"
   | "discover-detail";
+
+function BrandMark({ className }: { className?: string }) {
+  return (
+    <span
+      className={cn(
+        "flex size-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-400 to-indigo-600 text-white shadow-sm shadow-indigo-950/40",
+        className,
+      )}
+      aria-hidden="true"
+    >
+      <BookOpen className="size-4" strokeWidth={2.4} />
+    </span>
+  );
+}
+
+function NavButton({
+  active,
+  onClick,
+  icon,
+  children,
+  className,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      aria-label={typeof children === "string" ? children : undefined}
+      aria-current={active ? "page" : undefined}
+      className={cn(
+        "inline-flex h-9 items-center gap-2 rounded-lg px-3 text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+        active
+          ? "bg-primary/15 text-brand-text"
+          : "text-muted-foreground hover:bg-accent hover:text-foreground",
+        className,
+      )}
+    >
+      {icon}
+      <span>{children}</span>
+    </button>
+  );
+}
 
 function App() {
   const [apiBaseUrl, setApiBaseUrl] = useState<string>("");
@@ -216,18 +264,29 @@ function App() {
 
   if (loading) {
     return (
-      <div className="loading-container">
-        <div className="loading-spinner"></div>
-        <p>Starting Mugiwara...</p>
+      <div className="flex h-dvh flex-col items-center justify-center gap-4 bg-background text-foreground">
+        <BrandMark className="size-12 rounded-2xl" />
+        <div className="loading-spinner" />
+        <p className="text-sm text-muted-foreground">Starting Mugiwara...</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="error-container">
-        <h1>Error</h1>
-        <p>{error}</p>
+      <div className="flex h-dvh items-center justify-center bg-background p-6">
+        <div className="w-full max-w-sm rounded-2xl border border-destructive/30 bg-card p-6 text-center shadow-xl">
+          <h1 className="text-lg font-semibold text-destructive-text">
+            Could not start
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground">{error}</p>
+          <Button
+            className="mt-5 w-full"
+            onClick={() => window.location.reload()}
+          >
+            Try again
+          </Button>
+        </div>
       </div>
     );
   }
@@ -307,6 +366,12 @@ function App() {
     }
   };
 
+  const isReader = currentView === "reader";
+  const isLibrarySection =
+    currentView === "library" || currentView === "manga-detail";
+  const isDiscoverSection =
+    currentView === "discover" || currentView === "discover-detail";
+
   return (
     <ApiClientProvider
       baseUrl={apiBaseUrl}
@@ -315,59 +380,119 @@ function App() {
     >
       <ThemeApplier />
       <ToastProvider>
-        <div
-          className={`app${currentView === "reader" ? " app-reader" : ""}${readerImmersive ? " reader-immersive" : ""}`}
-        >
-          {currentView !== "reader" && (
-            <header className="app-header">
-              <h1 onClick={handleBackToLibrary} style={{ cursor: "pointer" }}>
-                Mugiwara
-              </h1>
-              <div className="header-actions">
+        <div className="flex h-dvh min-h-0 flex-col bg-background text-foreground">
+          {!isReader && (
+            <header className="electron-drag z-40 shrink-0 border-b border-border/70 bg-background/85 pt-[env(safe-area-inset-top)] backdrop-blur-xl">
+              <div className="mx-auto flex h-14 w-full max-w-7xl items-center gap-3 px-4 pl-[max(1rem,var(--titlebar-inset-left),env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]">
                 <button
                   onClick={handleBackToLibrary}
-                  className={`nav-btn ${currentView === "library" || currentView === "manga-detail" ? "active" : ""}`}
-                  aria-label="Library"
-                  aria-current={currentView === "library" || currentView === "manga-detail" ? "page" : undefined}
+                  className="electron-no-drag flex items-center gap-2.5 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  aria-label="Mugiwara home"
                 >
-                  <BookOpen size={16} />
+                  <BrandMark />
+                  <span className="text-base font-semibold tracking-tight">
+                    Mugiwara
+                  </span>
+                </button>
+
+                <nav className="electron-no-drag ml-2 hidden items-center gap-1 sm:flex">
+                  <NavButton
+                    active={isLibrarySection}
+                    onClick={handleBackToLibrary}
+                    icon={<BookOpen className="size-4" />}
+                  >
+                    Library
+                  </NavButton>
+                  <NavButton
+                    active={isDiscoverSection}
+                    onClick={handleOpenDiscover}
+                    icon={<Compass className="size-4" />}
+                  >
+                    Discover
+                  </NavButton>
+                </nav>
+
+                <div className="electron-no-drag ml-auto flex items-center gap-2">
+                  <span className="hidden items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-medium text-success-text md:inline-flex">
+                    <span className="size-1.5 rounded-full bg-emerald-400" />
+                    {serverLabel || "local"}
+                  </span>
+                  <Button
+                    variant={currentView === "settings" ? "secondary" : "ghost"}
+                    size="icon"
+                    onClick={handleOpenSettings}
+                    title="Settings"
+                    aria-label="Settings"
+                    aria-current={
+                      currentView === "settings" ? "page" : undefined
+                    }
+                  >
+                    <Settings className="size-5" />
+                  </Button>
+                </div>
+              </div>
+            </header>
+          )}
+
+          <main
+            className={cn(
+              "min-h-0 flex-1",
+              isReader ? "overflow-hidden" : "overflow-y-auto scrollbar-thin",
+              !isReader &&
+                "pb-[calc(4.5rem+env(safe-area-inset-bottom))] sm:pb-0",
+            )}
+          >
+            {renderContent()}
+          </main>
+
+          {!isReader && (
+            <nav
+              aria-label="Primary"
+              className="safe-bottom fixed inset-x-0 bottom-0 z-40 border-t border-border/70 bg-background/90 pt-1.5 backdrop-blur-xl sm:hidden"
+            >
+              <div className="mx-auto grid max-w-md grid-cols-3">
+                <button
+                  onClick={handleBackToLibrary}
+                  aria-current={isLibrarySection ? "page" : undefined}
+                  className={cn(
+                    "flex flex-col items-center gap-1 rounded-lg py-1.5 text-[11px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+                    isLibrarySection
+                      ? "text-brand-text"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  <BookOpen className="size-5" />
                   Library
                 </button>
                 <button
                   onClick={handleOpenDiscover}
-                  className={`nav-btn ${currentView === "discover" || currentView === "discover-detail" ? "active" : ""}`}
-                  aria-label="Discover"
-                  aria-current={currentView === "discover" || currentView === "discover-detail" ? "page" : undefined}
+                  aria-current={isDiscoverSection ? "page" : undefined}
+                  className={cn(
+                    "flex flex-col items-center gap-1 rounded-lg py-1.5 text-[11px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+                    isDiscoverSection
+                      ? "text-brand-text"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
                 >
-                  <Compass size={16} />
+                  <Compass className="size-5" />
                   Discover
                 </button>
                 <button
                   onClick={handleOpenSettings}
-                  className={`btn btn-icon ${currentView === "settings" ? "active" : ""}`}
-                  title="Settings"
-                  aria-label="Settings"
                   aria-current={currentView === "settings" ? "page" : undefined}
+                  className={cn(
+                    "flex flex-col items-center gap-1 rounded-lg py-1.5 text-[11px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+                    currentView === "settings"
+                      ? "text-brand-text"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
                 >
-                  <Settings size={20} />
+                  <Settings className="size-5" />
+                  Settings
                 </button>
-                {canChangeServer ? (
-                  <button
-                    className="server-status"
-                    title="Change server"
-                    onClick={() => setShowServerSetup(true)}
-                  >
-                    Server: {serverLabel || "not set"}
-                  </button>
-                ) : (
-                  <span className="server-status">
-                    Server: {serverLabel || "local"}
-                  </span>
-                )}
               </div>
-            </header>
+            </nav>
           )}
-          <main className="app-main">{renderContent()}</main>
         </div>
       </ToastProvider>
     </ApiClientProvider>

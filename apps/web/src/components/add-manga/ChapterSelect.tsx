@@ -4,6 +4,7 @@ import type { MangaDetails } from "./types";
 import { ChapterItem } from "./ChapterItem";
 import { useKeyboardShortcuts } from "../../hooks/useKeyboardShortcuts";
 import { Select } from "../Select";
+import { Button } from "../ui/button";
 
 interface ChapterSelectProps {
   mangaDetails: MangaDetails | null;
@@ -48,7 +49,9 @@ export function ChapterSelect({
       ctrl: true,
       action: () => {
         if (mangaDetails) {
-          const allChapterIds = new Set(mangaDetails.chapters.map((ch) => ch.chapterId));
+          const allChapterIds = new Set(
+            mangaDetails.chapters.map((ch) => ch.chapterId),
+          );
           const deselected = new Set(selectedChapters);
           for (const id of allChapterIds) {
             deselected.delete(id);
@@ -82,13 +85,14 @@ export function ChapterSelect({
     chapters.sort((a, b) =>
       sortOrder === "asc"
         ? a.sortOrder - b.sortOrder
-        : b.sortOrder - a.sortOrder
+        : b.sortOrder - a.sortOrder,
     );
     return chapters;
   }, [mangaDetails.chapters, languageFilter, sortOrder]);
 
   const visibleSelectedCount = useMemo(
-    () => visibleChapters.filter((ch) => selectedChapters.has(ch.chapterId)).length,
+    () =>
+      visibleChapters.filter((ch) => selectedChapters.has(ch.chapterId)).length,
     [visibleChapters, selectedChapters],
   );
 
@@ -122,7 +126,7 @@ export function ChapterSelect({
 
   function handleSelectLatest(n: number) {
     const sorted = [...details.chapters].sort(
-      (a, b) => b.sortOrder - a.sortOrder
+      (a, b) => b.sortOrder - a.sortOrder,
     );
     const ids = sorted.slice(0, n).map((ch) => ch.chapterId);
     onSelectionChange(new Set(ids));
@@ -130,48 +134,62 @@ export function ChapterSelect({
 
   function handleSelectFirst(n: number) {
     const sorted = [...details.chapters].sort(
-      (a, b) => a.sortOrder - b.sortOrder
+      (a, b) => a.sortOrder - b.sortOrder,
     );
     const ids = sorted.slice(0, n).map((ch) => ch.chapterId);
     onSelectionChange(new Set(ids));
   }
 
   return (
-    <div className="add-manga-chapters-container">
-      <div className="add-manga-chapter-controls">
-        <label className="add-manga-chapter-select-all">
+    <div className="mt-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="flex items-center gap-2 text-sm">
           <input
             ref={selectAllRef}
             type="checkbox"
             checked={allVisibleSelected && visibleChapters.length > 0}
             onChange={handleSelectAllChange}
+            className="size-4 accent-indigo-500"
           />
-          {" "}Select All
+          Select All
         </label>
 
         <Select
           value={languageFilter ?? ""}
           onChange={(v) => setLanguageFilter(v || null)}
+          aria-label="Filter by language"
+          className="w-36"
           options={[
             { value: "", label: "All Languages" },
-            ...languages.map((lang) => ({ value: lang, label: lang.toUpperCase() })),
+            ...languages.map((lang) => ({
+              value: lang,
+              label: lang.toUpperCase(),
+            })),
           ]}
         />
 
-        <button
-          className="add-manga-chapter-sort"
+        <Button
+          variant="outline"
+          size="sm"
           onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
           title={sortOrder === "asc" ? "Ascending" : "Descending"}
         >
-          Chapter # {sortOrder === "asc" ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-        </button>
+          Chapter #{" "}
+          {sortOrder === "asc" ? (
+            <ChevronUp className="size-3.5" />
+          ) : (
+            <ChevronDown className="size-3.5" />
+          )}
+        </Button>
 
         <Select
           value=""
           onChange={(v) => {
             switch (v) {
               case "select-all":
-                onSelectionChange(new Set(visibleChapters.map((ch) => ch.chapterId)));
+                onSelectionChange(
+                  new Set(visibleChapters.map((ch) => ch.chapterId)),
+                );
                 break;
               case "deselect-all":
                 onSelectionChange(new Set());
@@ -188,6 +206,8 @@ export function ChapterSelect({
             }
           }}
           placeholder="Quick Select..."
+          aria-label="Quick select chapters"
+          className="w-36"
           options={[
             { value: "select-all", label: "Select All" },
             { value: "deselect-all", label: "Deselect All" },
@@ -198,7 +218,7 @@ export function ChapterSelect({
         />
       </div>
 
-      <div className="add-manga-chapters">
+      <div className="mt-3 max-h-[42dvh] space-y-1.5 overflow-y-auto rounded-xl border border-border/60 bg-background/30 p-2 scrollbar-thin">
         {visibleChapters.map((chapter) => (
           <ChapterItem
             key={chapter.chapterId}
@@ -208,23 +228,26 @@ export function ChapterSelect({
           />
         ))}
         {visibleChapters.length === 0 && (
-          <div className="add-manga-chapters-empty">
+          <div className="p-6 text-center text-sm text-muted-foreground">
             No chapters match the current filter.
           </div>
         )}
       </div>
 
-      <div className="add-manga-chapter-footer">
-        <span className="add-manga-chapter-footer-count">
+      <div className="mt-3 flex flex-col gap-2 border-t border-border/70 pt-3 sm:flex-row sm:items-center sm:justify-between">
+        <span className="text-sm text-muted-foreground">
           Selected: {selectedChapters.size} / {mangaDetails.chapters.length}
         </span>
-        <button
-          className="btn btn-primary"
+        <Button
+          variant="brand"
           onClick={onImport}
           disabled={selectedChapters.size === 0}
         >
-          Import {selectedChapters.size > 0 ? `${selectedChapters.size} Chapters` : "Chapters"}
-        </button>
+          Import{" "}
+          {selectedChapters.size > 0
+            ? `${selectedChapters.size} Chapters`
+            : "Chapters"}
+        </Button>
       </div>
     </div>
   );
