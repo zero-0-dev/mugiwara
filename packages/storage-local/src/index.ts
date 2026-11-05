@@ -270,11 +270,11 @@ class LocalStorage extends BaseStorage {
 
   async deleteChapter(mangaId: string, chapterId: string): Promise<void> {
     const chapterPath = this.getChapterPath(mangaId, chapterId);
-    try {
-      await fs.rm(chapterPath, { recursive: true, force: true });
-    } catch {
-      // Ignore if doesn't exist
-    }
+    // `force: true` keeps deletion idempotent when the chapter is already
+    // gone, but real filesystem failures (permissions, I/O, a corrupt layout)
+    // must propagate. The disk-space manager relies on the rejection to keep
+    // the chapter marked as downloaded instead of claiming files were freed.
+    await fs.rm(chapterPath, { recursive: true, force: true });
   }
 
   async deleteManga(mangaId: string): Promise<void> {

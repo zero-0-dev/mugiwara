@@ -107,7 +107,43 @@ async function capture(viewport, label, dark) {
   ]) {
     await page.getByRole("tab", { name: tab, exact: true }).click();
     await save(page, `${label}-settings-${name}-${suffix}`);
+
+    if (tab === "Storage") {
+      // Disk space manager: reached from Settings -> Storage.
+      await page.getByRole("button", { name: /Manage disk space/i }).click();
+      await page
+        .getByRole("heading", { name: "Disk Space", exact: true })
+        .waitFor();
+      await save(page, `${label}-disk-space-${suffix}`);
+
+      // Destructive actions always require confirmation; capture that state
+      // without deleting any data.
+      const deleteButton = page
+        .getByRole("button", { name: /Delete all downloads/i })
+        .first();
+      if (
+        (await deleteButton.count()) > 0 &&
+        (await deleteButton.isEnabled())
+      ) {
+        await deleteButton.click();
+        await page.getByRole("dialog").waitFor();
+        await save(page, `${label}-disk-space-confirm-${suffix}`);
+        await page
+          .getByRole("button", { name: "Cancel", exact: true })
+          .click();
+        await page.getByRole("dialog").waitFor({ state: "hidden" });
+      }
+
+      await page
+        .getByRole("button", { name: "Back", exact: true })
+        .first()
+        .click();
+      await page
+        .getByRole("heading", { name: "Reading Preferences", exact: true })
+        .waitFor();
+    }
   }
+
   await page.getByRole("button", { name: "Back", exact: true }).first().click();
 
   await page

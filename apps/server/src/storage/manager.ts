@@ -10,6 +10,24 @@ export interface StorageBackendRecord {
   isDefault: boolean;
 }
 
+// SQLite returns the JSON column as text. Newly created backends pass the
+// object straight through, so accept both shapes.
+function normalizeStorageConfig(config: unknown): Record<string, any> {
+  if (typeof config !== "string") {
+    return config && typeof config === "object"
+      ? (config as Record<string, any>)
+      : {};
+  }
+
+  try {
+    const parsed = JSON.parse(config);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    console.error("Storage backend has an invalid JSON configuration");
+    return {};
+  }
+}
+
 export class StorageManager {
   private backends: Map<string, StorageBackend> = new Map();
   private defaultBackendId: string | null = null;
@@ -38,20 +56,25 @@ export class StorageManager {
     this.backends.clear();
   }
 
-  private async loadBackend(config: StorageBackendRecord): Promise<void> {
-    const factory = getStorageFactory(config.type);
+  private async loadBackend(record: StorageBackendRecord): Promise<void> {
+    const factory = getStorageFactory(record.type);
     if (!factory) {
-      console.error(`Unknown storage backend type: ${config.type}`);
+      console.error(`Unknown storage backend type: ${record.type}`);
       return;
     }
 
-    const backend = factory({ config: config.config });
-    await backend.initialize(config.config);
+    // `config` is stored as JSON text in SQLite, so rows loaded from the
+    // database arrive as a string while freshly created backends arrive as an
+    // object. Normalize before handing it to the plugin, otherwise a restart
+    // silently drops settings such as the local storage `basePath`.
+    const config = normalizeStorageConfig(record.config);
+    const backend = factory({ config });
+    await backend.initialize(config);
 
-    this.backends.set(config.id, backend);
+    this.backends.set(record.id, backend);
 
-    if (config.isDefault) {
-      this.defaultBackendId = config.id;
+    if (record.isDefault) {
+      this.defaultBackendId = record.id;
     }
   }
 
