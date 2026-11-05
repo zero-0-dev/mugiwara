@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ArrowDown,
   ArrowUp,
@@ -65,6 +65,17 @@ export function Library({ onMangaSelect }: LibraryProps) {
   const { data: manga = [], isLoading } = useLibrary(queryFilters);
   const { data: filterOptions } = useFilterOptions();
   const deleteManga = useDeleteManga();
+
+  // A deleted category must not keep filtering the library invisibly.
+  useEffect(() => {
+    if (!filters.category || !filterOptions?.categories) return;
+    const stillExists = filterOptions.categories.some(
+      (category) => category.id === filters.category,
+    );
+    if (!stillExists) {
+      setFilters((current) => ({ ...current, category: "" }));
+    }
+  }, [filterOptions?.categories, filters.category]);
   const checkLibraryUpdates = useCheckLibraryUpdates();
 
   const handleCheckUpdates = () => {

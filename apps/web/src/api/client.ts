@@ -1,5 +1,19 @@
-import type { LibraryFilterOptions, LibraryManga } from "@mugiwara-manga/types";
+import type {
+  Category,
+  LibraryFilterOptions,
+  LibraryManga,
+} from "@mugiwara-manga/types";
 import { getDeviceId } from "./device";
+
+export interface CategoryWithCount extends Category {
+  mangaCount: number;
+}
+
+export interface CategoryInput {
+  name?: string;
+  color?: string | null;
+  sortOrder?: number;
+}
 
 export interface Source {
   id: string;
@@ -547,27 +561,29 @@ export class ApiClient {
   }
 
   // Categories
-  getCategories(): Promise<
-    Array<{
-      id: string;
-      name: string;
-      color?: string;
-      sortOrder: number;
-      createdAt: string;
-    }>
-  > {
+  getCategories(): Promise<CategoryWithCount[]> {
     return this.request("/api/categories");
   }
 
-  getMangaCategories(mangaId: string): Promise<
-    Array<{
-      id: string;
-      name: string;
-      color?: string;
-      sortOrder: number;
-      createdAt: string;
-    }>
-  > {
+  createCategory(body: CategoryInput): Promise<Category> {
+    return this.request("/api/categories", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  }
+
+  updateCategory(id: string, body: CategoryInput): Promise<Category> {
+    return this.request(`/api/categories/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    });
+  }
+
+  deleteCategory(id: string): Promise<void> {
+    return this.request(`/api/categories/${id}`, { method: "DELETE" });
+  }
+
+  getMangaCategories(mangaId: string): Promise<Category[]> {
     return this.request(`/api/categories/manga/${mangaId}/categories`);
   }
 

@@ -13,12 +13,10 @@ import {
   Loader,
   Pencil,
   Play,
-  Plus,
   RefreshCw,
   Search,
   Sparkles,
   Trash2,
-  X,
 } from "lucide-react";
 import { Chapter, ReadingProgress } from "@mugiwara-manga/types";
 import { useApiClient } from "../api/context";
@@ -27,8 +25,6 @@ import {
   useManga,
   useChapters,
   useAllChapterProgress,
-  useCategories,
-  useMangaCategories,
   useMarkChapterComplete,
   useMarkChapterIncomplete,
   useDownloadChapter,
@@ -36,13 +32,12 @@ import {
   useUpdateMangaTitle,
   useFetchMetadata,
   useApplyMetadata,
-  useAddMangaToCategory,
-  useRemoveMangaFromCategory,
   useCheckMangaUpdates,
   useDownloadAllChapters,
   useDownloadQueueSync,
   useSources,
 } from "../api/hooks";
+import { CategoryPicker } from "./CategoryPicker";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Input } from "./ui/input";
@@ -53,7 +48,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
@@ -99,8 +93,6 @@ export function MangaDetail({
   const { data: manga, isLoading, error: fetchError } = useManga(mangaId);
   const { data: chapters = [] } = useChapters(mangaId);
   const { data: allProgress = [] } = useAllChapterProgress(mangaId);
-  const { data: categories = [] } = useCategories();
-  const { data: mangaCategories = [] } = useMangaCategories(mangaId);
   const { data: sources = [] } = useSources();
   const sourceInfo = manga
     ? sources.find((s) => s.id === manga.sourceId)
@@ -115,8 +107,6 @@ export function MangaDetail({
   const updateTitle = useUpdateMangaTitle(mangaId);
   const fetchMetadata = useFetchMetadata(mangaId);
   const applyMetadata = useApplyMetadata(mangaId);
-  const addToCategory = useAddMangaToCategory(mangaId);
-  const removeFromCategory = useRemoveMangaFromCategory(mangaId);
   const checkUpdates = useCheckMangaUpdates(mangaId);
   const downloadAll = useDownloadAllChapters(mangaId);
 
@@ -308,18 +298,6 @@ export function MangaDetail({
         setChapterToDelete(null);
         toast.success(`Deleted download for ${chapterLabel(target)}.`);
       },
-      onError: (err) => toast.error(err.message),
-    });
-  };
-
-  const handleAddToCategory = (categoryId: string) => {
-    addToCategory.mutate(categoryId, {
-      onError: (err) => toast.error(err.message),
-    });
-  };
-
-  const handleRemoveFromCategory = (categoryId: string) => {
-    removeFromCategory.mutate(categoryId, {
       onError: (err) => toast.error(err.message),
     });
   };
@@ -581,71 +559,7 @@ export function MangaDetail({
             </div>
           )}
 
-          <div className="no-scrollbar mt-3 flex flex-nowrap items-center gap-2 overflow-x-auto pb-0.5 sm:mt-4 sm:flex-wrap sm:overflow-visible">
-            <span className="shrink-0 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Categories
-            </span>
-            {mangaCategories.map((category) => (
-              <span
-                key={category.id}
-                className="inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium"
-                style={{
-                  backgroundColor: category.color
-                    ? `${category.color}22`
-                    : "var(--brand-soft)",
-                  borderColor: category.color || "var(--brand)",
-                  color: category.color || "var(--brand)",
-                }}
-              >
-                {category.name}
-                <button
-                  onClick={() => handleRemoveFromCategory(category.id)}
-                  className="rounded-full p-0.5 outline-none transition hover:bg-black/20 focus-visible:ring-2 focus-visible:ring-ring"
-                  title="Remove from category"
-                  aria-label={`Remove from ${category.name}`}
-                >
-                  <X className="size-3" />
-                </button>
-              </span>
-            ))}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="h-7 shrink-0 px-2">
-                  <Plus className="size-3.5" /> Add
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
-                <DropdownMenuLabel>Add to category</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {categories.filter(
-                  (cat) => !mangaCategories.some((mc) => mc.id === cat.id),
-                ).length === 0 ? (
-                  <DropdownMenuItem disabled>
-                    No more categories
-                  </DropdownMenuItem>
-                ) : (
-                  categories
-                    .filter(
-                      (cat) => !mangaCategories.some((mc) => mc.id === cat.id),
-                    )
-                    .map((category) => (
-                      <DropdownMenuItem
-                        key={category.id}
-                        onClick={() => handleAddToCategory(category.id)}
-                      >
-                        <span
-                          className="size-2.5 rounded-full"
-                          style={{
-                            backgroundColor: category.color || "#6366f1",
-                          }}
-                        />
-                        {category.name}
-                      </DropdownMenuItem>
-                    ))
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+          <CategoryPicker mangaId={mangaId} />
 
           {manga.description && (
             <div className="mt-3 sm:mt-4">
