@@ -18,6 +18,7 @@
     "build:android:release": "pnpm build:web && cap sync android && cd android && ./gradlew assembleRelease"
   },
   "dependencies": {
+    "@capacitor/app": "^8.1.2",
     "@capacitor/core": "^8.0.0",
     "@capacitor/haptics": "^8.0.2"
   },

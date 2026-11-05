@@ -56,7 +56,7 @@ import { cn } from "@/lib/utils";
 interface MangaDetailProps {
   mangaId: string;
   onBack: () => void;
-  onReadChapter: (chapterId: string, chaptersList?: Chapter[]) => void;
+  onReadChapter: (chapterId: string) => void;
 }
 
 interface ChapterWithProgress extends Chapter {
@@ -183,8 +183,8 @@ export function MangaDetail({
 
   const handleContinueReading = () => {
     const firstIncomplete = enrichedChapters.find((c) => !c.isRead);
-    if (firstIncomplete) onReadChapter(firstIncomplete.id, chapters);
-    else if (chapters[0]) onReadChapter(chapters[0].id, chapters);
+    if (firstIncomplete) onReadChapter(firstIncomplete.id);
+    else if (chapters[0]) onReadChapter(chapters[0].id);
   };
 
   const getContinueReadingText = () => {
@@ -653,7 +653,7 @@ export function MangaDetail({
                   index > 0 && "border-t border-border/60",
                   chapter.isCurrent && "bg-indigo-500/5",
                 )}
-                onClick={() => onReadChapter(chapter.id, chapters)}
+                onClick={() => onReadChapter(chapter.id)}
                 role="button"
                 tabIndex={0}
                 aria-label={`Read ${chapterLabel(chapter)}`}
@@ -661,7 +661,7 @@ export function MangaDetail({
                   if (e.target !== e.currentTarget) return;
                   if (e.key === "Enter" || e.key === " ") {
                     e.preventDefault();
-                    onReadChapter(chapter.id, chapters);
+                    onReadChapter(chapter.id);
                   }
                 }}
               >

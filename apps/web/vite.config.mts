@@ -5,16 +5,17 @@ import path from "path";
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  // Relative base keeps the build working when it is served by the local
-  // server (same origin), loaded by Electron, or bundled by Capacitor.
-  base: "./",
+  // Absolute base so deep links such as /manga/:id load /assets/* from the
+  // server root. Browser history routing needs that; Electron loads the same
+  // server origin and Capacitor serves the bundle at http://localhost.
+  base: "/",
   build: {
     outDir: "dist",
     emptyOutDir: true,
     // The app deliberately ships as one vendor bundle for the Electron and
-    // Capacitor shells (no network waterfall on first load). Radix adds
-    // roughly 200 kB raw / 60 kB gzip over the previous hand-rolled UI.
-    chunkSizeWarningLimit: 700,
+    // Capacitor shells (no network waterfall on first load). Radix plus React
+    // Router and the Capacitor bridge add roughly 220 kB gzip.
+    chunkSizeWarningLimit: 800,
   },
   server: {
     port: 5173,

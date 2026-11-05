@@ -1,6 +1,25 @@
 import { afterEach, vi } from "vitest";
 import { cleanup } from "@testing-library/react";
 
+// React Router's data router builds a Request for every navigation. In jsdom
+// the global AbortSignal comes from jsdom while Request comes from Node's
+// undici, and undici rejects it as "not an instance of AbortSignal". The signal
+// is irrelevant to these client-side route smoke tests, so drop it.
+const NativeRequest = globalThis.Request;
+if (NativeRequest) {
+  class JsdomSafeRequest extends NativeRequest {
+    constructor(input: RequestInfo | URL, init?: RequestInit) {
+      if (init?.signal) {
+        const { signal: _signal, ...rest } = init;
+        super(input, rest);
+      } else {
+        super(input, init);
+      }
+    }
+  }
+  globalThis.Request = JsdomSafeRequest as typeof Request;
+}
+
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();

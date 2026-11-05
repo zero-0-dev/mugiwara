@@ -6,6 +6,10 @@ import { ServerManager } from "./server-manager";
 // Keep a global reference to prevent garbage collection
 let mainWindow: BrowserWindow | null = null;
 let serverManager: ServerManager | null = null;
+let currentServerPort = 0;
+// A deep link can arrive before the window (or the embedded server) exists.
+let pendingDeepLinkPath = "";
+const DEEP_LINK_SCHEME = "mugiwara";
 
 // Development mode flag
 const isDev = process.env.NODE_ENV === "development" || !app.isPackaged;
@@ -146,6 +150,49 @@ function getAppUrl(serverPort: number): string {
   return isDev ? "http://localhost:5173" : `http://127.0.0.1:${serverPort}`;
 }
 
+/** Convert `mugiwara://manga/abc` into the router path `/manga/abc`. */
+function parseDeepLink(raw: string): string | null {
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== `${DEEP_LINK_SCHEME}:`) return null;
+    const host = url.host ? `/${url.host}` : "";
+    const pathname = url.pathname === "/" ? "" : url.pathname;
+    return `${host}${pathname}${url.search}${url.hash}` || "/";
+  } catch {
+    return null;
+  }
+}
+
+function findDeepLinkPath(argv: string[]): string | null {
+  for (const arg of argv) {
+    const path = parseDeepLink(arg);
+    if (path) return path;
+  }
+  return null;
+}
+
+function openDeepLink(path: string): void {
+  pendingDeepLinkPath = path;
+  if (!mainWindow) return;
+
+  const port = currentServerPort || serverManager?.getPort() || DEV_SERVER_PORT;
+  void mainWindow.loadURL(`${getAppUrl(port)}${path}`);
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.focus();
+}
+
+function registerDeepLinkProtocol(): void {
+  // In dev the executable is electron itself; pass the app entry so the OS
+  // launches the right project.
+  if (process.defaultApp && process.argv.length >= 2) {
+    app.setAsDefaultProtocolClient(DEEP_LINK_SCHEME, process.execPath, [
+      path.resolve(process.argv[1] ?? "."),
+    ]);
+  } else {
+    app.setAsDefaultProtocolClient(DEEP_LINK_SCHEME);
+  }
+}
+
 function getApiBase(apiPath: string): string {
   if (EXTERNAL_SERVER_URL) return `${EXTERNAL_SERVER_URL}${apiPath}`;
   const port = isDev
@@ -198,11 +245,16 @@ async function createWindow(serverPort: number) {
 
   // Store server port in window for renderer to access
   (mainWindow as any).serverPort = serverPort;
+  currentServerPort = serverPort;
 
   // Load the shared web client. In production the local server serves it,
   // which gives the renderer the same origin as the API and avoids file://
-  // security exceptions.
-  await loadAppWindow(getAppUrl(serverPort));
+  // security exceptions. A pending deep link is appended as a real route.
+  const startUrl = pendingDeepLinkPath
+    ? `${getAppUrl(serverPort)}${pendingDeepLinkPath}`
+    : getAppUrl(serverPort);
+  pendingDeepLinkPath = "";
+  await loadAppWindow(startUrl);
 
   // Handle window closed
   mainWindow.on("closed", () => {
@@ -213,6 +265,8 @@ async function createWindow(serverPort: number) {
 // Initialize application
 async function initialize() {
   try {
+    pendingDeepLinkPath =
+      pendingDeepLinkPath || findDeepLinkPath(process.argv) || "";
     if (EXTERNAL_SERVER_URL) {
       console.log(`[Main] Using external server: ${EXTERNAL_SERVER_URL}`);
       await createWindow(0);
@@ -305,7 +359,32 @@ ipcMain.handle("select-folder", async () => {
 });
 
 // App event handlers
-app.whenReady().then(initialize);
+registerDeepLinkProtocol();
+
+const hasSingleInstanceLock = app.requestSingleInstanceLock();
+if (!hasSingleInstanceLock) {
+  app.quit();
+} else {
+  app.on("second-instance", (_event, argv) => {
+    const deepLinkPath = findDeepLinkPath(argv);
+    if (deepLinkPath) {
+      openDeepLink(deepLinkPath);
+      return;
+    }
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    }
+  });
+  app.whenReady().then(initialize);
+}
+
+// macOS delivers custom-scheme links through open-url instead of argv.
+app.on("open-url", (event, url) => {
+  event.preventDefault();
+  const deepLinkPath = parseDeepLink(url);
+  if (deepLinkPath) openDeepLink(deepLinkPath);
+});
 
 app.on("window-all-closed", async () => {
   // Stop the server before quitting (only in production)
