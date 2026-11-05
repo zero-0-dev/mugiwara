@@ -556,4 +556,51 @@ describe("local storage sizes", () => {
       exists: false,
     });
   });
+
+  it("deletes archive and directory chapters and allows downloading again", async () => {
+    const storage = new LocalStorage();
+    await storage.initialize({ basePath });
+
+    const archiveDir = join(basePath, "manga", "chapters", "1");
+    await mkdir(archiveDir, { recursive: true });
+    await writeFile(join(archiveDir, "001.cbz"), Buffer.alloc(500));
+
+    const directoryDir = join(basePath, "manga", "chapters", "2");
+    await mkdir(directoryDir, { recursive: true });
+    await writeFile(join(directoryDir, "001.jpg"), Buffer.alloc(100));
+    await writeFile(join(directoryDir, "002.png"), Buffer.alloc(50));
+
+    await storage.deleteChapter("manga", "1");
+    await storage.deleteChapter("manga", "2");
+    await expect(storage.getChapterSize("manga", "1")).resolves.toBe(0);
+    await expect(storage.getChapterSize("manga", "2")).resolves.toBe(0);
+
+    // A chapter that was deleted is writable again, so the user can download
+    // it again and usage reflects the new files.
+    await storage.writeChapterPage(
+      "manga",
+      "2",
+      1,
+      Buffer.alloc(120),
+      "image/jpeg",
+    );
+    await expect(storage.getChapterSize("manga", "2")).resolves.toBe(120);
+  });
+
+  it("keeps deletion idempotent for missing chapters but propagates real failures", async () => {
+    const storage = new LocalStorage();
+    await storage.initialize({ basePath });
+
+    // Deleting an already-missing chapter succeeds...
+    await expect(
+      storage.deleteChapter("manga", "missing"),
+    ).resolves.toBeUndefined();
+
+    // ...but a broken storage layout must not be reported as a successful
+    // delete, otherwise the database would claim files were freed.
+    await writeFile(join(basePath, "not-a-directory"), Buffer.alloc(10));
+    await expect(
+      storage.deleteChapter("not-a-directory", "1"),
+    ).rejects.toMatchObject({ code: "ENOTDIR" });
+  });
 });

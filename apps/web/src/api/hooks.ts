@@ -551,6 +551,55 @@ export function useApplyMetadata(mangaId: string) {
 
 // ─── Category Mutations ────────────────────────────────────────────────────
 
+export function useCreateCategory() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { name: string; color?: string | null }) =>
+      api.createCategory(body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
+      queryClient.invalidateQueries({ queryKey: ["filterOptions"] });
+    },
+  });
+}
+
+export function useUpdateCategory() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      ...body
+    }: {
+      id: string;
+      name?: string;
+      color?: string | null;
+      sortOrder?: number;
+    }) => api.updateCategory(id, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
+      queryClient.invalidateQueries({ queryKey: ["filterOptions"] });
+      queryClient.invalidateQueries({ queryKey: ["library"] });
+      queryClient.invalidateQueries({ queryKey: ["mangaCategories"] });
+    },
+  });
+}
+
+export function useDeleteCategory() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (categoryId: string) => api.deleteCategory(categoryId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
+      queryClient.invalidateQueries({ queryKey: ["filterOptions"] });
+      queryClient.invalidateQueries({ queryKey: ["library"] });
+      queryClient.invalidateQueries({ queryKey: ["mangaCategories"] });
+    },
+  });
+}
+
 export function useAddMangaToCategory(mangaId: string) {
   const api = useApiClient();
   const queryClient = useQueryClient();
@@ -561,6 +610,7 @@ export function useAddMangaToCategory(mangaId: string) {
       queryClient.invalidateQueries({ queryKey: ["mangaCategories", mangaId] });
       queryClient.invalidateQueries({ queryKey: ["library"] });
       queryClient.invalidateQueries({ queryKey: ["filterOptions"] });
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
     },
   });
 }
@@ -575,6 +625,7 @@ export function useRemoveMangaFromCategory(mangaId: string) {
       queryClient.invalidateQueries({ queryKey: ["mangaCategories", mangaId] });
       queryClient.invalidateQueries({ queryKey: ["library"] });
       queryClient.invalidateQueries({ queryKey: ["filterOptions"] });
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
     },
   });
 }

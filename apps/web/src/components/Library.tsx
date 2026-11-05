@@ -124,6 +124,25 @@ export function Library({ onMangaSelect }: LibraryProps) {
   const { data: manga = [], isLoading } = useLibrary(queryFilters);
   const { data: filterOptions } = useFilterOptions();
   const deleteManga = useDeleteManga();
+
+  // A deleted category must not keep filtering the library invisibly.
+  useEffect(() => {
+    if (!filters.category || !filterOptions?.categories) return;
+    const stillExists = filterOptions.categories.some(
+      (category) => category.id === filters.category,
+    );
+    if (!stillExists) {
+      setSearchParams(
+        updateLibraryQuery(searchParams, { category: "" }),
+        { replace: true },
+      );
+    }
+  }, [
+    filterOptions?.categories,
+    filters.category,
+    searchParams,
+    setSearchParams,
+  ]);
   const checkLibraryUpdates = useCheckLibraryUpdates();
 
   const handleCheckUpdates = () => {

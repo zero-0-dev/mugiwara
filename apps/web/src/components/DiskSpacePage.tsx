@@ -378,11 +378,11 @@ export function DiskSpacePage({ onBack }: DiskSpacePageProps) {
         }}
       >
         <DialogContent className="max-w-lg">
-          <DialogHeader>
+          <DialogHeader className="max-sm:px-4 max-sm:pt-4">
             <DialogTitle>Delete all downloads?</DialogTitle>
           </DialogHeader>
           {deleteTarget && (
-            <div className="space-y-3 text-sm">
+            <div className="space-y-3 text-sm max-sm:px-4">
               <p>
                 This removes every downloaded chapter for{" "}
                 <span className="font-medium">{deleteTarget.title}</span> and
