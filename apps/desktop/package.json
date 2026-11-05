@@ -24,6 +24,12 @@
     "directories": {
       "buildResources": "buildResources"
     },
+    "protocols": [
+      {
+        "name": "Mugiwara",
+        "schemes": ["mugiwara"]
+      }
+    ],
     "files": [
       "dist/**/*",
       "package.json"

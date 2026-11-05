@@ -96,8 +96,20 @@ pnpm build:desktop:mac
 
 ### Web (`apps/web`)
 
-- `src/App.tsx` owns top-level views (library, detail, reader, discover,
-  settings, disk space) and server setup.
+- `src/App.tsx` owns app bootstrap (server resolution, theme, providers) and
+  mounts the router. Screens are URL-driven: `/`, `/manga/:mangaId`,
+  `/read/:mangaId/:chapterId`, `/discover`, `/discover/:anilistId`,
+  `/settings/:tab?` and `/disk-space`. Do not add an in-memory view union or a
+  second navigation model; use `react-router-dom` (`useNavigate`,
+  `useSearchParams`, `useParams`). Library filters/search/sort belong in query
+  params, transient UI state stays local.
+- `src/routing/*` holds the route table (`routes.tsx`), the application frame
+  (`AppShell.tsx`), scroll restoration and navigation helpers. Add new screens
+  as routes, not as new `currentView` branches.
+- `src/platform/backButton.ts` and `src/platform/deepLinks.ts` own the
+  Capacitor wiring (`@capacitor/app`): Android back maps to web history (second
+  press at the root exits), and app links resolve to routes. Feature
+  components must not import Capacitor App directly.
 - `src/api/client.ts` is the single API client. It stores the server URL and
   bearer token per origin and sends auth headers. Do not add ad-hoc `fetch`
   calls in components.
@@ -117,7 +129,8 @@ pnpm build:desktop:mac
 ### Desktop (`apps/desktop`)
 
 - `src/main/*` is the Electron main process, including the embedded
-  `ServerManager`, loopback token provisioning and IPC.
+  `ServerManager`, loopback token provisioning and IPC. It registers the
+  `mugiwara://` protocol and forwards deep links to the shared router.
 - `src/preload/*` exposes the narrow bridge consumed by the web UI.
 - The renderer is always the shared web build. Do not add a desktop-only UI.
 

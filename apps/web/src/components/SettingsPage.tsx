@@ -27,6 +27,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { cn } from "@/lib/utils";
 
 interface SettingsPageProps {
+  activeTab?: string;
+  onTabChange: (tab: string) => void;
   onBack: () => void;
   serverLabel?: string;
   onChangeServer?: () => void;
@@ -103,12 +105,13 @@ const TABS = [
 ];
 
 export function SettingsPage({
+  activeTab,
+  onTabChange,
   onBack,
   serverLabel,
   onChangeServer,
   onOpenDiskSpace,
 }: SettingsPageProps) {
-  const [activeTab, setActiveTab] = React.useState<string>("reading");
   const { data: serverSettings, isLoading } = useSettings();
   const saveSetting = useSaveSetting();
   const toast = useToast();
@@ -127,6 +130,13 @@ export function SettingsPage({
     ...defaultSettings,
     ...(serverSettings as Partial<Settings>),
   };
+
+  // Tab ids are intentionally not enumerated by the route: any tab registered
+  // here survives a reload as /settings/<id>, and new tabs (for example
+  // Categories) only need to be added to TABS below.
+  const resolvedActiveTab = TABS.some((tab) => tab.value === activeTab)
+    ? activeTab!
+    : TABS[0]!.value;
 
   function updateSetting(key: keyof Settings, value: string) {
     saveSetting.mutate(
@@ -175,8 +185,8 @@ export function SettingsPage({
       </div>
 
       <Tabs
-        value={activeTab}
-        onValueChange={setActiveTab}
+        value={resolvedActiveTab}
+        onValueChange={onTabChange}
         orientation={isMobile ? "horizontal" : "vertical"}
         className="mt-6 flex flex-col gap-4 md:flex-row md:items-start md:gap-6"
       >

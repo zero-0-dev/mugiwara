@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { useLocation, useSearchParams } from "react-router-dom";
 import {
   ArrowDown,
   ArrowUp,
@@ -21,6 +22,12 @@ import {
 } from "../api/hooks";
 import { useApiClient } from "../api/context";
 import { Select } from "./Select";
+import {
+  libraryFiltersFromQuery,
+  parseLibraryQuery,
+  saveLastLibraryPath,
+  updateLibraryQuery,
+} from "../routing/librarySearch";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Badge } from "./ui/badge";
@@ -31,35 +38,87 @@ interface LibraryProps {
   onMangaSelect: (mangaId: string) => void;
 }
 
-const EMPTY_FILTERS = {
-  status: "",
-  mediaType: "",
-  genre: "",
-  readingStatus: "all",
-  category: "",
-};
+interface LibraryFilters {
+  status: string;
+  mediaType: string;
+  genre: string;
+  category: string;
+  readingStatus: string;
+}
 
 export function Library({ onMangaSelect }: LibraryProps) {
   const api = useApiClient();
   const toast = useToast();
-  const [searchQuery, setSearchQuery] = useState("");
-  const [filters, setFilters] = useState(EMPTY_FILTERS);
-  const [sortBy, setSortBy] = useState("lastRead");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const query = parseLibraryQuery(searchParams);
+  const [searchInput, setSearchInput] = useState(query.search);
   const [showFilters, setShowFilters] = useState(false);
   const [showAddManga, setShowAddManga] = useState(false);
-  const debouncedSearch = useDebounce(searchQuery, 250);
+  const debouncedSearch = useDebounce(searchInput, 250);
+  const lastWrittenSearch = useRef<string | null>(null);
+
+  // Keep the filtered library in session storage so the mobile Library tab
+  // returns to the same query instead of resetting the list.
+  useEffect(() => {
+    saveLastLibraryPath(`${location.pathname}${location.search}`);
+  }, [location.pathname, location.search]);
+
+  // The URL is the source of truth. A back/forward or a shared link updates
+  // the visible search box; typing updates the URL with replace so keystrokes
+  // never fill the history stack.
+  useEffect(() => {
+    if (query.search === lastWrittenSearch.current) return;
+    setSearchInput(query.search);
+  }, [query.search]);
+
+  useEffect(() => {
+    if (debouncedSearch === query.search) return;
+    lastWrittenSearch.current = debouncedSearch;
+    setSearchParams(
+      updateLibraryQuery(searchParams, { search: debouncedSearch }),
+      { replace: true },
+    );
+  }, [debouncedSearch, query.search, searchParams, setSearchParams]);
+
+  const filters = {
+    status: query.status,
+    mediaType: query.mediaType,
+    genre: query.genre,
+    category: query.category,
+    readingStatus: query.readingStatus,
+  };
+  const sortBy = query.sortBy;
+  const sortOrder = query.sortOrder;
+
+  function updateQuery(
+    patch: Parameters<typeof updateLibraryQuery>[1],
+    replace = false,
+  ) {
+    setSearchParams(updateLibraryQuery(searchParams, patch), { replace });
+  }
+
+  function setFilters(next: LibraryFilters) {
+    updateQuery({
+      status: next.status,
+      mediaType: next.mediaType,
+      genre: next.genre,
+      category: next.category,
+      readingStatus: next.readingStatus,
+    });
+  }
+
+  function setSortBy(next: string) {
+    updateQuery({ sortBy: next });
+  }
+
+  function setSortOrder(next: "asc" | "desc") {
+    updateQuery({ sortOrder: next });
+  }
 
   const queryFilters = {
+    ...libraryFiltersFromQuery(query),
     search: debouncedSearch || undefined,
-    status: filters.status || undefined,
-    mediaType: filters.mediaType || undefined,
-    genre: filters.genre || undefined,
-    category: filters.category || undefined,
-    readingStatus:
-      filters.readingStatus !== "all" ? filters.readingStatus : undefined,
-    sortBy,
-    sortOrder: sortBy === "title" && sortOrder === "desc" ? "asc" : sortOrder,
   };
 
   const { data: manga = [], isLoading } = useLibrary(queryFilters);
@@ -109,10 +168,9 @@ export function Library({ onMangaSelect }: LibraryProps) {
   }
 
   function clearFilters() {
-    setSearchQuery("");
-    setFilters(EMPTY_FILTERS);
-    setSortBy("lastRead");
-    setSortOrder("desc");
+    setSearchInput("");
+    lastWrittenSearch.current = "";
+    setSearchParams(new URLSearchParams());
   }
 
   const activeFilterCount = [
@@ -123,7 +181,7 @@ export function Library({ onMangaSelect }: LibraryProps) {
     filters.readingStatus !== "all" ? filters.readingStatus : "",
   ].filter(Boolean).length;
 
-  const hasActiveFilters = Boolean(searchQuery) || activeFilterCount > 0;
+  const hasActiveFilters = Boolean(searchInput) || activeFilterCount > 0;
 
   if (isLoading) {
     return (
@@ -191,15 +249,19 @@ export function Library({ onMangaSelect }: LibraryProps) {
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
             placeholder="Search..."
             aria-label="Search library"
             className="h-9 border-0 bg-transparent pl-9 pr-9 text-sm shadow-none focus-visible:ring-0"
           />
-          {searchQuery && (
+          {searchInput && (
             <button
-              onClick={() => setSearchQuery("")}
+              onClick={() => {
+                setSearchInput("");
+                lastWrittenSearch.current = "";
+                updateQuery({ search: "" }, true);
+              }}
               className="absolute right-1.5 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
               aria-label="Clear search"
             >

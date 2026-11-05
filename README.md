@@ -48,6 +48,18 @@ brand accent tokens are bridged to the shadcn semantic variables in
   primitives with focus trapping, keyboard navigation and ARIA semantics.
 - Mobile-first layouts use a bottom navigation bar, safe-area padding and
   bottom-sheet dialogs. Modals restore focus and close on Escape.
+- Navigation is URL-driven with **React Router v7** (data router). Screens are
+  `/`, `/manga/:mangaId`, `/read/:mangaId/:chapterId`, `/discover`,
+  `/discover/:anilistId`, `/settings/:tab?` and `/disk-space`; unknown URLs
+  render a not-found screen. Library search, filters and sort live in query
+  parameters (`q`, `status`, `type`, `genre`, `category`, `reading`, `sort`,
+  `order`) so reloads, back/forward and shared links restore the list.
+  `App.tsx` resolves the server before routing, which keeps mobile deep links
+  working. Do not reintroduce in-memory view state; navigate with the router.
+  The Electron shell registers the `mugiwara://` scheme and loads the matching
+  route; Capacitor handles `appUrlOpen`/launch URLs after server resolution.
+- The web build uses an absolute Vite `base` so deep links load `/assets/*`
+  correctly from the server root. The server already provides the SPA fallback.
 - Use the helpers in `src/lib/utils.ts` (`cn`) and the primitives in
   `src/components/ui` before adding bespoke styles.
 
