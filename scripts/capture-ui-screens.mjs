@@ -77,6 +77,11 @@ async function capture(viewport, label, dark) {
   await card.click();
   await page.getByRole("heading", { name: "Chapters", exact: true }).waitFor();
   await save(page, `${label}-manga-detail-${suffix}`);
+  await page.screenshot({
+    path: join(OUT, `${label}-manga-detail-tracking-${suffix}.png`),
+    fullPage: true,
+  });
+  console.log(`saved ${label}-manga-detail-tracking-${suffix}.png`);
 
   await page
     .getByRole("button", { name: /Start reading|Continue reading|Read Again/i })
@@ -99,6 +104,7 @@ async function capture(viewport, label, dark) {
   for (const [tab, name] of [
     ["Categories", "categories"],
     ["Downloads", "downloads"],
+    ["Tracking", "tracking"],
     ["Storage", "storage"],
     ["Plugins", "plugins"],
     ["Queue", "queue"],
