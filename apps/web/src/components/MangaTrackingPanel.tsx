@@ -4,6 +4,8 @@ import {
   ArrowDownToLine,
   ArrowUpFromLine,
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
   Link2,
   Loader,
   RefreshCw,
@@ -143,8 +145,8 @@ function LinkDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl">
-        <DialogHeader>
+      <DialogContent className="max-w-xl max-sm:p-5">
+        <DialogHeader className="pr-8">
           <DialogTitle>Link to {providerLabel}</DialogTitle>
         </DialogHeader>
         <p className="text-sm text-muted-foreground">
@@ -281,6 +283,7 @@ export function MangaTrackingPanel({
   const [scoreDrafts, setScoreDrafts] = React.useState<Record<string, string>>(
     {},
   );
+  const [expanded, setExpanded] = React.useState(false);
 
   const connected = (status?.accounts ?? []).filter(
     (account) => account.connected,
@@ -313,13 +316,41 @@ export function MangaTrackingPanel({
   const linkScoreMax =
     tracking?.links.find((item) => item.provider === linkProvider)?.scoreMax ??
     (linkProvider === "anilist" ? 100 : 10);
+  const conflictCount =
+    tracking?.links.filter((item) => item.syncState === "conflict").length ?? 0;
+  const errorCount =
+    tracking?.links.filter((item) => item.syncState === "error").length ?? 0;
 
   return (
     <section className="rounded-2xl border border-border/80 bg-card p-4 sm:p-5">
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <h2 className="flex items-center gap-2 text-base font-semibold">
-            <Link2 className="size-4 text-muted-foreground" /> Tracking
+        <div className="min-w-0">
+          <h2 className="flex flex-wrap items-center gap-2 text-base font-semibold">
+            <Link2 className="size-4 text-muted-foreground" />
+            <button
+              type="button"
+              onClick={() => setExpanded((current) => !current)}
+              aria-expanded={expanded}
+              aria-controls="manga-tracking-details"
+              className="inline-flex items-center gap-1 rounded-md outline-none transition-colors hover:text-brand-text focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              Tracking
+              {expanded ? (
+                <ChevronUp className="size-4 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="size-4 text-muted-foreground" />
+              )}
+            </button>
+            {conflictCount > 0 && (
+              <Badge variant="warning">
+                {conflictCount} conflict{conflictCount === 1 ? "" : "s"}
+              </Badge>
+            )}
+            {errorCount > 0 && (
+              <Badge variant="destructive">
+                {errorCount} sync error{errorCount === 1 ? "" : "s"}
+              </Badge>
+            )}
           </h2>
           <p className="mt-0.5 text-sm text-muted-foreground">
             {tracking
@@ -334,7 +365,9 @@ export function MangaTrackingPanel({
         )}
       </div>
 
-      <div className="mt-3 space-y-3">
+      {expanded && (
+        <div id="manga-tracking-details">
+          <div className="mt-3 space-y-3">
         {providers.map((providerInfo) => {
           const account = connected.find(
             (item) => item.provider === providerInfo.provider,
@@ -608,8 +641,8 @@ export function MangaTrackingPanel({
           if (!open) setConflictProvider(null);
         }}
       >
-        <DialogContent>
-          <DialogHeader>
+        <DialogContent className="max-sm:p-5">
+          <DialogHeader className="pr-8">
             <DialogTitle>Resolve tracker conflict</DialogTitle>
           </DialogHeader>
           {conflictLink?.conflict ? (
@@ -720,6 +753,8 @@ export function MangaTrackingPanel({
             </div>
           </div>
         </>
+      )}
+        </div>
       )}
     </section>
   );
