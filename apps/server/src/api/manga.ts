@@ -6,6 +6,7 @@ import {
 } from "../database";
 import { v4 as uuidv4 } from "uuid";
 import { recordAudit } from "../services/audit";
+import { removeMangaDownloads } from "../services/downloads";
 
 const router: Router = Router();
 
@@ -96,6 +97,46 @@ router.put("/:id", async (req: Request, res: Response): Promise<void> => {
     res.status(500).json({ error: "Failed to update manga" });
   }
 });
+
+// DELETE /api/manga/:id/downloads - Delete every downloaded chapter file
+// while keeping the manga, chapters, categories and reading progress.
+router.delete(
+  "/:id/downloads",
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const id = req.params.id;
+      if (!id) {
+        res.status(400).json({ error: "ID is required" });
+        return;
+      }
+
+      const manga = await mangaRepository.findById(id);
+      if (!manga) {
+        res.status(404).json({ error: "Manga not found" });
+        return;
+      }
+
+      const result = await removeMangaDownloads(id);
+      recordAudit({
+        event: "manga.downloads.delete",
+        actor: req.auth?.id ?? null,
+        ip: req.ip ?? req.socket.remoteAddress ?? null,
+        details: {
+          mangaId: id,
+          title: manga.title,
+          deletedCount: result.deletedCount,
+          failedCount: result.failedCount,
+          bytesFreed: result.bytesFreed,
+        },
+      });
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error deleting manga downloads:", error);
+      res.status(500).json({ error: "Failed to delete downloads" });
+    }
+  },
+);
 
 // DELETE /api/manga/:id - Delete manga
 router.delete("/:id", async (req: Request, res: Response): Promise<void> => {

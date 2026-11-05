@@ -16,6 +16,9 @@ export class ImportQueueProcessor extends EventEmitter {
   private pollInterval: number;
   private isRunning = false;
   private abortControllers: Map<string, AbortController> = new Map();
+  // Tracked so callers can wait for a cancelled task to stop writing before
+  // they delete its files (the disk-space manager relies on this).
+  private taskPromises: Map<string, Promise<void>> = new Map();
   private processLoopTimeout?: NodeJS.Timeout;
 
   constructor(options: ImportQueueProcessorOptions) {
@@ -71,7 +74,10 @@ export class ImportQueueProcessor extends EventEmitter {
 
             // Process each task concurrently
             for (const task of tasks) {
-              this.processTask(task);
+              const promise = this.processTask(task).finally(() => {
+                this.taskPromises.delete(task.id);
+              });
+              this.taskPromises.set(task.id, promise);
             }
           }
         }
@@ -195,6 +201,13 @@ export class ImportQueueProcessor extends EventEmitter {
         compressImages,
       );
 
+      // Re-check immediately before the write. A user can delete a chapter
+      // while its download is in flight; the delete path aborts and awaits this
+      // task, so roughly simultaneous writes must not sneak past it.
+      if (signal.aborted) {
+        throw new Error("Task cancelled");
+      }
+
       // Store page in storage backend
       await storage.writeChapterPage(
         task.mangaId,
@@ -203,6 +216,12 @@ export class ImportQueueProcessor extends EventEmitter {
         page.data,
         page.contentType,
       );
+
+      // If cancellation arrived while the write was in flight, stop here: the
+      // delete path will remove the chapter directory once this promise ends.
+      if (signal.aborted) {
+        throw new Error("Task cancelled");
+      }
 
       // Update progress
       await this.repository.updateProgress(task.id, pageCount, pageCount + 5); // Estimate total
@@ -259,6 +278,19 @@ export class ImportQueueProcessor extends EventEmitter {
     } else {
       // Task is pending, just remove it
       await this.repository.cancel(taskId);
+    }
+  }
+
+  /**
+   * Cancels a task and waits for its running promise to settle. Safe to call
+   * for pending tasks (they are removed from the queue) and for tasks that are
+   * not tracked by this process.
+   */
+  async cancelTaskAndWait(taskId: string): Promise<void> {
+    const promise = this.taskPromises.get(taskId);
+    await this.cancelTask(taskId);
+    if (promise) {
+      await promise.catch(() => undefined);
     }
   }
 

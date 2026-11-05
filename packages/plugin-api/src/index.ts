@@ -9,6 +9,8 @@ export {
   SourceChapter,
   PageData,
   PageExport,
+  ChapterStorageUsage,
+  MangaStorageUsage,
   PluginOptions,
   SourceFactory,
   StorageFactory,

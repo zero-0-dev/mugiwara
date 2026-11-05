@@ -79,6 +79,22 @@ export interface PageExport {
   contentType: string;
 }
 
+// Disk usage of a single chapter as reported by a storage backend.
+export interface ChapterStorageUsage {
+  chapterId: string;
+  bytes: number;
+  // Whether the backend found any stored data for this chapter. A chapter can
+  // exist with zero bytes only in unusual cases (e.g. an empty archive).
+  exists: boolean;
+}
+
+// Disk usage of every requested chapter of a manga.
+export interface MangaStorageUsage {
+  mangaId: string;
+  totalBytes: number;
+  chapters: ChapterStorageUsage[];
+}
+
 // Plugin factory options
 export interface PluginOptions {
   config: PluginConfig;
@@ -136,6 +152,17 @@ export interface StorageBackend {
   ): Promise<Buffer>;
   listChapterPages(mangaId: string, chapterId: string): Promise<number>;
   getPageUrl(mangaId: string, chapterId: string, pageNumber: number): string;
+  // Bytes stored for a single chapter. The default BaseStorage implementation
+  // reads every page; backends should override it with native metadata when
+  // they can (e.g. fs.stat, S3 ListObjects).
+  getChapterSize(mangaId: string, chapterId: string): Promise<number>;
+  // Optional bulk size query. Implementations should list a manga once instead
+  // of making one request per chapter. When absent the server falls back to
+  // getChapterSize per chapter.
+  getMangaUsage?(
+    mangaId: string,
+    chapterIds?: string[],
+  ): Promise<MangaStorageUsage>;
   deleteChapter(mangaId: string, chapterId: string): Promise<void>;
   deleteManga(mangaId: string): Promise<void>;
   exportManga?(mangaId: string): AsyncGenerator<PageExport, void, unknown>;

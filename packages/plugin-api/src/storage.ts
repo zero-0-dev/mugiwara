@@ -1,4 +1,9 @@
-import { PluginMetadata, PluginConfig, PageExport } from "./types";
+import {
+  PluginMetadata,
+  PluginConfig,
+  PageExport,
+  MangaStorageUsage,
+} from "./types";
 
 export abstract class BaseStorage {
   abstract readonly metadata: PluginMetadata;
@@ -40,6 +45,45 @@ export abstract class BaseStorage {
     chapterId: string,
     pageNumber: number,
   ): string;
+
+  // Bytes stored for a single chapter.
+  //
+  // The default implementation lists and reads every page. That works for any
+  // backend that implements the abstract storage methods, but backends with
+  // native metadata (filesystem stat, object listing, ...) should override it
+  // so disk-usage screens do not have to download page contents.
+  async getChapterSize(mangaId: string, chapterId: string): Promise<number> {
+    const pageCount = await this.listChapterPages(mangaId, chapterId);
+    let totalBytes = 0;
+
+    for (let pageNumber = 1; pageNumber <= pageCount; pageNumber++) {
+      const data = await this.readChapterPage(mangaId, chapterId, pageNumber);
+      totalBytes += data.byteLength;
+    }
+
+    return totalBytes;
+  }
+
+  // Bulk variant used by the disk-space manager. The default implementation
+  // delegates to getChapterSize so it stays correct for every backend.
+  async getMangaUsage(
+    mangaId: string,
+    chapterIds?: string[],
+  ): Promise<MangaStorageUsage> {
+    const ids = chapterIds ?? (await this.listMangaChapters(mangaId));
+    const chapters = await Promise.all(
+      ids.map(async (chapterId) => {
+        const bytes = await this.getChapterSize(mangaId, chapterId);
+        return { chapterId, bytes, exists: bytes > 0 };
+      }),
+    );
+
+    return {
+      mangaId,
+      totalBytes: chapters.reduce((sum, chapter) => sum + chapter.bytes, 0),
+      chapters,
+    };
+  }
 
   // Delete a single chapter
   abstract deleteChapter(mangaId: string, chapterId: string): Promise<void>;

@@ -17,6 +17,7 @@ import {
   RefreshCw,
   Search,
   Sparkles,
+  Trash2,
   X,
 } from "lucide-react";
 import { Manga, Chapter, ReadingProgress } from "@mugiwara-manga/types";
@@ -31,6 +32,7 @@ import {
   useMarkChapterComplete,
   useMarkChapterIncomplete,
   useDownloadChapter,
+  useDeleteChapterDownload,
   useUpdateMangaTitle,
   useFetchMetadata,
   useApplyMetadata,
@@ -109,6 +111,7 @@ export function MangaDetail({
   const markComplete = useMarkChapterComplete(mangaId);
   const markIncomplete = useMarkChapterIncomplete(mangaId);
   const downloadChapter = useDownloadChapter(mangaId);
+  const deleteChapterDownload = useDeleteChapterDownload(mangaId);
   const updateTitle = useUpdateMangaTitle(mangaId);
   const fetchMetadata = useFetchMetadata(mangaId);
   const applyMetadata = useApplyMetadata(mangaId);
@@ -156,6 +159,8 @@ export function MangaDetail({
   const [showSearch, setShowSearch] = useState(false);
   const [imageCacheBuster, setImageCacheBuster] = useState(Date.now());
   const [searchingMetadata, setSearchingMetadata] = useState(false);
+  const [chapterToDelete, setChapterToDelete] =
+    useState<ChapterWithProgress | null>(null);
 
   const enrichedChapters = useMemo(() => {
     const progressMap = allProgress.reduce(
@@ -291,6 +296,18 @@ export function MangaDetail({
   const handleDownloadChapter = (chapterId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     downloadChapter.mutate(chapterId, {
+      onError: (err) => toast.error(err.message),
+    });
+  };
+
+  const handleDeleteChapterDownload = () => {
+    if (!chapterToDelete) return;
+    const target = chapterToDelete;
+    deleteChapterDownload.mutate(target.chapterId, {
+      onSuccess: () => {
+        setChapterToDelete(null);
+        toast.success(`Deleted download for ${chapterLabel(target)}.`);
+      },
       onError: (err) => toast.error(err.message),
     });
   };
@@ -712,6 +729,8 @@ export function MangaDetail({
         <div className="mt-4 overflow-hidden rounded-2xl border border-border/80 bg-card shadow-sm">
           {enrichedChapters.map((chapter, index) => {
             const downloadStatus = getChapterDownloadStatus(chapter);
+            const isDownloaded =
+              downloadStatus === "complete" || chapter.pagesCount > 0;
             return (
               <div
                 key={chapter.id}
@@ -883,6 +902,17 @@ export function MangaDetail({
                           <Circle /> Mark All Following as Unread
                         </DropdownMenuItem>
                       )}
+                      {isDownloaded && (
+                        <>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-destructive-text focus:text-destructive-text"
+                            onClick={() => setChapterToDelete(chapter)}
+                          >
+                            <Trash2 /> Delete download
+                          </DropdownMenuItem>
+                        </>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
@@ -933,6 +963,60 @@ export function MangaDetail({
             <p className="py-8 text-center text-sm text-muted-foreground">
               No results found.
             </p>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(chapterToDelete)}
+        onOpenChange={(open) => {
+          if (!open && !deleteChapterDownload.isPending) {
+            setChapterToDelete(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Delete downloaded chapter?</DialogTitle>
+          </DialogHeader>
+          {chapterToDelete && (
+            <div className="space-y-3 text-sm">
+              <p>
+                This removes the downloaded files for{" "}
+                <span className="font-medium">
+                  {chapterLabel(chapterToDelete)}
+                </span>
+                .
+              </p>
+              <p className="text-muted-foreground">
+                Reading progress and read/unread state are kept. You can
+                download the chapter again later.
+              </p>
+              <div className="flex justify-end gap-2 pt-1">
+                <Button
+                  variant="outline"
+                  onClick={() => setChapterToDelete(null)}
+                  disabled={deleteChapterDownload.isPending}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={handleDeleteChapterDownload}
+                  disabled={deleteChapterDownload.isPending}
+                >
+                  {deleteChapterDownload.isPending ? (
+                    <>
+                      <Loader className="size-4 animate-spin" /> Deleting...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="size-4" /> Delete download
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
           )}
         </DialogContent>
       </Dialog>

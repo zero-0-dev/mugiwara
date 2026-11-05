@@ -29,6 +29,7 @@ interface SettingsPageProps {
   onBack: () => void;
   serverLabel?: string;
   onChangeServer?: () => void;
+  onOpenDiskSpace?: () => void;
 }
 
 interface Settings {
@@ -104,6 +105,7 @@ export function SettingsPage({
   onBack,
   serverLabel,
   onChangeServer,
+  onOpenDiskSpace,
 }: SettingsPageProps) {
   const [activeTab, setActiveTab] = React.useState<string>("reading");
   const { data: serverSettings, isLoading } = useSettings();
@@ -318,7 +320,7 @@ export function SettingsPage({
           </TabsContent>
 
           <TabsContent value="storage" className="mt-0">
-            <StorageSection />
+            <StorageSection onOpenDiskSpace={onOpenDiskSpace} />
           </TabsContent>
           <TabsContent value="plugins" className="mt-0">
             <PluginsSection />

@@ -5,6 +5,7 @@ import { Library } from "./components/Library";
 import { MangaDetail } from "./components/MangaDetail";
 import { Reader } from "./components/Reader";
 import { SettingsPage } from "./components/SettingsPage";
+import { DiskSpacePage } from "./components/DiskSpacePage";
 import { Discover } from "./components/Discover";
 import { DiscoverDetail } from "./components/DiscoverDetail";
 import { ServerSetup } from "./components/ServerSetup";
@@ -66,6 +67,7 @@ type View =
   | "manga-detail"
   | "reader"
   | "settings"
+  | "disk-space"
   | "discover"
   | "discover-detail";
 
@@ -262,6 +264,14 @@ function App() {
     setCurrentView("library");
   };
 
+  const handleOpenDiskSpace = () => {
+    setCurrentView("disk-space");
+  };
+
+  const handleCloseDiskSpace = () => {
+    setCurrentView("settings");
+  };
+
   if (loading) {
     return (
       <div className="flex h-dvh flex-col items-center justify-center gap-4 bg-background text-foreground">
@@ -359,8 +369,11 @@ function App() {
             onChangeServer={
               canChangeServer ? () => setShowServerSetup(true) : undefined
             }
+            onOpenDiskSpace={handleOpenDiskSpace}
           />
         );
+      case "disk-space":
+        return <DiskSpacePage onBack={handleCloseDiskSpace} />;
       default:
         return null;
     }

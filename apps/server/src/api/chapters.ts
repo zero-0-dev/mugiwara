@@ -13,6 +13,8 @@ import { db } from "../database";
 import { v4 as uuidv4 } from "uuid";
 import sharp from "sharp";
 import { getBooleanSetting } from "../services/settings";
+import { removeChapterDownload } from "../services/downloads";
+import { recordAudit } from "../services/audit";
 import {
   detectImageContentType,
   maybeCompressPageData,
@@ -498,6 +500,62 @@ router.post(
     } catch (error) {
       console.error("Error queuing chapter download:", error);
       res.status(500).json({ error: "Failed to queue chapter for download" });
+    }
+  },
+);
+
+// DELETE /api/manga/:mangaId/chapters/:chapterId/download - Delete one
+// chapter's downloaded files. Reading progress is kept and the chapter becomes
+// downloadable again.
+router.delete(
+  "/:chapterId/download",
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const mangaId = req.params.mangaId;
+      const chapterId = req.params.chapterId;
+
+      if (!mangaId || !chapterId) {
+        res.status(400).json({ error: "Manga ID and Chapter ID are required" });
+        return;
+      }
+
+      const manga = await mangaRepository.findById(mangaId);
+      if (!manga) {
+        res.status(404).json({ error: "Manga not found" });
+        return;
+      }
+
+      const result = await removeChapterDownload(mangaId, chapterId);
+      if (!result) {
+        res.status(404).json({ error: "Chapter not found" });
+        return;
+      }
+
+      if (!result.success) {
+        // Files may still exist, so the chapter keeps its downloaded state.
+        res.status(500).json({
+          error: result.error || "Failed to delete chapter download",
+          result,
+        });
+        return;
+      }
+
+      recordAudit({
+        event: "manga.chapter.download.delete",
+        actor: req.auth?.id ?? null,
+        ip: req.ip ?? req.socket.remoteAddress ?? null,
+        details: {
+          mangaId,
+          chapterId,
+          title: manga.title,
+          bytesFreed: result.bytesFreed,
+        },
+      });
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error deleting chapter download:", error);
+      res.status(500).json({ error: "Failed to delete chapter download" });
     }
   },
 );

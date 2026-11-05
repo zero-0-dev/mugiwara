@@ -320,6 +320,20 @@ export function useStorageTypes() {
   });
 }
 
+export function useStorageUsage(params?: {
+  sort?: "size" | "lastRead";
+  order?: "asc" | "desc";
+}) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: ["storageUsage", params],
+    queryFn: () => api.getStorageUsage(params),
+    // Sizes are filesystem state, not a slowly-changing cache. Always check
+    // when the screen mounts so a delete made elsewhere is never missed.
+    staleTime: 0,
+  });
+}
+
 // ─── Plugins ───────────────────────────────────────────────────────────────
 
 export function useInstalledPlugins() {
@@ -741,6 +755,96 @@ export function useDeleteStorageBackend() {
     mutationFn: (id: string) => api.deleteStorageBackend(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["storageBackends"] });
+    },
+  });
+}
+
+export function useDeleteMangaDownloads() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (mangaId: string) => api.deleteMangaDownloads(mangaId),
+    onSuccess: (result, mangaId) => {
+      // The chapter flag "pending" means "not downloaded / downloadable" in
+      // the rest of the UI, so the detail screen updates without a reload.
+      queryClient.setQueryData(
+        ["chapters", mangaId],
+        (
+          chapters:
+            | Array<{
+                chapterId: string;
+                pagesCount: number;
+                importStatus?: string;
+                importProgress?: number;
+              }>
+            | undefined,
+        ) => {
+          if (!chapters) return chapters;
+          const deleted = new Set(
+            result.results
+              .filter((chapter) => chapter.success)
+              .map((chapter) => chapter.chapterId),
+          );
+          return chapters.map((chapter) =>
+            deleted.has(chapter.chapterId)
+              ? {
+                  ...chapter,
+                  pagesCount: 0,
+                  importProgress: 0,
+                  importStatus: "pending",
+                }
+              : chapter,
+          );
+        },
+      );
+      queryClient.invalidateQueries({ queryKey: ["storageUsage"] });
+      queryClient.invalidateQueries({ queryKey: ["library"] });
+      queryClient.invalidateQueries({ queryKey: ["chapters", mangaId] });
+      queryClient.invalidateQueries({ queryKey: ["importProgress", mangaId] });
+      queryClient.invalidateQueries({ queryKey: ["queueTasks"] });
+      queryClient.invalidateQueries({ queryKey: ["queueStats"] });
+    },
+  });
+}
+
+export function useDeleteChapterDownload(mangaId: string) {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (chapterId: string) =>
+      api.deleteChapterDownload(mangaId, chapterId),
+    onSuccess: (_result, chapterId) => {
+      queryClient.setQueryData(
+        ["chapters", mangaId],
+        (
+          chapters:
+            | Array<{
+                chapterId: string;
+                pagesCount: number;
+                importStatus?: string;
+                importProgress?: number;
+              }>
+            | undefined,
+        ) => {
+          if (!chapters) return chapters;
+          return chapters.map((chapter) =>
+            chapter.chapterId === chapterId
+              ? {
+                  ...chapter,
+                  pagesCount: 0,
+                  importProgress: 0,
+                  importStatus: "pending",
+                }
+              : chapter,
+          );
+        },
+      );
+      queryClient.invalidateQueries({ queryKey: ["storageUsage"] });
+      queryClient.invalidateQueries({ queryKey: ["library"] });
+      queryClient.invalidateQueries({ queryKey: ["chapters", mangaId] });
+      queryClient.invalidateQueries({ queryKey: ["importProgress", mangaId] });
+      queryClient.invalidateQueries({ queryKey: ["queueTasks"] });
+      queryClient.invalidateQueries({ queryKey: ["queueStats"] });
     },
   });
 }

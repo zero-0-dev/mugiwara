@@ -1,7 +1,4 @@
-import type {
-  LibraryFilterOptions,
-  LibraryManga,
-} from "@mugiwara-manga/types";
+import type { LibraryFilterOptions, LibraryManga } from "@mugiwara-manga/types";
 import { getDeviceId } from "./device";
 
 export interface Source {
@@ -139,6 +136,43 @@ export interface StorageType {
   name: string;
   description: string;
   configSchema: Record<string, unknown>;
+}
+
+export interface StorageUsageManga {
+  mangaId: string;
+  title: string;
+  coverImage?: string;
+  storageBackendId: string | null;
+  downloadedChapterCount: number;
+  totalBytes: number;
+  lastReadAt: string | null;
+  error?: string;
+}
+
+export interface StorageUsage {
+  summary: {
+    totalBytes: number;
+    mangaWithDownloads: number;
+    downloadedChapters: number;
+  };
+  manga: StorageUsageManga[];
+}
+
+export interface ChapterDeleteResult {
+  chapterId: string;
+  chapterRecordId: string;
+  title: string | null;
+  bytesFreed: number;
+  success: boolean;
+  error?: string;
+}
+
+export interface MangaDownloadsDeleteResult {
+  mangaId: string;
+  deletedCount: number;
+  failedCount: number;
+  bytesFreed: number;
+  results: ChapterDeleteResult[];
 }
 
 export interface InstalledPlugin {
@@ -426,16 +460,46 @@ export class ApiClient {
     return this.request(`/api/manga/${mangaId}/chapters/${chapterId}/progress`);
   }
 
-  updateChapterProgress(mangaId: string, chapterId: string, body: { pageNumber: number; totalPages: number; isCompleted: boolean }): Promise<void> {
-    return this.request(`/api/manga/${mangaId}/chapters/${chapterId}/progress`, { method: "POST", body: JSON.stringify({ ...body, deviceId: getDeviceId() }) });
+  updateChapterProgress(
+    mangaId: string,
+    chapterId: string,
+    body: { pageNumber: number; totalPages: number; isCompleted: boolean },
+  ): Promise<void> {
+    return this.request(
+      `/api/manga/${mangaId}/chapters/${chapterId}/progress`,
+      {
+        method: "POST",
+        body: JSON.stringify({ ...body, deviceId: getDeviceId() }),
+      },
+    );
   }
 
-  markChapterComplete(mangaId: string, chapterId: string, body?: { markPrevious?: boolean }): Promise<void> {
-    return this.request(`/api/manga/${mangaId}/chapters/${chapterId}/complete`, { method: "POST", body: JSON.stringify({ ...(body || {}), deviceId: getDeviceId() }) });
+  markChapterComplete(
+    mangaId: string,
+    chapterId: string,
+    body?: { markPrevious?: boolean },
+  ): Promise<void> {
+    return this.request(
+      `/api/manga/${mangaId}/chapters/${chapterId}/complete`,
+      {
+        method: "POST",
+        body: JSON.stringify({ ...(body || {}), deviceId: getDeviceId() }),
+      },
+    );
   }
 
-  markChapterIncomplete(mangaId: string, chapterId: string, body?: { markFollowing?: boolean }): Promise<void> {
-    return this.request(`/api/manga/${mangaId}/chapters/${chapterId}/complete`, { method: "DELETE", body: JSON.stringify({ ...(body || {}), deviceId: getDeviceId() }) });
+  markChapterIncomplete(
+    mangaId: string,
+    chapterId: string,
+    body?: { markFollowing?: boolean },
+  ): Promise<void> {
+    return this.request(
+      `/api/manga/${mangaId}/chapters/${chapterId}/complete`,
+      {
+        method: "DELETE",
+        body: JSON.stringify({ ...(body || {}), deviceId: getDeviceId() }),
+      },
+    );
   }
 
   downloadChapter(mangaId: string, chapterId: string): Promise<void> {
@@ -443,6 +507,22 @@ export class ApiClient {
       `/api/manga/${mangaId}/chapters/${chapterId}/download`,
       { method: "POST" },
     );
+  }
+
+  deleteChapterDownload(
+    mangaId: string,
+    chapterId: string,
+  ): Promise<ChapterDeleteResult> {
+    return this.request(
+      `/api/manga/${mangaId}/chapters/${encodeURIComponent(chapterId)}/download`,
+      { method: "DELETE" },
+    );
+  }
+
+  deleteMangaDownloads(mangaId: string): Promise<MangaDownloadsDeleteResult> {
+    return this.request(`/api/manga/${mangaId}/downloads`, {
+      method: "DELETE",
+    });
   }
 
   // Metadata
@@ -478,9 +558,7 @@ export class ApiClient {
     return this.request("/api/categories");
   }
 
-  getMangaCategories(
-    mangaId: string,
-  ): Promise<
+  getMangaCategories(mangaId: string): Promise<
     Array<{
       id: string;
       name: string;
@@ -669,6 +747,19 @@ export class ApiClient {
       method: "POST",
       body: JSON.stringify(body),
     });
+  }
+
+  getStorageUsage(params?: {
+    sort?: "size" | "lastRead";
+    order?: "asc" | "desc";
+  }): Promise<StorageUsage> {
+    const searchParams = new URLSearchParams();
+    if (params?.sort) searchParams.set("sort", params.sort);
+    if (params?.order) searchParams.set("order", params.order);
+    const qs = searchParams.toString();
+    return this.request<StorageUsage>(
+      `/api/storage/usage${qs ? `?${qs}` : ""}`,
+    );
   }
 
   // Plugins
