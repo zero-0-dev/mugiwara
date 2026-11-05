@@ -9,6 +9,7 @@
     "lint": "turbo lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "typecheck": "turbo typecheck",
+    "screens": "node scripts/capture-ui-screens.mjs",
     "clean": "turbo clean && rm -rf node_modules",
     "build:app:android": "node scripts/build.mjs app:android",
     "build:app:android:release": "node scripts/build.mjs app:android:release",
@@ -21,6 +22,7 @@
     "build:server:deploy": "turbo build --filter=@mugiwara-manga/server --filter=@mugiwara-manga/web && rm -rf apps/server/deploy && pnpm --filter=@mugiwara-manga/server deploy --legacy apps/server/deploy && cp -R apps/web/dist apps/server/deploy/web"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
     "prettier": "^3.1.1",
     "turbo": "^1.11.2",
     "typescript": "^5.3.3"

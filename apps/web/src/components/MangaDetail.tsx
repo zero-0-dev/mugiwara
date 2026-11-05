@@ -1,8 +1,23 @@
-import React, { useEffect, useRef, useState, useMemo } from "react";
-import { createPortal } from "react-dom";
+import React, { useEffect, useMemo, useState } from "react";
 import {
-  AlertCircle, ArrowLeft, Check, CheckCheck, ChevronDown, ChevronUp,
-  Circle, Clock, Download, EllipsisVertical, Loader, Pencil, Play, X,
+  AlertCircle,
+  ArrowLeft,
+  Check,
+  CheckCheck,
+  ChevronDown,
+  ChevronUp,
+  Circle,
+  Clock,
+  Download,
+  EllipsisVertical,
+  Loader,
+  Pencil,
+  Play,
+  Plus,
+  RefreshCw,
+  Search,
+  Sparkles,
+  X,
 } from "lucide-react";
 import { Manga, Chapter, ReadingProgress } from "@mugiwara-manga/types";
 import { useApiClient } from "../api/context";
@@ -26,8 +41,21 @@ import {
   useDownloadQueueSync,
   useSources,
 } from "../api/hooks";
-import { useFocusTrap } from "../hooks/useFocusTrap";
-import { useMobileLayout } from "../hooks/useMobileLayout";
+import { Button } from "./ui/button";
+import { Badge } from "./ui/badge";
+import { Input } from "./ui/input";
+import { Progress } from "./ui/progress";
+import { Separator } from "./ui/separator";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
+import { cn } from "@/lib/utils";
 
 interface MangaDetailProps {
   mangaId: string;
@@ -52,37 +80,17 @@ interface AniListResult {
   genres: string[];
 }
 
-interface ChapterMenuProps {
-  chapter: ChapterWithProgress;
-  isActive: boolean;
-  position: { x: number; y: number } | null;
-  menuRef: React.MutableRefObject<HTMLDivElement | null>;
-  onMarkComplete: (chapterId: string, markPrevious?: boolean) => void;
-  onMarkIncomplete: (chapterId: string, markFollowing?: boolean) => void;
-}
-
 function chapterLabel(chapter: { title?: string; chapterId: string }): string {
   const title = chapter.title?.trim();
   if (title) return title;
   return `Chapter ${chapter.chapterId}`;
 }
 
-function ChapterMenu({ chapter, isActive, position, menuRef, onMarkComplete, onMarkIncomplete }: ChapterMenuProps) {
-  if (!isActive) return null;
-
-  const menuContent = (
-    <div ref={menuRef} className="dropdown-menu" style={{ top: position?.y || 0, left: position?.x || 0 }} onClick={(e) => e.stopPropagation()}>
-      {!chapter.isRead && <button className="dropdown-menu-item" onClick={() => onMarkComplete(chapter.id)}><span className="menu-icon"><Check size={14} /></span>Mark as Read</button>}
-      {chapter.isRead && <button className="dropdown-menu-item" onClick={() => onMarkIncomplete(chapter.id)}><span className="menu-icon"><Circle size={14} /></span>Mark as Unread</button>}
-      <div className="dropdown-menu-divider" />
-      <button className="dropdown-menu-item" onClick={() => onMarkComplete(chapter.id, true)}><span className="menu-icon"><CheckCheck size={14} /></span>Mark All Previous as Read</button>
-      {chapter.isRead && <button className="dropdown-menu-item" onClick={() => onMarkIncomplete(chapter.id, true)}><span className="menu-icon"><Circle size={14} /></span>Mark All Following as Unread</button>}
-    </div>
-  );
-  return createPortal(menuContent, document.body);
-}
-
-export function MangaDetail({ mangaId, onBack, onReadChapter }: MangaDetailProps) {
+export function MangaDetail({
+  mangaId,
+  onBack,
+  onReadChapter,
+}: MangaDetailProps) {
   const api = useApiClient();
   const toast = useToast();
 
@@ -92,7 +100,9 @@ export function MangaDetail({ mangaId, onBack, onReadChapter }: MangaDetailProps
   const { data: categories = [] } = useCategories();
   const { data: mangaCategories = [] } = useMangaCategories(mangaId);
   const { data: sources = [] } = useSources();
-  const sourceInfo = manga ? sources.find((s) => s.id === manga.sourceId) : undefined;
+  const sourceInfo = manga
+    ? sources.find((s) => s.id === manga.sourceId)
+    : undefined;
   const isSourceOnline = !!sourceInfo;
   const sourceName = sourceInfo?.name || manga?.sourceId || "Unknown";
 
@@ -107,15 +117,15 @@ export function MangaDetail({ mangaId, onBack, onReadChapter }: MangaDetailProps
   const checkUpdates = useCheckMangaUpdates(mangaId);
   const downloadAll = useDownloadAllChapters(mangaId);
 
-  // Downloads finish in the background; keep the chapter list's download
-  // badges in sync without requiring a page reload.
   useDownloadQueueSync(mangaId);
 
   const handleCheckUpdates = () => {
     checkUpdates.mutate(undefined, {
       onSuccess: (data) => {
         if (data.newChaptersFound > 0) {
-          toast.success(`Found ${data.newChaptersFound} new chapter${data.newChaptersFound > 1 ? "s" : ""}! Queued for download.`);
+          toast.success(
+            `Found ${data.newChaptersFound} new chapter${data.newChaptersFound > 1 ? "s" : ""}! Queued for download.`,
+          );
         } else {
           toast.success("No new chapters found.");
         }
@@ -128,7 +138,9 @@ export function MangaDetail({ mangaId, onBack, onReadChapter }: MangaDetailProps
     downloadAll.mutate(undefined, {
       onSuccess: (data) => {
         if (data.chaptersQueued > 0) {
-          toast.success(`Queued ${data.chaptersQueued} chapter${data.chaptersQueued > 1 ? "s" : ""} for download.`);
+          toast.success(
+            `Queued ${data.chaptersQueued} chapter${data.chaptersQueued > 1 ? "s" : ""} for download.`,
+          );
         } else {
           toast.success("No pending chapters to download.");
         }
@@ -143,31 +155,31 @@ export function MangaDetail({ mangaId, onBack, onReadChapter }: MangaDetailProps
   const [searchResults, setSearchResults] = useState<AniListResult[]>([]);
   const [showSearch, setShowSearch] = useState(false);
   const [imageCacheBuster, setImageCacheBuster] = useState(Date.now());
-  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
-  const [activeChapterMenu, setActiveChapterMenu] = useState<string | null>(null);
-  const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(null);
-  const [categoryPosition, setCategoryPosition] = useState<{ top?: number; bottom?: number; left: number; width: number } | null>(null);
-  const menuRef = useRef<HTMLDivElement | null>(null);
-  const categoryButtonRef = useRef<HTMLButtonElement | null>(null);
-  const categoryDropdownRef = useRef<HTMLDivElement | null>(null);
-  const searchDialogRef = useRef<HTMLDivElement | null>(null);
-  const isMobile = useMobileLayout();
-
-  useFocusTrap(searchDialogRef, showSearch, () => setShowSearch(false));
+  const [searchingMetadata, setSearchingMetadata] = useState(false);
 
   const enrichedChapters = useMemo(() => {
-    const progressMap = allProgress.reduce((acc, p) => {
-      if (p.chapterId) acc[p.chapterId] = p;
-      return acc;
-    }, {} as Record<string, ReadingProgress>);
+    const progressMap = allProgress.reduce(
+      (acc, p) => {
+        if (p.chapterId) acc[p.chapterId] = p;
+        return acc;
+      },
+      {} as Record<string, ReadingProgress>,
+    );
     const mostRecentProgress = allProgress[0];
     const currentChapterId = mostRecentProgress?.chapterId;
     return chapters.map((chapter) => {
       const progress = progressMap[chapter.id];
       const isCurrent = chapter.id === currentChapterId;
-      const isRead = progress?.isCompleted || (progress?.percentComplete || 0) >= 95;
+      const isRead =
+        progress?.isCompleted || (progress?.percentComplete || 0) >= 95;
       const progressPercent = Math.round(progress?.percentComplete || 0);
-      return { ...chapter, progress, isRead, isCurrent, progressPercent: isRead ? 100 : progressPercent } as ChapterWithProgress;
+      return {
+        ...chapter,
+        progress,
+        isRead,
+        isCurrent,
+        progressPercent: isRead ? 100 : progressPercent,
+      } as ChapterWithProgress;
     });
   }, [chapters, allProgress]);
 
@@ -182,17 +194,28 @@ export function MangaDetail({ mangaId, onBack, onReadChapter }: MangaDetailProps
 
   const getContinueReadingText = () => {
     const firstIncomplete = enrichedChapters.find((c) => !c.isRead);
-    if (!firstIncomplete) return chapters.length > 0 ? "Read Again" : "Start Reading";
+    if (!firstIncomplete)
+      return chapters.length > 0 ? "Read Again" : "Start Reading";
     const label = chapterLabel(firstIncomplete);
-    if (firstIncomplete.progress && firstIncomplete.progress.percentComplete > 0) return `Continue reading ${label}`;
+    if (
+      firstIncomplete.progress &&
+      firstIncomplete.progress.percentComplete > 0
+    )
+      return `Continue reading ${label}`;
     return `Start reading ${label}`;
   };
 
   const handleEditTitle = () => {
-    if (manga) { setEditedTitle(manga.title); setIsEditingTitle(true); }
+    if (manga) {
+      setEditedTitle(manga.title);
+      setIsEditingTitle(true);
+    }
   };
 
-  const handleCancelEdit = () => { setIsEditingTitle(false); setEditedTitle(""); };
+  const handleCancelEdit = () => {
+    setIsEditingTitle(false);
+    setEditedTitle("");
+  };
 
   const handleSaveTitle = async () => {
     if (!manga || !editedTitle.trim()) return;
@@ -210,36 +233,59 @@ export function MangaDetail({ mangaId, onBack, onReadChapter }: MangaDetailProps
   };
 
   const handleSearch = async () => {
+    setSearchingMetadata(true);
     try {
-      const response = await fetch(`${api.getBaseUrl()}/api/manga/${manga!.id}/metadata/search`);
+      const response = await fetch(
+        `${api.getBaseUrl()}/api/manga/${manga!.id}/metadata/search`,
+      );
       if (!response.ok) throw new Error("Failed to search");
       const data = await response.json();
       setSearchResults(data.results);
       setShowSearch(true);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setSearchingMetadata(false);
     }
   };
 
   const handleApplyMetadata = async (anilistId: number) => {
-    applyMetadata.mutate({ anilistId }, {
-      onSuccess: () => { setShowSearch(false); setImageCacheBuster(Date.now()); },
-      onError: (err) => toast.error(err.message),
-    });
+    applyMetadata.mutate(
+      { anilistId },
+      {
+        onSuccess: () => {
+          setShowSearch(false);
+          setImageCacheBuster(Date.now());
+        },
+        onError: (err) => toast.error(err.message),
+      },
+    );
   };
 
-  const handleMarkChapterComplete = (chapterId: string, markPrevious?: boolean) => {
-    markComplete.mutate({ chapterId, markPrevious }, {
-      onSuccess: () => setActiveChapterMenu(null),
-      onError: (err) => toast.error(err.message),
-    });
+  const handleMarkChapterComplete = (
+    chapterId: string,
+    markPrevious?: boolean,
+  ) => {
+    markComplete.mutate(
+      { chapterId, markPrevious },
+      {
+        onSuccess: () => undefined,
+        onError: (err) => toast.error(err.message),
+      },
+    );
   };
 
-  const handleMarkChapterIncomplete = (chapterId: string, markFollowing?: boolean) => {
-    markIncomplete.mutate({ chapterId, markFollowing }, {
-      onSuccess: () => setActiveChapterMenu(null),
-      onError: (err) => toast.error(err.message),
-    });
+  const handleMarkChapterIncomplete = (
+    chapterId: string,
+    markFollowing?: boolean,
+  ) => {
+    markIncomplete.mutate(
+      { chapterId, markFollowing },
+      {
+        onSuccess: () => undefined,
+        onError: (err) => toast.error(err.message),
+      },
+    );
   };
 
   const handleDownloadChapter = (chapterId: string, e: React.MouseEvent) => {
@@ -250,96 +296,41 @@ export function MangaDetail({ mangaId, onBack, onReadChapter }: MangaDetailProps
   };
 
   const handleAddToCategory = (categoryId: string) => {
-    addToCategory.mutate(categoryId, { onError: (err) => toast.error(err.message) });
-    setShowCategoryDropdown(false);
+    addToCategory.mutate(categoryId, {
+      onError: (err) => toast.error(err.message),
+    });
   };
-
-  const toggleCategoryDropdown = () => {
-    if (showCategoryDropdown) {
-      setShowCategoryDropdown(false);
-      return;
-    }
-    const rect = categoryButtonRef.current?.getBoundingClientRect();
-    if (rect) {
-      const width = Math.min(Math.max(rect.width, 220), Math.max(220, window.innerWidth - 16));
-      const left = Math.max(8, Math.min(rect.left, window.innerWidth - width - 8));
-      const spaceBelow = window.innerHeight - rect.bottom;
-      const spaceAbove = rect.top;
-      if (spaceBelow < 280 && spaceAbove > spaceBelow) {
-        setCategoryPosition({ bottom: window.innerHeight - rect.top + 4, left, width });
-      } else {
-        setCategoryPosition({ top: rect.bottom + 4, left, width });
-      }
-    }
-    setShowCategoryDropdown(true);
-  };
-
-  useEffect(() => {
-    if (!showCategoryDropdown) return undefined;
-
-    const handlePointerDown = (event: PointerEvent) => {
-      const target = event.target as Node;
-      if (
-        !categoryButtonRef.current?.contains(target) &&
-        !categoryDropdownRef.current?.contains(target)
-      ) {
-        setShowCategoryDropdown(false);
-      }
-    };
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setShowCategoryDropdown(false);
-    };
-    const timer = window.setTimeout(
-      () => document.addEventListener("pointerdown", handlePointerDown),
-      0,
-    );
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.clearTimeout(timer);
-      document.removeEventListener("pointerdown", handlePointerDown);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [showCategoryDropdown]);
 
   const handleRemoveFromCategory = (categoryId: string) => {
-    removeFromCategory.mutate(categoryId, { onError: (err) => toast.error(err.message) });
-  };
-
-  const handleChapterMenuClick = (e: React.MouseEvent, chapterId: string) => {
-    e.stopPropagation();
-    e.preventDefault();
-    const btn = e.currentTarget as HTMLElement;
-    const rect = btn.getBoundingClientRect();
-    const chapterItem = btn.closest(".chapter-item") as HTMLElement;
-    let x = rect.left;
-    if (chapterItem && chapterItem.matches(":hover")) x -= 4;
-    let y = rect.bottom;
-    const menuWidth = 220, menuHeight = 200, padding = 8;
-    if (x + menuWidth > window.innerWidth - padding) x = Math.max(padding, rect.right - menuWidth);
-    if (y + menuHeight > window.innerHeight - padding) y = Math.max(padding, rect.top - menuHeight);
-    setMenuPosition({ x, y });
-    setActiveChapterMenu(chapterId);
+    removeFromCategory.mutate(categoryId, {
+      onError: (err) => toast.error(err.message),
+    });
   };
 
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node) && !(e.target as HTMLElement).closest(".chapter-menu-btn")) {
-        setActiveChapterMenu(null);
-      }
-    };
-    if (activeChapterMenu) {
-      const timer = setTimeout(() => document.addEventListener("click", handleClickOutside), 0);
-      return () => { clearTimeout(timer); document.removeEventListener("click", handleClickOutside); };
-    }
-    return undefined;
-  }, [activeChapterMenu]);
+    setShowMore(false);
+    setShowSearch(false);
+  }, [mangaId]);
 
   if (isLoading) {
-    return <div className="manga-detail-loading"><div className="loading-spinner"></div><p>Loading manga details...</p></div>;
+    return (
+      <div className="mx-auto flex w-full max-w-6xl flex-col items-center gap-3 px-4 py-24 text-muted-foreground">
+        <div className="loading-spinner" />
+        <p className="text-sm">Loading manga details...</p>
+      </div>
+    );
   }
 
   if (fetchError || !manga) {
-    return <div className="manga-detail-error"><p>{(fetchError as Error)?.message || "Manga not found"}</p><button onClick={onBack} className="btn btn-primary">Go Back</button></div>;
+    return (
+      <div className="mx-auto flex w-full max-w-md flex-col items-center gap-4 px-4 py-24 text-center">
+        <AlertCircle className="size-10 text-destructive" />
+        <p className="text-sm text-muted-foreground">
+          {(fetchError as Error)?.message || "Manga not found"}
+        </p>
+        <Button onClick={onBack}>Go Back</Button>
+      </div>
+    );
   }
 
   const getChapterDownloadStatus = (chapter: ChapterWithProgress) => {
@@ -351,258 +342,553 @@ export function MangaDetail({ mangaId, onBack, onReadChapter }: MangaDetailProps
   };
 
   return (
-    <div className="manga-detail">
-      <style>{`
-        .menu-icon { width: 20px; display: flex; align-items: center; justify-content: center; }
-        .chapter-actions { position: relative; }
-        .chapter-menu-btn { background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 6px; font-size: 16px; border-radius: 8px; transition: background-color 0.2s, color 0.2s; display: flex; align-items: center; justify-content: center; }
-        .chapter-menu-btn:hover { background-color: var(--bg-tertiary); color: var(--text-primary); }
-        .chapter-progress-indicator { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-        .chapter-progress-indicator.unread { border: 2px solid var(--bg-tertiary); }
-        .chapter-progress-indicator.read { background-color: var(--success); color: white; }
-        .chapter-progress-indicator.in-progress { background: conic-gradient(var(--accent) var(--progress, 0%), transparent 0%); border: 2px solid var(--accent); }
-      `}</style>
-
-      <div className="manga-detail-header">
-        <button onClick={onBack} className="btn btn-secondary back-btn"><ArrowLeft size={16} /> Back to Library</button>
-        <div className="manga-detail-header-actions">
-          <button onClick={handleCheckUpdates} disabled={checkUpdates.isPending} className="btn btn-secondary btn-sm">
+    <div className="mx-auto w-full max-w-6xl px-4 py-5 sm:px-6 sm:py-7">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Button variant="outline" onClick={onBack}>
+          <ArrowLeft className="size-4" /> Back to Library
+        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleCheckUpdates}
+            disabled={checkUpdates.isPending}
+          >
+            <RefreshCw
+              className={cn(
+                "size-3.5",
+                checkUpdates.isPending && "animate-spin",
+              )}
+            />
             {checkUpdates.isPending ? "Checking..." : "Check for Updates"}
-          </button>
+          </Button>
           {hasPendingChapters && (
-            <button onClick={handleDownloadAll} disabled={downloadAll.isPending} className="btn btn-primary btn-sm">
+            <Button
+              variant="brand"
+              size="sm"
+              onClick={handleDownloadAll}
+              disabled={downloadAll.isPending}
+            >
+              <Download className="size-3.5" />
               {downloadAll.isPending ? "Downloading..." : "Download All"}
-            </button>
+            </Button>
           )}
         </div>
       </div>
 
-      <div className="manga-detail-content">
-        <div className="manga-info-section">
-          <div className="manga-cover-large">
+      <div className="mt-5 grid gap-6 md:grid-cols-[200px_minmax(0,1fr)] lg:grid-cols-[224px_minmax(0,1fr)]">
+        <div className="mx-auto w-full max-w-[220px] md:mx-0 md:max-w-none">
+          <div className="aspect-[2/3] overflow-hidden rounded-2xl border border-border/70 bg-secondary shadow-xl shadow-black/20">
             {manga.coverImage ? (
-              <img src={api.getAssetUrl(manga.coverImage, imageCacheBuster)} alt={manga.title} />
+              <img
+                src={api.getAssetUrl(manga.coverImage, imageCacheBuster)}
+                alt={manga.title}
+                className="size-full object-cover"
+              />
             ) : (
-              <div className="placeholder-cover-large"><span>{manga.title.charAt(0)}</span></div>
+              <div className="flex size-full items-center justify-center bg-gradient-to-br from-indigo-500/30 to-secondary text-5xl font-bold text-muted-foreground">
+                {manga.title.charAt(0)}
+              </div>
             )}
           </div>
+        </div>
 
-          <div className="manga-meta">
-            <div className="manga-title-row">
-              <div className="manga-title-container">
-                {isEditingTitle ? (
-                  <div className="title-edit-mode">
-                    <input type="text" value={editedTitle} onChange={(e) => setEditedTitle(e.target.value)} className="title-input" autoFocus onKeyDown={(e) => { if (e.key === "Enter") handleSaveTitle(); if (e.key === "Escape") handleCancelEdit(); }} />
-                    <div className="title-edit-actions">
-                      <button onClick={handleSaveTitle} disabled={updateTitle.isPending || !editedTitle.trim()} className="btn btn-primary btn-sm">{updateTitle.isPending ? "Saving..." : "Save"}</button>
-                      <button onClick={handleCancelEdit} disabled={updateTitle.isPending} className="btn btn-secondary btn-sm">Cancel</button>
-                    </div>
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              {isEditingTitle ? (
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <Input
+                    type="text"
+                    value={editedTitle}
+                    onChange={(e) => setEditedTitle(e.target.value)}
+                    className="text-lg font-semibold"
+                    autoFocus
+                    aria-label="Manga title"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleSaveTitle();
+                      if (e.key === "Escape") handleCancelEdit();
+                    }}
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      onClick={handleSaveTitle}
+                      disabled={updateTitle.isPending || !editedTitle.trim()}
+                    >
+                      {updateTitle.isPending ? "Saving..." : "Save"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleCancelEdit}
+                      disabled={updateTitle.isPending}
+                    >
+                      Cancel
+                    </Button>
                   </div>
-                ) : (
-                  <div className="title-display-mode">
-                    <h1 className="manga-title-large">{manga.title}</h1>
-                    <button onClick={handleEditTitle} className="btn btn-icon" title="Edit title"><Pencil size={16} /></button>
-                  </div>
-                )}
-              </div>
-
-              <div className="metadata-header-actions">
-                {manga.anilistId && <span className="sync-status">Synced with AniList</span>}
-                <div className="metadata-buttons">
-                  <button onClick={handleAutoFetch} disabled={fetchMetadata.isPending} className="btn btn-primary btn-sm">{fetchMetadata.isPending ? "Fetching..." : "Auto-fetch"}</button>
-                  <button onClick={handleSearch} disabled={fetchMetadata.isPending} className="btn btn-secondary btn-sm">Search</button>
                 </div>
+              ) : (
+                <div className="flex items-start gap-2">
+                  <h1 className="text-balance text-2xl font-semibold tracking-tight sm:text-3xl">
+                    {manga.title}
+                  </h1>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={handleEditTitle}
+                    title="Edit title"
+                    aria-label="Edit title"
+                    className="mt-0.5 text-muted-foreground"
+                  >
+                    <Pencil className="size-4" />
+                  </Button>
+                </div>
+              )}
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                {manga.status && (
+                  <Badge variant="secondary" className="capitalize">
+                    {manga.status}
+                  </Badge>
+                )}
+                {manga.mediaType && (
+                  <Badge variant="secondary" className="capitalize">
+                    {manga.mediaType}
+                  </Badge>
+                )}
+                {manga.anilistId && (
+                  <Badge variant="success">
+                    <Sparkles className="size-3" /> Synced with AniList
+                  </Badge>
+                )}
+                <Badge variant={isSourceOnline ? "success" : "warning"}>
+                  <span
+                    className={cn(
+                      "size-1.5 rounded-full",
+                      isSourceOnline ? "bg-emerald-400" : "bg-amber-400",
+                    )}
+                  />
+                  {sourceName}
+                </Badge>
               </div>
             </div>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="brand"
+                onClick={handleAutoFetch}
+                disabled={fetchMetadata.isPending}
+              >
+                <Sparkles className="size-3.5" />
+                {fetchMetadata.isPending ? "Fetching..." : "Auto-fetch"}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleSearch}
+                disabled={searchingMetadata}
+              >
+                <Search className="size-3.5" />
+                {searchingMetadata ? "Searching..." : "Search"}
+              </Button>
+            </div>
+          </div>
 
-            <div className={`manga-info-collapsible ${showMore ? "expanded" : ""}`}>
-              {manga.author && <p className="meta-item"><strong>Author:</strong> {manga.author}</p>}
-              {manga.artist && <p className="meta-item"><strong>Artist:</strong> {manga.artist}</p>}
-              <p className="meta-item"><strong>Status:</strong> {manga.status}</p>
-              <p className="meta-item"><strong>Type:</strong> {manga.mediaType}</p>
-              <p className="meta-item"><strong>Source:</strong> {sourceName} <span className={`source-status-dot ${isSourceOnline ? "online" : "offline"}`} /></p>
-              <p className="meta-item"><strong>Chapters:</strong> {chapters.length}</p>
-              {manga.genres && manga.genres.length > 0 && (
-                <div className="meta-item"><strong>Genres:</strong><div className="genres-inline">{manga.genres.map((genre) => <span key={genre} className="genre-tag-small">{genre}</span>)}</div></div>
-              )}
+          <div className="mt-4 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
+            {manga.author && <MetaRow label="Author" value={manga.author} />}
+            {manga.artist && <MetaRow label="Artist" value={manga.artist} />}
+            <MetaRow label="Chapters" value={String(chapters.length)} />
+            <MetaRow label="Source" value={sourceName} />
+          </div>
 
-              <div className="meta-item categories-section">
-                <div className="categories-header">
-                  <strong>Categories:</strong>
-                  <div className="category-dropdown-container">
-                    <button
-                      ref={categoryButtonRef}
-                      onClick={toggleCategoryDropdown}
-                      className="category-add-btn"
-                      aria-haspopup="menu"
-                      aria-expanded={showCategoryDropdown}
-                    >
-                      + Add to Category
-                    </button>
-                    {showCategoryDropdown && createPortal(
-                      <>
-                        {isMobile && (
-                          <div
-                            className="category-dropdown-backdrop"
-                            onClick={() => setShowCategoryDropdown(false)}
-                          />
-                        )}
-                        <div
-                          ref={categoryDropdownRef}
-                          className={`category-dropdown${isMobile ? " sheet" : ""}`}
-                          role="menu"
-                          aria-label="Add to category"
+          {manga.genres && manga.genres.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {manga.genres.map((genre) => (
+                <Badge key={genre} variant="outline">
+                  {genre}
+                </Badge>
+              ))}
+            </div>
+          )}
+
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Categories
+            </span>
+            {mangaCategories.map((category) => (
+              <span
+                key={category.id}
+                className="inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium"
+                style={{
+                  backgroundColor: category.color
+                    ? `${category.color}22`
+                    : "var(--brand-soft)",
+                  borderColor: category.color || "var(--brand)",
+                  color: category.color || "var(--brand)",
+                }}
+              >
+                {category.name}
+                <button
+                  onClick={() => handleRemoveFromCategory(category.id)}
+                  className="rounded-full p-0.5 outline-none transition hover:bg-black/20 focus-visible:ring-2 focus-visible:ring-ring"
+                  title="Remove from category"
+                  aria-label={`Remove from ${category.name}`}
+                >
+                  <X className="size-3" />
+                </button>
+              </span>
+            ))}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-7 px-2">
+                  <Plus className="size-3.5" /> Add
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuLabel>Add to category</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {categories.filter(
+                  (cat) => !mangaCategories.some((mc) => mc.id === cat.id),
+                ).length === 0 ? (
+                  <DropdownMenuItem disabled>
+                    No more categories
+                  </DropdownMenuItem>
+                ) : (
+                  categories
+                    .filter(
+                      (cat) => !mangaCategories.some((mc) => mc.id === cat.id),
+                    )
+                    .map((category) => (
+                      <DropdownMenuItem
+                        key={category.id}
+                        onClick={() => handleAddToCategory(category.id)}
+                      >
+                        <span
+                          className="size-2.5 rounded-full"
                           style={{
-                            "--dropdown-top": categoryPosition?.top !== undefined ? `${categoryPosition.top}px` : "auto",
-                            "--dropdown-bottom": categoryPosition?.bottom !== undefined ? `${categoryPosition.bottom}px` : "auto",
-                            "--dropdown-left": `${categoryPosition?.left ?? 0}px`,
-                            "--dropdown-width": `${categoryPosition?.width ?? 220}px`,
-                          } as React.CSSProperties}
-                        >
-                          {categories.filter((cat) => !mangaCategories.some((mc) => mc.id === cat.id)).map((category) => (
-                            <button key={category.id} onClick={() => handleAddToCategory(category.id)} className="category-dropdown-item" role="menuitem">
-                              <span className="category-dot-small" style={{ backgroundColor: category.color || "#6366f1" }} />{category.name}
-                            </button>
-                          ))}
-                          {categories.filter((cat) => !mangaCategories.some((mc) => mc.id === cat.id)).length === 0 && <span className="category-dropdown-empty">No more categories</span>}
-                        </div>
-                      </>,
-                      document.body,
+                            backgroundColor: category.color || "#6366f1",
+                          }}
+                        />
+                        {category.name}
+                      </DropdownMenuItem>
+                    ))
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
+          {manga.description && (
+            <div className="mt-4">
+              <h2 className="text-sm font-semibold">Description</h2>
+              <div
+                className={cn(
+                  "mt-1 text-sm leading-6 text-muted-foreground [&_br]:hidden [&_p]:mb-2",
+                  !showMore && "line-clamp-3",
+                )}
+                dangerouslySetInnerHTML={{ __html: manga.description }}
+              />
+              <Button
+                variant="link"
+                size="sm"
+                onClick={() => setShowMore(!showMore)}
+                className="mt-1 h-auto px-0"
+              >
+                {showMore ? (
+                  <>
+                    Show less <ChevronUp className="size-3.5" />
+                  </>
+                ) : (
+                  <>
+                    Show more <ChevronDown className="size-3.5" />
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <Separator className="my-7" />
+
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 className="text-xl font-semibold tracking-tight">Chapters</h2>
+          {readChaptersCount > 0 && (
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              {readChaptersCount} of {enrichedChapters.length} chapters read
+            </p>
+          )}
+        </div>
+        {readChaptersCount > 0 && (
+          <Progress
+            value={(readChaptersCount / enrichedChapters.length) * 100}
+            className="h-1.5 w-36"
+          />
+        )}
+      </div>
+
+      {enrichedChapters.length > 0 && (
+        <div className="mt-4 overflow-hidden rounded-2xl border border-border/80 bg-gradient-to-r from-indigo-500/12 via-card to-card p-4 shadow-sm sm:p-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <Button
+              variant="brand"
+              size="lg"
+              onClick={handleContinueReading}
+              className="justify-start sm:justify-center"
+            >
+              <Play className="size-4 fill-current" />
+              {getContinueReadingText()}
+            </Button>
+            {readChaptersCount > 0 && (
+              <Badge variant="secondary">
+                {Math.round(
+                  (readChaptersCount / enrichedChapters.length) * 100,
+                )}
+                % complete
+              </Badge>
+            )}
+          </div>
+        </div>
+      )}
+
+      {enrichedChapters.length === 0 ? (
+        <p className="mt-6 rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+          No chapters available
+        </p>
+      ) : (
+        <div className="mt-4 overflow-hidden rounded-2xl border border-border/80 bg-card shadow-sm">
+          {enrichedChapters.map((chapter, index) => {
+            const downloadStatus = getChapterDownloadStatus(chapter);
+            return (
+              <div
+                key={chapter.id}
+                className={cn(
+                  "group flex cursor-pointer items-center gap-3 px-3 py-3 outline-none transition-colors hover:bg-accent/60 focus-visible:bg-accent sm:px-4",
+                  index > 0 && "border-t border-border/60",
+                  chapter.isCurrent && "bg-indigo-500/5",
+                )}
+                onClick={() => onReadChapter(chapter.id, chapters)}
+                role="button"
+                tabIndex={0}
+                aria-label={`Read ${chapterLabel(chapter)}`}
+                onKeyDown={(e) => {
+                  if (e.target !== e.currentTarget) return;
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    onReadChapter(chapter.id, chapters);
+                  }
+                }}
+              >
+                <div
+                  className={cn(
+                    "flex size-8 shrink-0 items-center justify-center rounded-full border",
+                    chapter.isRead
+                      ? "border-emerald-500/30 bg-emerald-500/15 text-success-text"
+                      : chapter.isCurrent
+                        ? "border-primary/40 bg-primary/15 text-brand-text"
+                        : "border-border text-muted-foreground",
+                  )}
+                >
+                  {chapter.isRead ? (
+                    <Check className="size-4" />
+                  ) : chapter.isCurrent ? (
+                    <Play className="size-3.5 fill-current" />
+                  ) : (
+                    <Circle className="size-3.5" />
+                  )}
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={cn(
+                        "truncate text-sm font-medium",
+                        chapter.isRead && "text-muted-foreground",
+                      )}
+                    >
+                      {chapterLabel(chapter)}
+                    </span>
+                    {chapter.isCurrent && !chapter.isRead && (
+                      <Badge variant="default" className="shrink-0">
+                        Reading
+                      </Badge>
+                    )}
+                    {chapter.isRead && (
+                      <Badge variant="success" className="shrink-0">
+                        Read
+                      </Badge>
                     )}
                   </div>
-                </div>
-                <div className="manga-categories">
-                  {mangaCategories.map((category) => (
-                    <span key={category.id} className="category-tag" style={{ backgroundColor: category.color ? `${category.color}33` : "rgba(99, 102, 241, 0.2)", borderColor: category.color || "#6366f1", color: category.color || "#818cf8" }}>
-                      {category.name}
-                      <button onClick={() => handleRemoveFromCategory(category.id)} className="category-remove-btn" title="Remove from category"><X size={12} /></button>
+                  <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
+                    <span>
+                      {chapter.pagesCount > 0
+                        ? `${chapter.pagesCount} pages`
+                        : "Not downloaded"}
                     </span>
-                  ))}
-                  {mangaCategories.length === 0 && <span className="no-categories">Not in any category</span>}
+                    {chapter.progressPercent !== undefined &&
+                      chapter.progressPercent > 0 &&
+                      !chapter.isRead && (
+                        <span className="inline-flex items-center gap-1.5">
+                          <Progress
+                            value={chapter.progressPercent}
+                            className="h-1 w-16"
+                          />
+                          {chapter.progressPercent}%
+                        </span>
+                      )}
+                  </div>
+                </div>
+
+                <div className="flex shrink-0 items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={(e) => handleDownloadChapter(chapter.chapterId, e)}
+                    disabled={
+                      downloadStatus === "downloading" ||
+                      downloadStatus === "pending"
+                    }
+                    title={
+                      downloadStatus === "complete"
+                        ? "Downloaded"
+                        : downloadStatus === "downloading"
+                          ? "Downloading..."
+                          : downloadStatus === "error"
+                            ? "Download failed"
+                            : downloadStatus === "pending"
+                              ? "Queued"
+                              : "Download chapter"
+                    }
+                    aria-label="Download chapter"
+                    className={cn(
+                      downloadStatus === "complete" && "text-success-text",
+                      downloadStatus === "error" && "text-destructive-text",
+                      downloadStatus === "pending" && "text-warning-text",
+                    )}
+                  >
+                    {downloadStatus === "complete" ? (
+                      <Check className="size-4" />
+                    ) : downloadStatus === "downloading" ? (
+                      <Loader className="size-4 animate-spin" />
+                    ) : downloadStatus === "error" ? (
+                      <AlertCircle className="size-4" />
+                    ) : downloadStatus === "pending" ? (
+                      <Clock className="size-4" />
+                    ) : (
+                      <Download className="size-4" />
+                    )}
+                  </Button>
+
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={(e) => e.stopPropagation()}
+                        title="Chapter options"
+                        aria-label="Chapter options"
+                      >
+                        <EllipsisVertical className="size-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                      align="end"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {!chapter.isRead ? (
+                        <DropdownMenuItem
+                          onClick={() => handleMarkChapterComplete(chapter.id)}
+                        >
+                          <Check /> Mark as Read
+                        </DropdownMenuItem>
+                      ) : (
+                        <DropdownMenuItem
+                          onClick={() =>
+                            handleMarkChapterIncomplete(chapter.id)
+                          }
+                        >
+                          <Circle /> Mark as Unread
+                        </DropdownMenuItem>
+                      )}
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={() =>
+                          handleMarkChapterComplete(chapter.id, true)
+                        }
+                      >
+                        <CheckCheck /> Mark All Previous as Read
+                      </DropdownMenuItem>
+                      {chapter.isRead && (
+                        <DropdownMenuItem
+                          onClick={() =>
+                            handleMarkChapterIncomplete(chapter.id, true)
+                          }
+                        >
+                          <Circle /> Mark All Following as Unread
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </div>
-              {manga.description && <div className="manga-description"><strong>Description:</strong><div className="description-content" dangerouslySetInnerHTML={{ __html: manga.description }} /></div>}
-            </div>
+            );
+          })}
+        </div>
+      )}
 
-            <button onClick={() => setShowMore(!showMore)} className="btn btn-text show-more-btn">{showMore ? <>Show less <ChevronUp size={14} /></> : <>Show more <ChevronDown size={14} /></>}</button>
-
-            {showSearch && (
-              <div className="search-results-overlay" onClick={() => setShowSearch(false)}>
-                <div
-                  ref={searchDialogRef}
-                  className="search-results-modal"
-                  role="dialog"
-                  aria-modal="true"
-                  aria-labelledby="metadata-search-title"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <h4 id="metadata-search-title">Select from AniList results:</h4>
-                  <div className="results-grid">
-                    {searchResults.map((result) => (
-                      <div
-                        key={result.id}
-                        className="result-card"
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => handleApplyMetadata(result.id)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.preventDefault();
-                            handleApplyMetadata(result.id);
-                          }
-                        }}
-                      >
-                        {result.coverImage && <img src={result.coverImage.medium} alt={result.title.romaji} className="result-cover" />}
-                        <div className="result-info">
-                          <h5>{result.title.english || result.title.romaji}</h5>
-                          <p className="result-year">{result.year}</p>
-                          <div className="result-genres">{result.genres.slice(0, 3).map((g) => <span key={g} className="genre-tag">{g}</span>)}</div>
-                        </div>
-                      </div>
+      <Dialog open={showSearch} onOpenChange={setShowSearch}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader className="max-sm:px-4 max-sm:pt-4">
+            <DialogTitle>Select from AniList results</DialogTitle>
+          </DialogHeader>
+          <div className="grid max-h-[60vh] grid-cols-1 gap-2 overflow-y-auto pr-1 sm:grid-cols-2 max-sm:px-4">
+            {searchResults.map((result) => (
+              <button
+                key={result.id}
+                className="flex items-start gap-3 rounded-xl border border-border/70 bg-background/40 p-2 text-left outline-none transition-colors hover:border-primary/40 hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
+                onClick={() => handleApplyMetadata(result.id)}
+              >
+                {result.coverImage && (
+                  <img
+                    src={result.coverImage.medium}
+                    alt={result.title.romaji}
+                    className="h-24 w-16 shrink-0 rounded-md object-cover"
+                  />
+                )}
+                <div className="min-w-0">
+                  <h3 className="truncate text-sm font-medium">
+                    {result.title.english || result.title.romaji}
+                  </h3>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {result.year || "Unknown year"}
+                  </p>
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {result.genres.slice(0, 3).map((genre) => (
+                      <Badge key={genre} variant="outline">
+                        {genre}
+                      </Badge>
                     ))}
                   </div>
-                  <button onClick={() => setShowSearch(false)} className="btn btn-secondary">Cancel</button>
                 </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="chapters-section">
-          <h2>Chapters</h2>
-
-          {enrichedChapters.length > 0 && (
-            <div className="continue-reading-section">
-              <button onClick={handleContinueReading} className="btn btn-primary continue-reading-btn">
-                <span className="continue-icon"><Play size={18} /></span>{getContinueReadingText()}
               </button>
-              {readChaptersCount > 0 && (
-                <div className="reading-stats">
-                  <span>{readChaptersCount} / {enrichedChapters.length} chapters read</span>
-                  <div className="overall-progress-bar">
-                    <div className="overall-progress-fill" style={{ width: `${(readChaptersCount / enrichedChapters.length) * 100}%` }} />
-                  </div>
-                </div>
-              )}
-            </div>
+            ))}
+          </div>
+          {searchResults.length === 0 && (
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              No results found.
+            </p>
           )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
 
-          {enrichedChapters.length === 0 ? (
-            <p className="no-chapters">No chapters available</p>
-          ) : (
-            <div className="chapters-list">
-              {enrichedChapters.map((chapter) => {
-                const downloadStatus = getChapterDownloadStatus(chapter);
-                return (
-                  <div
-                    key={chapter.id}
-                    className={`chapter-item ${chapter.isRead ? "read" : ""} ${chapter.isCurrent ? "current" : ""}`}
-                    onClick={() => onReadChapter(chapter.id, chapters)}
-                    role="button"
-                    tabIndex={0}
-                    aria-label={`Read ${chapterLabel(chapter)}`}
-                    onKeyDown={(e) => {
-                      if (e.target !== e.currentTarget) return;
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        onReadChapter(chapter.id, chapters);
-                      }
-                    }}
-                  >
-                    <div className="chapter-status-icon">
-                      {chapter.isRead ? <span className="status-read"><Check size={14} /></span> : chapter.isCurrent ? <span className="status-current"><Play size={14} /></span> : <span className="status-unread"><Circle size={14} /></span>}
-                    </div>
-                    <div className="chapter-info">
-                      <span className="chapter-title">{chapterLabel(chapter)}</span>
-                    </div>
-                    <div className="chapter-meta">
-                      {chapter.progressPercent !== undefined && chapter.progressPercent > 0 && !chapter.isRead && (
-                        <div className="chapter-progress">
-                          <div className="chapter-progress-bar"><div className="chapter-progress-fill" style={{ width: `${chapter.progressPercent}%` }} /></div>
-                          <span className="chapter-progress-text">{chapter.progressPercent}%</span>
-                        </div>
-                      )}
-                      {chapter.isRead && <span className="chapter-read-badge">Read</span>}
-                      <span className="chapter-pages">{chapter.pagesCount > 0 ? `${chapter.pagesCount} pages` : "Not downloaded"}</span>
-
-                      <div className="chapter-row-actions">
-                        <div className="chapter-actions">
-                          <button className="chapter-menu-btn" onClick={(e) => handleChapterMenuClick(e, chapter.id)} title="Chapter options"><EllipsisVertical size={16} /></button>
-                          <ChapterMenu chapter={chapter} isActive={activeChapterMenu === chapter.id} position={menuPosition} menuRef={menuRef} onMarkComplete={handleMarkChapterComplete} onMarkIncomplete={handleMarkChapterIncomplete} />
-                        </div>
-
-                        <button className={`chapter-download-btn ${downloadStatus}`} onClick={(e) => handleDownloadChapter(chapter.chapterId, e)} disabled={downloadStatus === "downloading" || downloadStatus === "pending"} title={downloadStatus === "complete" ? "Downloaded" : downloadStatus === "downloading" ? "Downloading..." : downloadStatus === "error" ? "Download failed" : downloadStatus === "pending" ? "Queued" : "Download chapter"}>
-                          {downloadStatus === "complete" ? <span className="download-icon complete"><Check size={14} /></span> : downloadStatus === "downloading" ? <span className="download-icon downloading"><Loader size={14} /></span> : downloadStatus === "error" ? <span className="download-icon error"><AlertCircle size={14} /></span> : downloadStatus === "pending" ? <span className="download-icon pending"><Clock size={14} /></span> : <span className="download-icon"><Download size={14} /></span>}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </div>
+function MetaRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex min-w-0 gap-2">
+      <span className="w-20 shrink-0 text-muted-foreground">{label}</span>
+      <span className="truncate capitalize">{value}</span>
     </div>
   );
 }

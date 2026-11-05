@@ -54,43 +54,48 @@ export function SearchResultsGrid({
 
   if (isSearching || isLoadingDetails) {
     return (
-      <div className="add-manga-results">
-        <div className="add-manga-results-grid">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <SkeletonCard key={i} />
-          ))}
-        </div>
+      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+        {Array.from({ length: 10 }).map((_, i) => (
+          <SkeletonCard key={i} />
+        ))}
       </div>
     );
   }
 
   if (results.length === 0) {
     if (!hasSearched) return null;
-    if (isLocal) {
-      return (
-        <div className="add-manga-empty">
-          <p>No manga found at "{searchQuery}".</p>
-          <p>
-            Choose a folder that contains chapter subfolders, image files, or
-            CBZ/ZIP archives. The folder must exist on the server machine.
-          </p>
-        </div>
-      );
-    }
     return (
-      <div className="add-manga-empty">
-        <p>No manga found for "{searchQuery}".</p>
-        <p>Try a different query or switch to another source.</p>
+      <div className="mt-6 rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+        {isLocal ? (
+          <>
+            <p>No manga found at "{searchQuery}".</p>
+            <p className="mt-1">
+              Choose a folder that contains chapter subfolders, image files, or
+              CBZ/ZIP archives. The folder must exist on the server machine.
+            </p>
+          </>
+        ) : (
+          <>
+            <p>No manga found for "{searchQuery}".</p>
+            <p className="mt-1">
+              Try a different query or switch to another source.
+            </p>
+          </>
+        )}
       </div>
     );
   }
 
   return (
-    <div className="add-manga-results">
-      <p className="add-manga-results-count">
-        {results.length} manga found{searchQuery ? ` for "${searchQuery}"` : ""}
+    <div className="mt-4">
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        {results.length} manga found
+        {searchQuery ? ` for "${searchQuery}"` : ""}
       </p>
-      <div className="add-manga-results-grid" onKeyDown={handleKeyDown}>
+      <div
+        className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5"
+        onKeyDown={handleKeyDown}
+      >
         {results.map((result, i) => (
           <SearchResultCard
             key={result.sourceMangaId}

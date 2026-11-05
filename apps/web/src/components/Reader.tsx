@@ -6,7 +6,15 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { Maximize, Minimize, RotateCcw, ZoomIn } from "lucide-react";
+import {
+  ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
+  Maximize,
+  Minimize,
+  RotateCcw,
+  ZoomIn,
+} from "lucide-react";
 import type { PageInfo } from "@mugiwara-manga/types";
 import { useApiClient } from "../api/context";
 import {
@@ -41,6 +49,9 @@ import {
 import { useWakeLock } from "../reader/useWakeLock";
 import { hapticPageTurn } from "../platform/haptics";
 import { setSystemBarsHidden } from "../platform/systemBars";
+import { Button } from "./ui/button";
+import { Badge } from "./ui/badge";
+import { cn } from "@/lib/utils";
 
 interface ReaderProps {
   mangaId: string;
@@ -178,7 +189,9 @@ export function Reader({
   const { mutate: saveProgress } = useUpdateChapterProgress(mangaId, chapterId);
   const setReadingModeMutation = useSetReadingMode(mangaId);
 
-  const currentChapter = chapterList.find((chapter) => chapter.id === chapterId);
+  const currentChapter = chapterList.find(
+    (chapter) => chapter.id === chapterId,
+  );
   const mangaTitle = manga?.title?.trim();
   const chapterTitle = currentChapter
     ? currentChapter.title?.trim() || `Chapter ${currentChapter.chapterId}`
@@ -268,9 +281,9 @@ export function Reader({
   }, [serverReadingModeData]);
 
   useEffect(() => {
-    const configured = (serverSettings as Record<string, unknown> | undefined)?.[
-      "reading.defaultMode"
-    ];
+    const configured = (
+      serverSettings as Record<string, unknown> | undefined
+    )?.["reading.defaultMode"];
     if (configured === "rtl" || configured === "ltr") {
       setVerticalDirection(configured);
     }
@@ -402,10 +415,7 @@ export function Reader({
       const deltaLeft = left - startLeft;
       const deltaTop = top - startTop;
 
-      if (
-        reduceMotion ||
-        (Math.abs(deltaLeft) < 1 && Math.abs(deltaTop) < 1)
-      ) {
+      if (reduceMotion || (Math.abs(deltaLeft) < 1 && Math.abs(deltaTop) < 1)) {
         element.scrollTo({ left, top, behavior: "auto" });
         return;
       }
@@ -542,7 +552,9 @@ export function Reader({
         return;
       }
 
-      setCurrentPage((previous) => (previous === pageIndex ? previous : pageIndex));
+      setCurrentPage((previous) =>
+        previous === pageIndex ? previous : pageIndex,
+      );
     };
 
     const debouncer = new SettleDebouncer<number>(SCROLL_SETTLE_MS, settle);
@@ -661,7 +673,9 @@ export function Reader({
       start = null;
     };
 
-    scroller.addEventListener("touchstart", handleTouchStart, { passive: true });
+    scroller.addEventListener("touchstart", handleTouchStart, {
+      passive: true,
+    });
     scroller.addEventListener("touchend", handleTouchEnd, { passive: true });
     scroller.addEventListener("touchcancel", handleTouchCancel, {
       passive: true,
@@ -839,7 +853,13 @@ export function Reader({
         goToNextPage();
       }
     },
-    [direction, goToNextPage, goToPrevPage, readingMode, showControlsTemporarily],
+    [
+      direction,
+      goToNextPage,
+      goToPrevPage,
+      readingMode,
+      showControlsTemporarily,
+    ],
   );
 
   const handlePointerDown = (event: React.PointerEvent) => {
@@ -942,10 +962,8 @@ export function Reader({
       cancelPendingTap();
       pointerStartRef.current = null;
       const rect = element.getBoundingClientRect();
-      const midX =
-        (event.touches[0]!.clientX + event.touches[1]!.clientX) / 2;
-      const midY =
-        (event.touches[0]!.clientY + event.touches[1]!.clientY) / 2;
+      const midX = (event.touches[0]!.clientX + event.touches[1]!.clientX) / 2;
+      const midY = (event.touches[0]!.clientY + event.touches[1]!.clientY) / 2;
       pinchRef.current = {
         distance: Math.max(1, distance(event.touches)),
         scale: zoomRef.current.scale,
@@ -998,7 +1016,9 @@ export function Reader({
 
     if (next) {
       if (document.documentElement.requestFullscreen) {
-        void document.documentElement.requestFullscreen().catch(() => undefined);
+        void document.documentElement
+          .requestFullscreen()
+          .catch(() => undefined);
       }
     } else if (document.fullscreenElement) {
       void document.exitFullscreen().catch(() => undefined);
@@ -1021,20 +1041,18 @@ export function Reader({
 
   if (pagesLoading) {
     return (
-      <div className="reader-loading">
+      <div className="flex h-full flex-col items-center justify-center gap-3 bg-[#0b0b0c] text-zinc-400">
         <div className="loading-spinner" />
-        <p>Loading chapter...</p>
+        <p className="text-sm">Loading chapter...</p>
       </div>
     );
   }
 
   if (pages.length === 0) {
     return (
-      <div className="reader-empty">
-        <p>No pages found in this chapter</p>
-        <button onClick={() => onBack()} className="btn btn-primary">
-          Go Back
-        </button>
+      <div className="flex h-full flex-col items-center justify-center gap-4 bg-[#0b0b0c] px-6 text-center text-zinc-300">
+        <p className="text-sm text-zinc-400">No pages found in this chapter</p>
+        <Button onClick={() => onBack()}>Go Back</Button>
       </div>
     );
   }
@@ -1042,7 +1060,11 @@ export function Reader({
   return (
     <div
       ref={containerRef}
-      className={`reader reader-mode-${readingMode} ${immersive ? "reader-immersive" : ""}`}
+      className={cn(
+        "reader select-none",
+        `reader-mode-${readingMode}`,
+        immersive && "reader-immersive",
+      )}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
@@ -1050,61 +1072,89 @@ export function Reader({
       onContextMenu={handleContextMenu}
     >
       <div
-        className={`reader-controls top-controls ${showControls ? "visible" : ""}`}
+        className={cn(
+          "reader-controls top-controls absolute inset-x-0 top-0 z-30 p-2 pt-[max(0.5rem,env(safe-area-inset-top))] transition-all duration-200 sm:p-3",
+          showControls
+            ? "pointer-events-auto translate-y-0 opacity-100"
+            : "pointer-events-none -translate-y-2 opacity-0",
+        )}
       >
-        <button onClick={() => onBack()} className="btn btn-secondary">
-          Back
-        </button>
-        <div className="reader-settings">
+        <div className="mx-auto flex max-w-4xl items-center gap-1.5 rounded-2xl border border-white/10 bg-black/65 p-1.5 text-white shadow-xl backdrop-blur-xl sm:gap-2 sm:p-2">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => onBack()}
+            className="text-white hover:bg-white/10 hover:text-white"
+            aria-label="Back"
+            title="Back"
+          >
+            <ArrowLeft className="size-4" />
+          </Button>
+
+          <div className="min-w-0 flex-1 px-1">
+            <div className="flex min-w-0 items-center gap-1.5 text-xs sm:text-sm">
+              {mangaTitle && (
+                <span className="truncate font-medium" title={mangaTitle}>
+                  {mangaTitle}
+                </span>
+              )}
+              {mangaTitle && chapterTitle && (
+                <span className="text-white/40" aria-hidden="true">
+                  ·
+                </span>
+              )}
+              {chapterTitle && (
+                <span className="truncate text-white/60" title={chapterTitle}>
+                  {chapterTitle}
+                </span>
+              )}
+            </div>
+          </div>
+
+          <Badge
+            variant="secondary"
+            className="hidden shrink-0 border-white/10 bg-white/10 text-white sm:inline-flex"
+          >
+            {currentPage + 1} / {pages.length}
+          </Badge>
+
           <select
             value={readingMode}
             aria-label="Reading mode"
             onChange={(event) =>
               handleModeChange(event.target.value as ReaderMode)
             }
+            className="h-8 shrink-0 rounded-md border border-white/15 bg-white/10 px-2 text-xs text-white outline-none focus:ring-2 focus:ring-indigo-400"
           >
-            <option value="rtl">RTL (Manga)</option>
-            <option value="ltr">LTR</option>
-            <option value="vertical">Vertical</option>
+            <option value="rtl" className="bg-zinc-900">
+              RTL
+            </option>
+            <option value="ltr" className="bg-zinc-900">
+              LTR
+            </option>
+            <option value="vertical" className="bg-zinc-900">
+              Vertical
+            </option>
           </select>
-        </div>
-        <div className="reader-meta">
-          <div className="reader-info">
-            {mangaTitle ? (
-              <span className="reader-manga-title" title={mangaTitle}>
-                {mangaTitle}
-              </span>
-            ) : null}
-            {mangaTitle && chapterTitle ? (
-              <span className="reader-info-separator" aria-hidden="true">
-                ·
-              </span>
-            ) : null}
-            {chapterTitle ? (
-              <span className="reader-chapter-title" title={chapterTitle}>
-                {chapterTitle}
-              </span>
-            ) : null}
-          </div>
-          <div className="page-indicator">
-            {currentPage + 1} / {pages.length}
-          </div>
-        </div>
-        <div className="reader-actions">
+
           {zoom.scale > 1 ? (
-            <button
+            <Button
               type="button"
-              className="btn btn-icon reader-zoom-reset"
+              variant="ghost"
+              size="icon-sm"
+              className="text-white hover:bg-white/10 hover:text-white"
               title="Reset zoom"
               aria-label="Reset zoom"
               onClick={resetZoom}
             >
-              <RotateCcw size={18} />
-            </button>
+              <RotateCcw className="size-4" />
+            </Button>
           ) : (
-            <button
+            <Button
               type="button"
-              className="btn btn-icon"
+              variant="ghost"
+              size="icon-sm"
+              className="text-white hover:bg-white/10 hover:text-white"
               title="Zoom in"
               aria-label="Zoom in"
               onClick={() =>
@@ -1115,18 +1165,24 @@ export function Reader({
                 })
               }
             >
-              <ZoomIn size={18} />
-            </button>
+              <ZoomIn className="size-4" />
+            </Button>
           )}
-          <button
+          <Button
             type="button"
-            className="btn btn-icon"
+            variant="ghost"
+            size="icon-sm"
+            className="text-white hover:bg-white/10 hover:text-white"
             title={immersive ? "Exit fullscreen" : "Enter fullscreen"}
             aria-label={immersive ? "Exit fullscreen" : "Enter fullscreen"}
             onClick={toggleImmersive}
           >
-            {immersive ? <Minimize size={18} /> : <Maximize size={18} />}
-          </button>
+            {immersive ? (
+              <Minimize className="size-4" />
+            ) : (
+              <Maximize className="size-4" />
+            )}
+          </Button>
         </div>
       </div>
 
@@ -1141,11 +1197,11 @@ export function Reader({
             <div className="page-slide" key={slide.key}>
               {slide.kind === "page" ? (
                 <ReaderPage
-                  src={api.getAssetUrl(
-                    pages[slide.pageIndex!]?.url,
-                  )}
+                  src={api.getAssetUrl(pages[slide.pageIndex!]?.url)}
                   pageNumber={slide.pageIndex! + 1}
-                  eager={Math.abs(slide.pageIndex! - currentPage) <= PRELOAD_RADIUS}
+                  eager={
+                    Math.abs(slide.pageIndex! - currentPage) <= PRELOAD_RADIUS
+                  }
                   active={slide.pageIndex === currentPage}
                   zoom={zoom}
                   width={pages[slide.pageIndex!]?.width}
@@ -1186,28 +1242,50 @@ export function Reader({
       )}
 
       <div
-        className={`reader-controls bottom-controls ${showControls ? "visible" : ""}`}
+        className={cn(
+          "reader-controls bottom-controls absolute inset-x-0 bottom-0 z-30 p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] transition-all duration-200 sm:p-3",
+          showControls
+            ? "pointer-events-auto translate-y-0 opacity-100"
+            : "pointer-events-none translate-y-2 opacity-0",
+        )}
       >
-        <button
-          onClick={() => goToPrevPage()}
-          disabled={currentPage === 0 && !onPrevChapter}
-          className="btn btn-secondary"
-        >
-          Previous
-        </button>
-        <div className="progress-bar-container">
-          <div
-            className="progress-bar"
-            style={{ width: `${((currentPage + 1) / pages.length) * 100}%` }}
-          />
+        <div className="mx-auto flex max-w-4xl items-center gap-2 rounded-2xl border border-white/10 bg-black/65 p-1.5 text-white shadow-xl backdrop-blur-xl sm:p-2">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => goToPrevPage()}
+            disabled={currentPage === 0 && !onPrevChapter}
+            className="text-white hover:bg-white/10 hover:text-white disabled:opacity-30"
+            aria-label="Previous page"
+            title="Previous page"
+          >
+            <ChevronLeft className="size-5" />
+          </Button>
+          <div className="flex min-w-0 flex-1 items-center gap-2 px-1">
+            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/15">
+              <div
+                className="h-full rounded-full bg-indigo-400 transition-[width] duration-200"
+                style={{
+                  width: `${((currentPage + 1) / pages.length) * 100}%`,
+                }}
+              />
+            </div>
+            <span className="w-12 shrink-0 text-right text-[11px] tabular-nums text-white/60">
+              {currentPage + 1} / {pages.length}
+            </span>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => goToNextPage()}
+            disabled={currentPage === pages.length - 1 && !onNextChapter}
+            className="text-white hover:bg-white/10 hover:text-white disabled:opacity-30"
+            aria-label="Next page"
+            title="Next page"
+          >
+            <ChevronRight className="size-5" />
+          </Button>
         </div>
-        <button
-          onClick={() => goToNextPage()}
-          disabled={currentPage === pages.length - 1 && !onNextChapter}
-          className="btn btn-primary"
-        >
-          Next
-        </button>
       </div>
     </div>
   );

@@ -6,6 +6,10 @@ import type {
   ImportChapterProgress,
   ImportProgressResponse,
 } from "./types";
+import { Button } from "../ui/button";
+import { Progress } from "../ui/progress";
+import { Alert, AlertDescription } from "../ui/alert";
+import { cn } from "@/lib/utils";
 
 interface ImportProgressProps {
   mangaId: string;
@@ -49,39 +53,48 @@ export function ImportProgress({
 
   if (progressError) {
     return (
-      <div className="import-progress">
-        <h4 className="import-progress-title">Importing {mangaTitle}...</h4>
-        <div className="add-manga-error" role="alert">
-          Progress could not be loaded:{" "}
-          {progressError instanceof Error ? progressError.message : "unknown error"}.
-          The server may be offline. The import may still finish; close this
-          dialog and check the library.
-        </div>
-        <div className="import-progress-footer">
-          <button className="btn btn-secondary" onClick={handleCancel} disabled={cancelImport.isPending}>
-            {cancelImport.isPending ? "Cancelling..." : "Cancel remaining"}
-          </button>
-        </div>
+      <div className="space-y-3">
+        <h4 className="font-semibold">Importing {mangaTitle}...</h4>
+        <Alert variant="destructive">
+          <AlertCircle />
+          <AlertDescription>
+            Progress could not be loaded:{" "}
+            {progressError instanceof Error
+              ? progressError.message
+              : "unknown error"}
+            . The server may be offline. The import may still finish; close this
+            dialog and check the library.
+          </AlertDescription>
+        </Alert>
+        <Button
+          variant="outline"
+          onClick={handleCancel}
+          disabled={cancelImport.isPending}
+        >
+          {cancelImport.isPending ? "Cancelling..." : "Cancel remaining"}
+        </Button>
       </div>
     );
   }
 
   if (!progress) {
     return (
-      <div className="import-progress">
-        <h4 className="import-progress-title">Importing {mangaTitle}...</h4>
-        <div className="import-progress-card">
-          <div className="import-progress-bar">
-            <div className="import-progress-bar-fill" style={{ width: "0%" }} />
+      <div className="space-y-3">
+        <h4 className="font-semibold">Importing {mangaTitle}...</h4>
+        <div className="rounded-xl border border-border/70 bg-background/40 p-4">
+          <Progress value={0} />
+          <div className="mt-2 text-sm font-medium">Starting…</div>
+          <div className="text-xs text-muted-foreground">
+            Waiting for the server queue
           </div>
-          <div className="import-progress-pct">Starting…</div>
-          <div className="import-progress-count">Waiting for the server queue</div>
         </div>
-        <div className="import-progress-footer">
-          <button className="btn btn-secondary" onClick={handleCancel} disabled={cancelImport.isPending}>
-            {cancelImport.isPending ? "Cancelling..." : "Cancel remaining"}
-          </button>
-        </div>
+        <Button
+          variant="outline"
+          onClick={handleCancel}
+          disabled={cancelImport.isPending}
+        >
+          {cancelImport.isPending ? "Cancelling..." : "Cancel remaining"}
+        </Button>
       </div>
     );
   }
@@ -96,51 +109,62 @@ export function ImportProgress({
       : "Queued";
 
   return (
-    <div className="import-progress">
-      <h4 className="import-progress-title">{statusLabel}: {mangaTitle}</h4>
-      <div className="import-progress-card">
-        <div className="import-progress-bar">
-          <div className="import-progress-bar-fill" style={{ width: `${progress.overallProgress}%` }} />
+    <div className="space-y-3">
+      <h4 className="font-semibold">
+        {statusLabel}: {mangaTitle}
+      </h4>
+      <div className="rounded-xl border border-border/70 bg-background/40 p-4">
+        <Progress value={progress.overallProgress} />
+        <div className="mt-2 text-sm font-medium">
+          {progress.overallProgress}% complete
         </div>
-        <div className="import-progress-pct">{progress.overallProgress}% complete</div>
-        <div className="import-progress-count">
-          {progress.completedChapters} / {progress.totalChapters} chapters imported
+        <div className="text-xs text-muted-foreground">
+          {progress.completedChapters} / {progress.totalChapters} chapters
+          imported
         </div>
         {progress.downloadingChapters > 0 && (
-          <div className="import-progress-count">
-            {progress.downloadingChapters} downloading · {progress.queuedChapters} queued
+          <div className="text-xs text-muted-foreground">
+            {progress.downloadingChapters} downloading ·{" "}
+            {progress.queuedChapters} queued
           </div>
         )}
         {progress.erroredChapters > 0 && (
-          <div className="import-progress-errors">
-            <AlertCircle size={14} /> {progress.erroredChapters} error
+          <div className="mt-1 flex items-center gap-1 text-xs text-destructive-text">
+            <AlertCircle className="size-3.5" /> {progress.erroredChapters}{" "}
+            error
             {progress.erroredChapters > 1 ? "s" : ""}
           </div>
         )}
         {(progress.cancelledChapters ?? 0) > 0 && (
-          <div className="import-progress-cancelled">
+          <div className="mt-1 text-xs text-warning-text">
             {progress.cancelledChapters} chapter
             {(progress.cancelledChapters ?? 0) > 1 ? "s" : ""} cancelled
           </div>
         )}
       </div>
-      <div className="import-progress-chapters">
+      <div className="max-h-[38dvh] space-y-1 overflow-y-auto rounded-xl border border-border/60 bg-background/30 p-2 scrollbar-thin">
         {progress.chapters.map((ch: ImportChapterProgress) => (
           <ChapterRow key={ch.chapterId} chapter={ch} />
         ))}
       </div>
       {cancelError && (
-        <p className="add-manga-error" role="alert">{cancelError}</p>
+        <Alert variant="destructive" role="alert">
+          <AlertDescription>{cancelError}</AlertDescription>
+        </Alert>
       )}
-      <div className="import-progress-footer">
+      <div>
         {finished ? (
-          <p className="import-progress-settled">
+          <p className="text-sm text-muted-foreground">
             The queue has settled. Close this dialog or return to the library.
           </p>
         ) : (
-          <button className="btn btn-secondary" onClick={handleCancel} disabled={cancelImport.isPending}>
+          <Button
+            variant="outline"
+            onClick={handleCancel}
+            disabled={cancelImport.isPending}
+          >
             {cancelImport.isPending ? "Cancelling..." : "Cancel remaining"}
-          </button>
+          </Button>
         )}
       </div>
     </div>
@@ -149,41 +173,57 @@ export function ImportProgress({
 
 function ChapterRow({ chapter }: { chapter: ImportChapterProgress }) {
   let icon: React.ReactNode;
-  let iconClass: string;
+  let tone: string;
   let extra: React.ReactNode = null;
 
   switch (chapter.status) {
     case "complete":
-      icon = <Check size={14} />;
-      iconClass = "status-complete";
+      icon = <Check className="size-3.5" />;
+      tone = "text-success-text";
       break;
     case "downloading":
-      icon = <Loader size={14} />;
-      iconClass = "status-downloading";
+      icon = <Loader className="size-3.5 animate-spin" />;
+      tone = "text-brand-text";
       if (chapter.completedPages !== undefined && chapter.totalPages) {
-        extra = <span className="import-chapter-pages">{chapter.completedPages} / {chapter.totalPages} pages</span>;
+        extra = (
+          <span className="text-xs text-muted-foreground">
+            {chapter.completedPages} / {chapter.totalPages} pages
+          </span>
+        );
       }
       break;
     case "queued":
-      icon = <Circle size={14} />;
-      iconClass = "status-queued";
+      icon = <Circle className="size-3.5" />;
+      tone = "text-muted-foreground";
       break;
     case "cancelled":
-      icon = <X size={14} />;
-      iconClass = "status-cancelled";
-      extra = <span className="import-chapter-cancelled">Cancelled</span>;
+      icon = <X className="size-3.5" />;
+      tone = "text-warning-text";
+      extra = <span className="text-xs text-warning-text">Cancelled</span>;
       break;
     default:
-      icon = <X size={14} />;
-      iconClass = "status-error";
-      extra = chapter.errorMessage ? <span className="import-chapter-error">{chapter.errorMessage}</span> : null;
+      icon = <X className="size-3.5" />;
+      tone = "text-destructive-text";
+      extra = chapter.errorMessage ? (
+        <span className="text-xs text-destructive-text">
+          {chapter.errorMessage}
+        </span>
+      ) : null;
       break;
   }
 
   return (
-    <div className={`import-chapter-row ${iconClass}`}>
-      <span className="import-chapter-icon">{icon}</span>
-      <span className="import-chapter-label">Ch. {chapter.chapterId}{chapter.title ? ` — ${chapter.title}` : ""}</span>
+    <div
+      className={cn(
+        "flex items-center gap-2 rounded-md px-2 py-1.5 text-sm",
+        tone,
+      )}
+    >
+      <span className="shrink-0">{icon}</span>
+      <span className="min-w-0 flex-1 truncate">
+        Ch. {chapter.chapterId}
+        {chapter.title ? ` — ${chapter.title}` : ""}
+      </span>
       {extra}
     </div>
   );

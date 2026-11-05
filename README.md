@@ -19,6 +19,22 @@ Platform-specific code lives in the shells and `apps/web/src/platform/server.ts`
 Feature components should not branch on `process.platform`, `Platform.OS`, or
 `navigator.platform`.
 
+## UI system
+
+`apps/web` uses **Tailwind CSS v4** with **shadcn/ui** primitives built on
+Radix (`src/components/ui`). The original `--bg-primary`, `--text-primary` and
+brand accent tokens are bridged to the shadcn semantic variables in
+`src/index.css`, so dark and light themes keep the same look and feel.
+
+- Layout and components use Tailwind utilities; `src/index.css` is limited to
+  tokens, base styles and the performance-sensitive reader page layout.
+- Dialogs, selects, dropdown menus, tabs, switches and toasts are accessible
+  primitives with focus trapping, keyboard navigation and ARIA semantics.
+- Mobile-first layouts use a bottom navigation bar, safe-area padding and
+  bottom-sheet dialogs. Modals restore focus and close on Escape.
+- Use the helpers in `src/lib/utils.ts` (`cn`) and the primitives in
+  `src/components/ui` before adding bespoke styles.
+
 ## Quick start (development)
 
 ```sh

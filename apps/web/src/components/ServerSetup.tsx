@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Server, Wifi, ArrowLeft, KeyRound, ShieldCheck } from "lucide-react";
+import { ArrowLeft, KeyRound, Server, ShieldCheck, Wifi } from "lucide-react";
 import {
   getStoredServerUrl,
   isCapacitor,
@@ -9,6 +9,12 @@ import {
   testServerUrl,
   validateToken,
 } from "../platform/server";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
+import { Alert, AlertDescription } from "./ui/alert";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
+import { cn } from "@/lib/utils";
 
 interface ServerSetupProps {
   initialUrl?: string;
@@ -148,160 +154,171 @@ export function ServerSetup({
   };
 
   return (
-    <div className="server-setup">
-      <div className="server-setup-card">
-        {canCancel && (
-          <button className="server-setup-back" onClick={onCancel}>
-            <ArrowLeft size={16} /> Back
-          </button>
-        )}
-        <div className="server-setup-icon">
-          <Server size={32} />
-        </div>
-        <h1>Connect to Mugiwara</h1>
-        <p className="server-setup-description">
-          Mugiwara requires a paired device. Run the server on a computer or
-          NAS, then pair this app with the short-lived code printed by the
-          server.
-        </p>
+    <div className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-background px-4 py-10">
+      <div
+        className="pointer-events-none absolute inset-0 opacity-70"
+        aria-hidden="true"
+      >
+        <div className="absolute left-1/2 top-[-10rem] size-[28rem] -translate-x-1/2 rounded-full bg-indigo-600/20 blur-3xl" />
+        <div className="absolute bottom-[-12rem] right-[-6rem] size-[26rem] rounded-full bg-indigo-500/10 blur-3xl" />
+      </div>
 
-        <label className="server-setup-label" htmlFor="server-url">
-          Server address
-        </label>
-        {lockUrl ? (
-          <div className="server-setup-locked-url">
-            {normalizeServerUrl(url) || url}
+      <div className="relative w-full max-w-md">
+        <div className="rounded-2xl border border-border/80 bg-card/90 p-5 shadow-2xl shadow-black/30 backdrop-blur-xl sm:p-7">
+          {canCancel && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onCancel}
+              className="mb-3 -ml-2"
+            >
+              <ArrowLeft className="size-4" /> Back
+            </Button>
+          )}
+
+          <div className="flex flex-col items-center text-center">
+            <span className="flex size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-400 to-indigo-600 text-white shadow-lg shadow-indigo-950/30">
+              <Server className="size-7" />
+            </span>
+            <h1 className="mt-4 text-2xl font-semibold tracking-tight">
+              Connect to Mugiwara
+            </h1>
+            <p className="mt-1.5 text-sm text-muted-foreground">
+              Pair this app with the server running on your computer or NAS. The
+              server prints a short-lived code on startup.
+            </p>
           </div>
-        ) : (
-          <div className="server-setup-row">
-            <input
-              id="server-url"
-              className="server-setup-input"
-              type="url"
-              inputMode="url"
-              autoCapitalize="none"
-              autoCorrect="off"
-              spellCheck={false}
-              placeholder="http://192.168.1.20:3001"
-              value={url}
-              onChange={(event) => setUrl(event.target.value)}
-            />
-          </div>
-        )}
 
-        <div
-          className="server-setup-tabs"
-          role="tablist"
-          aria-label="Pairing method"
-        >
-          <button
-            type="button"
-            role="tab"
-            aria-selected={mode === "code"}
-            className={`server-setup-tab ${mode === "code" ? "active" : ""}`}
-            onClick={() => {
-              setMode("code");
-              setError(null);
-            }}
-          >
-            <KeyRound size={15} /> Pairing code
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={mode === "token"}
-            className={`server-setup-tab ${mode === "token" ? "active" : ""}`}
-            onClick={() => {
-              setMode("token");
-              setError(null);
-            }}
-          >
-            <ShieldCheck size={15} /> Access token
-          </button>
-        </div>
-
-        {mode === "code" ? (
-          <>
-            <label className="server-setup-label" htmlFor="pairing-code">
-              Pairing code
-            </label>
-            <div className="server-setup-row">
-              <input
-                id="pairing-code"
-                className="server-setup-input server-setup-code"
-                type="text"
-                inputMode="text"
-                autoCapitalize="characters"
-                autoCorrect="off"
-                spellCheck={false}
-                maxLength={12}
-                placeholder="ABCD2345"
-                value={code}
-                onChange={(event) => setCode(event.target.value.toUpperCase())}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") handleConnect();
-                }}
-              />
-              <button
-                className="btn btn-secondary"
-                type="button"
-                onClick={handleRequestCode}
-                disabled={testing}
-              >
-                Get code
-              </button>
+          <div className="mt-5 space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="server-url">Server address</Label>
+              {lockUrl ? (
+                <div className="rounded-lg border border-border bg-muted/50 px-3 py-2.5 font-mono text-sm text-muted-foreground">
+                  {normalizeServerUrl(url) || url}
+                </div>
+              ) : (
+                <Input
+                  id="server-url"
+                  type="url"
+                  inputMode="url"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  placeholder="http://192.168.1.20:3001"
+                  value={url}
+                  onChange={(event) => setUrl(event.target.value)}
+                />
+              )}
             </div>
-            <label className="server-setup-label" htmlFor="device-label">
-              Device name
-            </label>
-            <input
-              id="device-label"
-              className="server-setup-input"
-              type="text"
-              maxLength={80}
-              value={deviceLabel}
-              onChange={(event) => setDeviceLabel(event.target.value)}
-            />
-          </>
-        ) : (
-          <>
-            <label className="server-setup-label" htmlFor="access-token">
-              Access token
-            </label>
-            <input
-              id="access-token"
-              className="server-setup-input server-setup-code"
-              type="password"
-              autoCapitalize="none"
-              autoCorrect="off"
-              spellCheck={false}
-              placeholder="mgt_..."
-              value={token}
-              onChange={(event) => setToken(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") handleConnect();
+
+            <Tabs
+              value={mode}
+              onValueChange={(value) => {
+                setMode(value as Mode);
+                setError(null);
               }}
-            />
-          </>
-        )}
+            >
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="code">
+                  <KeyRound className="size-4" /> Pairing code
+                </TabsTrigger>
+                <TabsTrigger value="token">
+                  <ShieldCheck className="size-4" /> Access token
+                </TabsTrigger>
+              </TabsList>
 
-        <button
-          className="btn btn-primary server-setup-connect"
-          onClick={handleConnect}
-          disabled={testing}
-        >
-          {testing ? "Connecting..." : "Connect"}
-        </button>
+              <TabsContent value="code" className="mt-3 space-y-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="pairing-code">Pairing code</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="pairing-code"
+                      type="text"
+                      inputMode="text"
+                      autoCapitalize="characters"
+                      autoCorrect="off"
+                      spellCheck={false}
+                      maxLength={12}
+                      placeholder="ABCD2345"
+                      value={code}
+                      onChange={(event) =>
+                        setCode(event.target.value.toUpperCase())
+                      }
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") handleConnect();
+                      }}
+                      className="font-mono tracking-[0.2em]"
+                    />
+                    <Button
+                      variant="outline"
+                      type="button"
+                      onClick={handleRequestCode}
+                      disabled={testing}
+                    >
+                      Get code
+                    </Button>
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="device-label">Device name</Label>
+                  <Input
+                    id="device-label"
+                    type="text"
+                    maxLength={80}
+                    value={deviceLabel}
+                    onChange={(event) => setDeviceLabel(event.target.value)}
+                  />
+                </div>
+              </TabsContent>
 
-        {error && <p className="server-setup-error">{error}</p>}
-        {notice && <p className="server-setup-notice">{notice}</p>}
+              <TabsContent value="token" className="mt-3 space-y-1.5">
+                <Label htmlFor="access-token">Access token</Label>
+                <Input
+                  id="access-token"
+                  type="password"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  placeholder="mgt_..."
+                  value={token}
+                  onChange={(event) => setToken(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") handleConnect();
+                  }}
+                  className="font-mono"
+                />
+              </TabsContent>
+            </Tabs>
 
-        <div className="server-setup-help">
-          <Wifi size={16} />
-          <span>
-            The server prints its LAN address and a first-run pairing code on
-            startup. Pairing codes expire after 10 minutes and work once.
-          </span>
+            <Button
+              variant="brand"
+              className="w-full"
+              size="lg"
+              onClick={handleConnect}
+              disabled={testing}
+            >
+              {testing ? "Connecting..." : "Connect"}
+            </Button>
+
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+            {notice && (
+              <Alert variant="success">
+                <AlertDescription>{notice}</AlertDescription>
+              </Alert>
+            )}
+
+            <div className="flex items-start gap-2 rounded-xl border border-border/70 bg-background/40 p-3 text-xs text-muted-foreground">
+              <Wifi className="mt-0.5 size-4 shrink-0" />
+              <span>
+                The server prints its LAN address and a first-run pairing code
+                on startup. Pairing codes expire after 10 minutes and work once.
+              </span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
