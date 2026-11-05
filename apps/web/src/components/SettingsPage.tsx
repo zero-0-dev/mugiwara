@@ -5,6 +5,7 @@ import {
   Database,
   Download,
   Info,
+  Link2,
   ListOrdered,
   Plug,
   ShieldCheck,
@@ -16,6 +17,7 @@ import { StorageSection } from "./settings/StorageSection";
 import { PluginsSection } from "./settings/PluginsSection";
 import { QueueSection } from "./settings/QueueSection";
 import { SecuritySection } from "./settings/SecuritySection";
+import { TrackingSection } from "./settings/TrackingSection";
 import { useSettings, useSaveSetting } from "../api/hooks";
 import { useMobileLayout } from "../hooks/useMobileLayout";
 import pkg from "../../package.json";
@@ -100,6 +102,7 @@ const TABS = [
   { value: "reading", label: "Reading", icon: BookOpen },
   { value: "categories", label: "Categories", icon: Tags },
   { value: "downloads", label: "Downloads", icon: Download },
+  { value: "tracking", label: "Tracking", icon: Link2 },
   { value: "storage", label: "Storage", icon: Database },
   { value: "plugins", label: "Plugins", icon: Plug },
   { value: "queue", label: "Queue", icon: ListOrdered },
@@ -339,6 +342,9 @@ export function SettingsPage({
 
           <TabsContent value="storage" className="mt-0">
             <StorageSection onOpenDiskSpace={onOpenDiskSpace} />
+          </TabsContent>
+          <TabsContent value="tracking" className="mt-0">
+            <TrackingSection />
           </TabsContent>
           <TabsContent value="plugins" className="mt-0">
             <PluginsSection />

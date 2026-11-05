@@ -23,10 +23,13 @@ const PUBLIC_API_PATHS = new Set([
   "/api/auth/pairing/init",
 ]);
 
+const TRACKER_CALLBACK_PATH =
+  /^\/api\/trackers\/[^/]+\/auth\/callback$/;
+
 const CONTENT_TOKEN_QUERY = "contentToken";
 
 export function isPublicApiPath(path: string): boolean {
-  return PUBLIC_API_PATHS.has(path);
+  return PUBLIC_API_PATHS.has(path) || TRACKER_CALLBACK_PATH.test(path);
 }
 
 export function createAuthMiddleware(auth: AuthService) {

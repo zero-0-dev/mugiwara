@@ -291,23 +291,107 @@ export const mangaCollectionsRelations = relations(
   }),
 );
 
-export const tracking = sqliteTable("tracking", {
-  id: text("id").primaryKey(),
-  mangaId: text("manga_id")
-    .notNull()
-    .references(() => manga.id, { onDelete: "cascade" }),
-  trackerType: text("tracker_type").notNull(),
-  trackerMangaId: text("tracker_manga_id").notNull(),
-  status: text("status").notNull().default("plan_to_read"),
-  score: integer("score"),
-  chaptersRead: integer("chapters_read").notNull().default(0),
-  startedAt: text("started_at"),
-  finishedAt: text("finished_at"),
-  lastSyncedAt: text("last_synced_at"),
-  createdAt: text("created_at")
-    .notNull()
-    .default(sql`(current_timestamp)`),
-});
+// OAuth accounts for external trackers. Access and refresh tokens are stored
+// AES-256-GCM encrypted and are never returned by the API.
+export const trackerAccounts = sqliteTable(
+  "tracker_accounts",
+  {
+    id: text("id").primaryKey(),
+    provider: text("provider").notNull(), // 'anilist' | 'myanimelist'
+    externalUserId: text("external_user_id").notNull(),
+    username: text("username"),
+    accessTokenEnc: text("access_token_enc").notNull(),
+    refreshTokenEnc: text("refresh_token_enc"),
+    tokenType: text("token_type").notNull().default("Bearer"),
+    scope: text("scope"),
+    expiresAt: text("expires_at"),
+    // Pull-only accounts import progress but never write to the provider.
+    readOnly: integer("read_only", { mode: "boolean" }).notNull().default(false),
+    lastSyncAt: text("last_sync_at"),
+    lastError: text("last_error"),
+    createdAt: text("created_at")
+      .notNull()
+      .default(sql`(current_timestamp)`),
+    updatedAt: text("updated_at")
+      .notNull()
+      .default(sql`(current_timestamp)`),
+  },
+  (table) => ({
+    providerUnique: uniqueIndex("tracker_accounts_provider_idx").on(
+      table.provider,
+    ),
+  }),
+);
+
+// Short-lived OAuth state + PKCE verifier rows. The verifier is encrypted at
+// rest like the tokens; rows are single-use and expire quickly.
+export const trackerOAuthStates = sqliteTable(
+  "tracker_oauth_states",
+  {
+    id: text("id").primaryKey(),
+    provider: text("provider").notNull(),
+    state: text("state").notNull(),
+    codeVerifierEnc: text("code_verifier_enc").notNull(),
+    redirectUri: text("redirect_uri").notNull(),
+    createdAt: text("created_at")
+      .notNull()
+      .default(sql`(current_timestamp)`),
+    expiresAt: text("expires_at").notNull(),
+  },
+  (table) => ({
+    stateUnique: uniqueIndex("tracker_oauth_states_state_idx").on(table.state),
+  }),
+);
+
+export const trackerAccountsRelations = relations(
+  trackerAccounts,
+  ({ many }) => ({
+    tracking: many(tracking),
+  }),
+);
+
+export const tracking = sqliteTable(
+  "tracking",
+  {
+    id: text("id").primaryKey(),
+    mangaId: text("manga_id")
+      .notNull()
+      .references(() => manga.id, { onDelete: "cascade" }),
+    trackerType: text("tracker_type").notNull(), // 'anilist' | 'myanimelist'
+    trackerMangaId: text("tracker_manga_id").notNull(),
+    status: text("status").notNull().default("plan_to_read"),
+    // Provider-native score: 0-100 for AniList, 0-10 for MyAnimeList.
+    score: integer("score"),
+    chaptersRead: integer("chapters_read").notNull().default(0),
+    startedAt: text("started_at"),
+    finishedAt: text("finished_at"),
+    lastSyncedAt: text("last_synced_at"),
+    lastPushedAt: text("last_pushed_at"),
+    lastPulledAt: text("last_pulled_at"),
+    remoteUpdatedAt: text("remote_updated_at"),
+    // idle | synced | pending | error | conflict
+    syncState: text("sync_state").notNull().default("idle"),
+    syncError: text("sync_error"),
+    // Set when local chapter completion changes and a push is pending.
+    localDirty: integer("local_dirty", { mode: "boolean" })
+      .notNull()
+      .default(false),
+    // JSON snapshot of the local/remote values while syncState = conflict.
+    conflict: text("conflict"),
+    createdAt: text("created_at")
+      .notNull()
+      .default(sql`(current_timestamp)`),
+    updatedAt: text("updated_at")
+      .notNull()
+      .default(sql`(current_timestamp)`),
+  },
+  (table) => ({
+    uniqueTracking: uniqueIndex("tracking_manga_provider_idx").on(
+      table.mangaId,
+      table.trackerType,
+    ),
+  }),
+);
 
 export const trackingRelations = relations(tracking, ({ one }) => ({
   manga: one(manga, {

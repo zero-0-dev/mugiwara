@@ -77,6 +77,11 @@ async function capture(viewport, label, dark) {
   await card.click();
   await page.getByRole("heading", { name: "Chapters", exact: true }).waitFor();
   await save(page, `${label}-manga-detail-${suffix}`);
+  await page.screenshot({
+    path: join(OUT, `${label}-manga-detail-tracking-${suffix}.png`),
+    fullPage: true,
+  });
+  console.log(`saved ${label}-manga-detail-tracking-${suffix}.png`);
 
   await page
     .getByRole("button", { name: /Start reading|Continue reading|Read Again/i })
@@ -99,6 +104,7 @@ async function capture(viewport, label, dark) {
   for (const [tab, name] of [
     ["Categories", "categories"],
     ["Downloads", "downloads"],
+    ["Tracking", "tracking"],
     ["Storage", "storage"],
     ["Plugins", "plugins"],
     ["Queue", "queue"],
@@ -138,8 +144,10 @@ async function capture(viewport, label, dark) {
         .getByRole("button", { name: "Back", exact: true })
         .first()
         .click();
+      // Back from /disk-space returns to /settings/storage, not the default
+      // Reading tab.
       await page
-        .getByRole("heading", { name: "Reading Preferences", exact: true })
+        .getByRole("heading", { name: "Storage Backends", exact: true })
         .waitFor();
     }
   }

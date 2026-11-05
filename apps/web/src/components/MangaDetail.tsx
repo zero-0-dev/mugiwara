@@ -43,6 +43,7 @@ import { Badge } from "./ui/badge";
 import { Input } from "./ui/input";
 import { Progress } from "./ui/progress";
 import { Separator } from "./ui/separator";
+import { MangaTrackingPanel } from "./MangaTrackingPanel";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
 import {
   DropdownMenu,
@@ -57,6 +58,7 @@ interface MangaDetailProps {
   mangaId: string;
   onBack: () => void;
   onReadChapter: (chapterId: string) => void;
+  onOpenSettings?: () => void;
 }
 
 interface ChapterWithProgress extends Chapter {
@@ -86,6 +88,7 @@ export function MangaDetail({
   mangaId,
   onBack,
   onReadChapter,
+  onOpenSettings,
 }: MangaDetailProps) {
   const api = useApiClient();
   const toast = useToast();
@@ -589,6 +592,13 @@ export function MangaDetail({
               </Button>
             </div>
           )}
+
+          <div className="mt-4">
+            <MangaTrackingPanel
+              mangaId={mangaId}
+              onOpenSettings={onOpenSettings}
+            />
+          </div>
         </div>
       </div>
 

@@ -10,6 +10,8 @@ import { PluginInstallationService } from "./plugins/installation";
 import { PluginDiscoveryService } from "./plugins/discovery";
 import { StorageManager } from "./storage";
 import { ImportTaskRepository, ImportQueueProcessor } from "./queue";
+import { createTrackerRuntime } from "./trackers";
+import { getBooleanSetting, getSetting } from "./services/settings";
 
 const PORT = Number(process.env.PORT) || 3001;
 const HOST = process.env.HOST || "0.0.0.0";
@@ -45,6 +47,7 @@ function isLoopbackHost(host: string): boolean {
 
 // Initialize server
 let server: ReturnType<ReturnType<typeof createApp>["listen"]> | null = null;
+let trackerSchedule: ReturnType<typeof setInterval> | null = null;
 
 async function startServer() {
   try {
@@ -149,6 +152,60 @@ async function startServer() {
     await queueProcessor.start();
     console.log("✅ Import queue processor started");
 
+    // Step 8.5: Initialize two-way tracker sync. The tracker queue is separate
+    // from the download queue so provider outages never block reading.
+    console.log("🔁 Initializing tracker sync...");
+    const trackerRuntime = createTrackerRuntime({
+      baseUrl:
+        process.env.MUGIWARA_PUBLIC_URL?.replace(/\/+$/, "") ||
+        `http://localhost:${PORT}`,
+    });
+    global.trackerService = trackerRuntime.service;
+    global.trackerQueue = trackerRuntime.queue;
+
+    const trackingEnabled = await getBooleanSetting("tracking.enabled");
+    if (trackingEnabled) {
+      if (await getBooleanSetting("tracking.pullOnStart")) {
+        setTimeout(() => {
+          void trackerRuntime.service
+            .pullAll()
+            .then((result) => {
+              if (result.pulled > 0 || result.failed > 0) {
+                console.log(
+                  `🔁 Tracker pull on start: ${result.pulled} pulled, ${result.failed} failed`,
+                );
+              }
+            })
+            .catch((error: unknown) => {
+              console.error(
+                "Tracker pull on start failed:",
+                error instanceof Error ? error.message : "unknown error",
+              );
+            });
+        }, 2500).unref();
+      }
+
+      const scheduleMinutes = Number(
+        (await getSetting("tracking.scheduleMinutes")) ?? "0",
+      );
+      if (Number.isFinite(scheduleMinutes) && scheduleMinutes > 0) {
+        trackerSchedule = setInterval(
+          () => {
+            void trackerRuntime.service.pullAll().catch((error: unknown) => {
+              console.error(
+                "Scheduled tracker pull failed:",
+                error instanceof Error ? error.message : "unknown error",
+              );
+            });
+          },
+          scheduleMinutes * 60 * 1000,
+        );
+        trackerSchedule.unref?.();
+        console.log(`✅ Tracker schedule: pull every ${scheduleMinutes} min`);
+      }
+    }
+    console.log("✅ Tracker sync initialized");
+
     // Step 9: Build the Express app and start HTTP server
     const webDir = findWebDir();
     const app = createApp({ authService, webDir, host: HOST });
@@ -190,6 +247,14 @@ async function startServer() {
       if (global.queueProcessor) {
         console.log("⏹️  Stopping queue processor...");
         global.queueProcessor.stop();
+      }
+
+      if (trackerSchedule) {
+        clearInterval(trackerSchedule);
+        trackerSchedule = null;
+      }
+      if (global.trackerQueue) {
+        global.trackerQueue.stop();
       }
 
       if (global.pluginManager) {

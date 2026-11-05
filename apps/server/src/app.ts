@@ -28,6 +28,10 @@ import storageRoutes from "./api/storage";
 import pluginsRoutes from "./api/plugins";
 import queueRoutes from "./api/queue";
 import discoverRoutes from "./api/discover";
+import {
+  createMangaTrackingRouter,
+  createTrackersRouter,
+} from "./api/trackers";
 
 export interface CreateAppOptions {
   authService?: AuthService;
@@ -130,6 +134,7 @@ export function createApp(options: CreateAppOptions = {}): express.Express {
   app.use("/api/manga", mangaRoutes);
   app.use("/api/manga/:mangaId/chapters", chapterRoutes);
   app.use("/api/manga/:mangaId/metadata", metadataRoutes);
+  app.use("/api/manga/:mangaId/tracking", createMangaTrackingRouter());
   app.use("/api/library", libraryRoutes);
   app.use("/api/library", filtersRoutes);
   app.use("/api/settings", settingsRoutes);
@@ -141,6 +146,7 @@ export function createApp(options: CreateAppOptions = {}): express.Express {
   app.use("/api/plugins", pluginsRoutes);
   app.use("/api/queue", queueRoutes);
   app.use("/api/discover", discoverRoutes);
+  app.use("/api/trackers", createTrackersRouter());
 
   // Unknown API routes should stay JSON, never return the app shell.
   app.use("/api", (_req: Request, res: Response) => {

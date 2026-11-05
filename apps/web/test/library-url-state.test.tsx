@@ -25,6 +25,7 @@ vi.mock("../src/api/hooks", () => ({
   }),
   useDeleteManga: () => ({ mutate: vi.fn(), isPending: false }),
   useCheckLibraryUpdates: () => ({ mutate: vi.fn(), isPending: false }),
+  useTrackerStatus: () => ({ data: undefined, isLoading: false }),
 }));
 
 function renderLibrary(initialEntries: string[], initialIndex = 0) {

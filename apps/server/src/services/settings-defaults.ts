@@ -23,4 +23,13 @@ export const defaultSettings: Record<string, string> = {
 
   // Download preferences
   "download.compressImages": "true",
+
+  // Tracker sync
+  "tracking.enabled": "true",
+  "tracking.pullOnStart": "true",
+  // Minutes between scheduled pulls. 0 disables the schedule.
+  "tracking.scheduleMinutes": "60",
+
+  // Public URL used to document/complete OAuth redirects on LAN installs.
+  "server.publicUrl": "",
 };

@@ -136,6 +136,121 @@ export interface QueueStats {
   error: number;
 }
 
+// ─── Tracker sync ──────────────────────────────────────────────────────────
+
+export type TrackerProviderId = "anilist" | "myanimelist";
+export type TrackerSyncState =
+  | "idle"
+  | "synced"
+  | "pending"
+  | "error"
+  | "conflict";
+
+export interface TrackerAccount {
+  provider: TrackerProviderId;
+  label: string;
+  connected: boolean;
+  externalUserId: string | null;
+  username: string | null;
+  readOnly: boolean;
+  expiresAt: string | null;
+  lastSyncAt: string | null;
+  lastError: string | null;
+  scoreMax: number;
+}
+
+export interface TrackerProviderInfo {
+  provider: TrackerProviderId;
+  label: string;
+  configured: boolean;
+}
+
+export interface TrackerStatus {
+  accounts: TrackerAccount[];
+  linkedManga: number;
+  conflicts: number;
+  errored: number;
+  lastSyncedAt: string | null;
+  issues: Array<{
+    mangaId: string;
+    provider: TrackerProviderId;
+    syncState: TrackerSyncState;
+    error: string | null;
+  }>;
+  queue: {
+    pending: number;
+    running: boolean;
+    processed: number;
+    failed: number;
+    lastError: string | null;
+    lastRunAt: string | null;
+  } | null;
+  providers: TrackerProviderInfo[];
+}
+
+export interface TrackerCandidate {
+  trackerMangaId: string;
+  title: string;
+  altTitles: string[];
+  year: number | null;
+  chapters: number | null;
+  coverImage: string | null;
+  confidence?: number;
+}
+
+export interface TrackerConflict {
+  reason: "both_changed" | "remote_lower" | "remote_changed";
+  local: {
+    status: string;
+    score: number | null;
+    chaptersRead: number;
+  };
+  remote: {
+    status: string;
+    score: number | null;
+    chaptersRead: number;
+    updatedAt: string | null;
+  };
+}
+
+export interface MangaTrackingLink {
+  provider: TrackerProviderId;
+  label: string;
+  trackerMangaId: string;
+  status: string;
+  score: number | null;
+  scoreMax: number;
+  displayScore: number | null;
+  chaptersRead: number;
+  syncState: TrackerSyncState;
+  syncError: string | null;
+  lastSyncedAt: string | null;
+  lastPushedAt: string | null;
+  lastPulledAt: string | null;
+  conflict: TrackerConflict | null;
+}
+
+export interface MangaTrackingOverview {
+  mangaId: string;
+  totalChapters: number;
+  localChaptersRead: number;
+  links: MangaTrackingLink[];
+}
+
+export interface TrackerSyncResult {
+  provider: TrackerProviderId;
+  mangaId: string;
+  state: "synced" | "conflict";
+  conflict?: TrackerConflict;
+}
+
+export interface TrackerAuthStart {
+  provider: TrackerProviderId;
+  authorizationUrl: string;
+  state: string;
+  redirectUri: string;
+}
+
 export interface StorageBackend {
   id: string;
   type: string;
@@ -832,6 +947,129 @@ export class ApiClient {
   downloadAllChapters(mangaId: string): Promise<{ chaptersQueued: number }> {
     return this.request(`/api/library/manga/${mangaId}/download-all`, {
       method: "POST",
+    });
+  }
+
+  // Trackers
+  getTrackerAccounts(): Promise<TrackerAccount[]> {
+    return this.request("/api/trackers/accounts");
+  }
+
+  getTrackerStatus(): Promise<TrackerStatus> {
+    return this.request("/api/trackers/status");
+  }
+
+  startTrackerAuth(provider: TrackerProviderId): Promise<TrackerAuthStart> {
+    return this.request(`/api/trackers/${provider}/auth/start`, {
+      method: "POST",
+    });
+  }
+
+  completeTrackerCode(
+    provider: TrackerProviderId,
+    body: { code: string; state: string },
+  ): Promise<{ account: TrackerAccount }> {
+    return this.request(`/api/trackers/${provider}/auth/code`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  }
+
+  disconnectTracker(provider: TrackerProviderId): Promise<void> {
+    return this.request(`/api/trackers/${provider}`, { method: "DELETE" });
+  }
+
+  setTrackerReadOnly(
+    provider: TrackerProviderId,
+    readOnly: boolean,
+  ): Promise<void> {
+    return this.request(`/api/trackers/${provider}/mode`, {
+      method: "PUT",
+      body: JSON.stringify({ readOnly }),
+    });
+  }
+
+  syncTracker(
+    provider: TrackerProviderId,
+    body: {
+      mangaId?: string;
+      direction?: "push" | "pull";
+    } = {},
+  ): Promise<
+    TrackerSyncResult | { pulled: number; failed: number }
+  > {
+    return this.request(`/api/trackers/${provider}/sync`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  }
+
+  getMangaTracking(mangaId: string): Promise<MangaTrackingOverview> {
+    return this.request(`/api/manga/${mangaId}/tracking`);
+  }
+
+  searchTrackerCandidates(
+    mangaId: string,
+    provider: TrackerProviderId,
+    query?: string,
+  ): Promise<TrackerCandidate[]> {
+    const params = new URLSearchParams({ provider });
+    if (query?.trim()) params.set("q", query.trim());
+    return this.request(
+      `/api/manga/${mangaId}/tracking/search?${params.toString()}`,
+    );
+  }
+
+  linkMangaTracker(
+    mangaId: string,
+    provider: TrackerProviderId,
+    trackerMangaId: string,
+  ): Promise<MangaTrackingLink> {
+    return this.request(`/api/manga/${mangaId}/tracking/link`, {
+      method: "POST",
+      body: JSON.stringify({ provider, trackerMangaId }),
+    });
+  }
+
+  updateMangaTracking(
+    mangaId: string,
+    provider: TrackerProviderId,
+    body: { status?: string; score?: number | null },
+  ): Promise<MangaTrackingLink> {
+    return this.request(`/api/manga/${mangaId}/tracking/${provider}`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    });
+  }
+
+  unlinkMangaTracker(
+    mangaId: string,
+    provider: TrackerProviderId,
+  ): Promise<void> {
+    return this.request(`/api/manga/${mangaId}/tracking/${provider}`, {
+      method: "DELETE",
+    });
+  }
+
+  syncMangaTracker(
+    mangaId: string,
+    provider: TrackerProviderId,
+    direction: "push" | "pull",
+  ): Promise<TrackerSyncResult> {
+    return this.request(`/api/manga/${mangaId}/tracking/sync`, {
+      method: "POST",
+      body: JSON.stringify({ provider, direction }),
+    });
+  }
+
+  resolveTrackerConflict(
+    mangaId: string,
+    provider: TrackerProviderId,
+    resolution: "local" | "remote",
+  ): Promise<TrackerSyncResult> {
+    return this.request(`/api/manga/${mangaId}/tracking/conflict`, {
+      method: "POST",
+      body: JSON.stringify({ provider, resolution }),
     });
   }
 }
