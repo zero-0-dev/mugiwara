@@ -1,5 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, ChevronUp, Compass, Search } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronUp,
+  Compass,
+  Search,
+  SlidersHorizontal,
+} from "lucide-react";
 import { useDiscoverBrowse } from "../api/hooks";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -96,18 +102,31 @@ export function Discover({ onMangaSelect }: DiscoverProps) {
   }
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:py-8">
-      <div>
-        <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight sm:text-3xl">
-          <Compass className="size-6 text-brand-text" />
-          Discover
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Find your next series on AniList, then add it from a source.
-        </p>
+    <div className="mx-auto w-full max-w-7xl px-4 py-4 sm:px-6 sm:py-6 lg:py-8">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight sm:text-3xl">
+            <Compass className="size-5 shrink-0 text-brand-text sm:size-6" />
+            Discover
+          </h1>
+          <p className="mt-1 hidden text-sm text-muted-foreground sm:block">
+            Find your next series on AniList, then add it from a source.
+          </p>
+        </div>
+        <Button
+          variant={showFilters ? "secondary" : "ghost"}
+          size="icon"
+          className="shrink-0 sm:hidden"
+          onClick={() => setShowFilters(!showFilters)}
+          aria-expanded={showFilters}
+          aria-label="Filters"
+          title="Filters"
+        >
+          <SlidersHorizontal className="size-5" />
+        </Button>
       </div>
 
-      <div className="mt-5 flex gap-2">
+      <div className="mt-3 flex gap-2 sm:mt-5">
         <div className="relative flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -117,15 +136,15 @@ export function Discover({ onMangaSelect }: DiscoverProps) {
             onKeyDown={handleKeyDown}
             placeholder="Search manga..."
             aria-label="Search manga"
-            className="h-11 pl-9"
+            className="h-10 pl-9"
           />
         </div>
-        <Button variant="brand" onClick={handleSearch} className="h-11">
+        <Button variant="brand" onClick={handleSearch} className="h-10">
           Search
         </Button>
       </div>
 
-      <div className="no-scrollbar -mx-4 mt-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
+      <div className="no-scrollbar -mx-4 mt-3 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:mt-4 sm:px-0">
         {CATEGORIES.map((cat) => (
           <button
             key={cat.label}
@@ -150,7 +169,7 @@ export function Discover({ onMangaSelect }: DiscoverProps) {
       </div>
 
       <button
-        className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-brand-text outline-none hover:text-brand-text focus-visible:ring-2 focus-visible:ring-ring"
+        className="mt-3 hidden items-center gap-1 text-sm font-medium text-brand-text outline-none hover:text-brand-text focus-visible:ring-2 focus-visible:ring-ring sm:inline-flex"
         onClick={() => setShowFilters(!showFilters)}
         aria-expanded={showFilters}
       >
@@ -166,7 +185,7 @@ export function Discover({ onMangaSelect }: DiscoverProps) {
       </button>
 
       {showFilters && (
-        <div className="mt-3 rounded-2xl border border-border/80 bg-card/70 p-4">
+        <div className="mt-3 rounded-2xl border border-border/80 bg-card/70 p-3 sm:p-4">
           <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Genre
           </span>
@@ -201,7 +220,7 @@ export function Discover({ onMangaSelect }: DiscoverProps) {
       )}
 
       {isLoading ? (
-        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:mt-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
           {Array.from({ length: 18 }).map((_, index) => (
             <div key={index} className="space-y-2">
               <Skeleton className="aspect-[2/3] w-full rounded-xl" />

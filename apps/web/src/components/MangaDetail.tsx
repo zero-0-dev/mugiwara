@@ -342,7 +342,7 @@ export function MangaDetail({
   };
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-5 sm:px-6 sm:py-7">
+    <div className="mx-auto w-full max-w-6xl px-4 py-4 sm:px-6 sm:py-7">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Button variant="outline" onClick={onBack}>
           <ArrowLeft className="size-4" /> Back to Library
@@ -360,7 +360,9 @@ export function MangaDetail({
                 checkUpdates.isPending && "animate-spin",
               )}
             />
-            {checkUpdates.isPending ? "Checking..." : "Check for Updates"}
+            <span className="hidden sm:inline">
+              {checkUpdates.isPending ? "Checking..." : "Check for Updates"}
+            </span>
           </Button>
           {hasPendingChapters && (
             <Button
@@ -376,8 +378,8 @@ export function MangaDetail({
         </div>
       </div>
 
-      <div className="mt-5 grid gap-6 md:grid-cols-[200px_minmax(0,1fr)] lg:grid-cols-[224px_minmax(0,1fr)]">
-        <div className="mx-auto w-full max-w-[220px] md:mx-0 md:max-w-none">
+      <div className="mt-4 grid grid-cols-[104px_minmax(0,1fr)] items-start gap-x-4 gap-y-5 md:mt-5 md:grid-cols-[200px_minmax(0,1fr)] md:gap-x-6 lg:grid-cols-[224px_minmax(0,1fr)]">
+        <div className="w-full md:row-span-2">
           <div className="aspect-[2/3] overflow-hidden rounded-2xl border border-border/70 bg-secondary shadow-xl shadow-black/20">
             {manga.coverImage ? (
               <img
@@ -394,7 +396,7 @@ export function MangaDetail({
         </div>
 
         <div className="min-w-0">
-          <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex items-start justify-between gap-2">
             <div className="min-w-0 flex-1">
               {isEditingTitle ? (
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -430,7 +432,7 @@ export function MangaDetail({
                 </div>
               ) : (
                 <div className="flex items-start gap-2">
-                  <h1 className="text-balance text-2xl font-semibold tracking-tight sm:text-3xl">
+                  <h1 className="text-balance text-xl font-semibold leading-tight tracking-tight sm:text-3xl">
                     {manga.title}
                   </h1>
                   <Button
@@ -445,23 +447,39 @@ export function MangaDetail({
                   </Button>
                 </div>
               )}
-              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              <div className="no-scrollbar mt-2 flex flex-nowrap items-center gap-1.5 overflow-x-auto pb-0.5 sm:flex-wrap sm:overflow-visible">
                 {manga.status && (
-                  <Badge variant="secondary" className="capitalize">
+                  <Badge
+                    variant="secondary"
+                    className="shrink-0 px-2 text-[11px] capitalize"
+                  >
                     {manga.status}
                   </Badge>
                 )}
                 {manga.mediaType && (
-                  <Badge variant="secondary" className="capitalize">
+                  <Badge
+                    variant="secondary"
+                    className="shrink-0 px-2 text-[11px] capitalize"
+                  >
                     {manga.mediaType}
                   </Badge>
                 )}
                 {manga.anilistId && (
-                  <Badge variant="success">
-                    <Sparkles className="size-3" /> Synced with AniList
+                  <Badge
+                    variant="success"
+                    className="shrink-0 px-2 text-[11px]"
+                  >
+                    <Sparkles className="size-3" />
+                    <span className="sm:hidden">AniList</span>
+                    <span className="hidden sm:inline">
+                      Synced with AniList
+                    </span>
                   </Badge>
                 )}
-                <Badge variant={isSourceOnline ? "success" : "warning"}>
+                <Badge
+                  variant={isSourceOnline ? "success" : "warning"}
+                  className="shrink-0 px-2 text-[11px]"
+                >
                   <span
                     className={cn(
                       "size-1.5 rounded-full",
@@ -472,29 +490,64 @@ export function MangaDetail({
                 </Badge>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                variant="brand"
-                onClick={handleAutoFetch}
-                disabled={fetchMetadata.isPending}
-              >
-                <Sparkles className="size-3.5" />
-                {fetchMetadata.isPending ? "Fetching..." : "Auto-fetch"}
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleSearch}
-                disabled={searchingMetadata}
-              >
-                <Search className="size-3.5" />
-                {searchingMetadata ? "Searching..." : "Search"}
-              </Button>
+            <div className="flex shrink-0 items-center gap-1">
+              <div className="hidden items-center gap-2 sm:flex">
+                <Button
+                  size="sm"
+                  variant="brand"
+                  onClick={handleAutoFetch}
+                  disabled={fetchMetadata.isPending}
+                >
+                  <Sparkles className="size-3.5" />
+                  {fetchMetadata.isPending ? "Fetching..." : "Auto-fetch"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleSearch}
+                  disabled={searchingMetadata}
+                >
+                  <Search className="size-3.5" />
+                  {searchingMetadata ? "Searching..." : "Search"}
+                </Button>
+              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="sm:hidden"
+                    aria-label="Metadata actions"
+                    title="Metadata actions"
+                  >
+                    <EllipsisVertical className="size-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    onClick={handleAutoFetch}
+                    disabled={fetchMetadata.isPending}
+                  >
+                    <Sparkles />
+                    {fetchMetadata.isPending
+                      ? "Fetching..."
+                      : "Auto-fetch metadata"}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={handleSearch}
+                    disabled={searchingMetadata}
+                  >
+                    <Search />
+                    {searchingMetadata ? "Searching..." : "Search AniList"}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
+        </div>
 
-          <div className="mt-4 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
+        <div className="col-span-2 min-w-0 md:col-span-1 md:col-start-2">
+          <div className="mt-1 grid gap-x-6 gap-y-1.5 text-sm sm:grid-cols-2 md:mt-4">
             {manga.author && <MetaRow label="Author" value={manga.author} />}
             {manga.artist && <MetaRow label="Artist" value={manga.artist} />}
             <MetaRow label="Chapters" value={String(chapters.length)} />
@@ -502,23 +555,23 @@ export function MangaDetail({
           </div>
 
           {manga.genres && manga.genres.length > 0 && (
-            <div className="mt-3 flex flex-wrap gap-1.5">
+            <div className="no-scrollbar mt-2 flex flex-nowrap gap-1.5 overflow-x-auto pb-0.5 sm:mt-3 sm:flex-wrap sm:overflow-visible">
               {manga.genres.map((genre) => (
-                <Badge key={genre} variant="outline">
+                <Badge key={genre} variant="outline" className="shrink-0">
                   {genre}
                 </Badge>
               ))}
             </div>
           )}
 
-          <div className="mt-4 flex flex-wrap items-center gap-2">
-            <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <div className="no-scrollbar mt-3 flex flex-nowrap items-center gap-2 overflow-x-auto pb-0.5 sm:mt-4 sm:flex-wrap sm:overflow-visible">
+            <span className="shrink-0 text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Categories
             </span>
             {mangaCategories.map((category) => (
               <span
                 key={category.id}
-                className="inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium"
+                className="inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium"
                 style={{
                   backgroundColor: category.color
                     ? `${category.color}22`
@@ -540,7 +593,7 @@ export function MangaDetail({
             ))}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="h-7 px-2">
+                <Button variant="ghost" size="sm" className="h-7 shrink-0 px-2">
                   <Plus className="size-3.5" /> Add
                 </Button>
               </DropdownMenuTrigger>
@@ -578,12 +631,12 @@ export function MangaDetail({
           </div>
 
           {manga.description && (
-            <div className="mt-4">
+            <div className="mt-3 sm:mt-4">
               <h2 className="text-sm font-semibold">Description</h2>
               <div
                 className={cn(
                   "mt-1 text-sm leading-6 text-muted-foreground [&_br]:hidden [&_p]:mb-2",
-                  !showMore && "line-clamp-3",
+                  !showMore && "line-clamp-2 sm:line-clamp-3",
                 )}
                 dangerouslySetInnerHTML={{ __html: manga.description }}
               />
@@ -714,7 +767,10 @@ export function MangaDetail({
                       </Badge>
                     )}
                     {chapter.isRead && (
-                      <Badge variant="success" className="shrink-0">
+                      <Badge
+                        variant="success"
+                        className="shrink-0 px-2 text-[11px]"
+                      >
                         Read
                       </Badge>
                     )}

@@ -145,23 +145,31 @@ export function Library({ onMangaSelect }: LibraryProps) {
   }
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:py-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-            Library
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+    <div className="mx-auto w-full max-w-7xl px-4 py-4 sm:px-6 sm:py-6 lg:py-8">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-baseline gap-2">
+            <h1 className="text-xl font-semibold tracking-tight sm:text-3xl">
+              Library
+            </h1>
+            <span className="text-xs text-muted-foreground sm:hidden">
+              {manga.length} title{manga.length === 1 ? "" : "s"}
+            </span>
+          </div>
+          <p className="mt-1 hidden text-sm text-muted-foreground sm:block">
             {manga.length} title{manga.length === 1 ? "" : "s"} in your
             collection
             {hasActiveFilters ? " matching your filters" : ""}.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           <Button
             variant="outline"
             onClick={handleCheckUpdates}
             disabled={checkLibraryUpdates.isPending}
+            className="size-10 px-0 sm:w-auto sm:px-4"
+            aria-label="Check for updates"
+            title="Check for updates"
           >
             <RefreshCw
               className={cn(
@@ -169,78 +177,80 @@ export function Library({ onMangaSelect }: LibraryProps) {
                 checkLibraryUpdates.isPending && "animate-spin",
               )}
             />
-            <span className="hidden xs:inline">Check for Updates</span>
-            <span className="xs:hidden">Updates</span>
+            <span className="hidden sm:inline">Check for Updates</span>
           </Button>
           <Button variant="brand" onClick={() => setShowAddManga(true)}>
             <Plus className="size-4" />
-            Add Manga
+            <span className="hidden xs:inline">Add Manga</span>
+            <span className="xs:hidden">Add</span>
           </Button>
         </div>
       </div>
 
-      <div className="mt-6 flex flex-col gap-2 rounded-2xl border border-border/80 bg-card/70 p-2 shadow-sm sm:flex-row sm:items-center">
-        <div className="relative flex-1">
+      <div className="mt-4 flex items-center gap-1.5 rounded-xl border border-border/80 bg-card/70 p-1.5 shadow-sm sm:mt-6 sm:gap-2 sm:rounded-2xl sm:p-2">
+        <div className="relative min-w-0 flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by title, author, or artist..."
+            placeholder="Search..."
             aria-label="Search library"
-            className="h-10 border-0 bg-transparent pl-9 pr-9 shadow-none focus-visible:ring-0 sm:h-9"
+            className="h-9 border-0 bg-transparent pl-9 pr-9 text-sm shadow-none focus-visible:ring-0"
           />
           {searchQuery && (
             <button
               onClick={() => setSearchQuery("")}
-              className="absolute right-2 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+              className="absolute right-1.5 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
               aria-label="Clear search"
             >
               <X className="size-4" />
             </button>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant={showFilters ? "secondary" : "ghost"}
-            onClick={() => setShowFilters(!showFilters)}
-            aria-expanded={showFilters}
-          >
-            <SlidersHorizontal className="size-4" />
-            Filters
-            {activeFilterCount > 0 && (
-              <Badge className="ml-0.5 h-5 min-w-5 justify-center px-1.5">
-                {activeFilterCount}
-              </Badge>
-            )}
-          </Button>
-          <Select
-            value={sortBy}
-            onChange={setSortBy}
-            className="h-9 w-[8.5rem]"
-            aria-label="Sort library"
-            options={[
-              { value: "lastRead", label: "Last Read" },
-              { value: "title", label: "Title" },
-              { value: "dateAdded", label: "Date Added" },
-              { value: "progress", label: "Progress" },
-              { value: "chapterCount", label: "Chapter Count" },
-            ]}
-          />
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
-            title={sortOrder === "asc" ? "Ascending" : "Descending"}
-            aria-label={sortOrder === "asc" ? "Ascending" : "Descending"}
-          >
-            {sortOrder === "asc" ? (
-              <ArrowUp className="size-4" />
-            ) : (
-              <ArrowDown className="size-4" />
-            )}
-          </Button>
-        </div>
+        <Button
+          variant={showFilters ? "secondary" : "ghost"}
+          onClick={() => setShowFilters(!showFilters)}
+          aria-expanded={showFilters}
+          aria-label="Filters"
+          title="Filters"
+          className="relative h-8 shrink-0 gap-1.5 px-2 sm:px-3"
+        >
+          <SlidersHorizontal className="size-4" />
+          <span className="hidden sm:inline">Filters</span>
+          {activeFilterCount > 0 && (
+            <Badge className="absolute -right-1 -top-1 h-4 min-w-4 justify-center px-1 text-[10px] sm:static sm:ml-1">
+              {activeFilterCount}
+            </Badge>
+          )}
+        </Button>
+        <Select
+          value={sortBy}
+          onChange={setSortBy}
+          className="h-9 w-[7.25rem] shrink-0 text-xs sm:w-[8.5rem] sm:text-sm"
+          aria-label="Sort library"
+          options={[
+            { value: "lastRead", label: "Last Read" },
+            { value: "title", label: "Title" },
+            { value: "dateAdded", label: "Date Added" },
+            { value: "progress", label: "Progress" },
+            { value: "chapterCount", label: "Chapter Count" },
+          ]}
+        />
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
+          title={sortOrder === "asc" ? "Ascending" : "Descending"}
+          aria-label={sortOrder === "asc" ? "Ascending" : "Descending"}
+          className="shrink-0"
+        >
+          {sortOrder === "asc" ? (
+            <ArrowUp className="size-4" />
+          ) : (
+            <ArrowDown className="size-4" />
+          )}
+        </Button>
       </div>
 
       {showFilters && (
@@ -342,7 +352,7 @@ export function Library({ onMangaSelect }: LibraryProps) {
       )}
 
       {manga.length === 0 ? (
-        <div className="mt-10 flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card/40 px-6 py-16 text-center">
+        <div className="mt-6 flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card/40 px-6 py-12 text-center sm:mt-10 sm:py-16">
           <div className="flex size-14 items-center justify-center rounded-2xl bg-secondary text-muted-foreground">
             <Search className="size-6" />
           </div>
@@ -371,7 +381,7 @@ export function Library({ onMangaSelect }: LibraryProps) {
           )}
         </div>
       ) : (
-        <div className="mt-6 grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+        <div className="mt-4 grid grid-cols-2 gap-x-3 gap-y-6 sm:mt-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
           {manga.map((m) => {
             const cover = api.getAssetUrl(m.coverImage);
             return (
