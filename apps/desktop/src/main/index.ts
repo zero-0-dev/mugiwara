@@ -169,6 +169,15 @@ async function loadAppWindow(url: string) {
   }
 }
 
+function appIconPath(): string | undefined {
+  // Packaged builds copy the icon to extraResources; in dev it lives in the
+  // repo's buildResources directory (see package.json build.directories).
+  const file = app.isPackaged
+    ? path.join(process.resourcesPath, "icon.png")
+    : path.join(__dirname, "../../buildResources/icon.png");
+  return existsSync(file) ? file : undefined;
+}
+
 async function createWindow(serverPort: number) {
   // Create the browser window
   mainWindow = new BrowserWindow({
@@ -176,6 +185,9 @@ async function createWindow(serverPort: number) {
     height: 900,
     minWidth: 800,
     minHeight: 600,
+    // electron-builder supplies the packaged app icon; this also covers the
+    // dev window and Linux taskbars.
+    icon: appIconPath(),
     titleBarStyle: "hiddenInset",
     webPreferences: {
       nodeIntegration: false,

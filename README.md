@@ -1,5 +1,9 @@
 # Mugiwara
 
+<p align="center">
+  <img src="assets/branding/mugiwara-logo.png" alt="Mugiwara — manga reader" width="220" />
+</p>
+
 Self-hosted manga reader. One shared web client (`apps/web`) runs in a browser,
 inside the Electron desktop shell, and inside the Capacitor mobile shell. The
 Node server (`apps/server`) owns the library, files, plugins, queue, and SQLite
@@ -18,6 +22,18 @@ packages/*        Shared types, plugin API, storage/source plugins
 Platform-specific code lives in the shells and `apps/web/src/platform/server.ts`.
 Feature components should not branch on `process.platform`, `Platform.OS`, or
 `navigator.platform`.
+
+## Branding
+
+The logo master lives in `assets/branding/mugiwara-logo.png`. All favicons, PWA
+icons, desktop icons and Android/iOS launcher icons and splashes are generated
+from it:
+
+```sh
+pnpm brand:assets
+```
+
+See `assets/branding/README.md`. Do not hand-edit generated icons.
 
 ## UI system
 

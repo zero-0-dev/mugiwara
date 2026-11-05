@@ -21,11 +21,18 @@
   "build": {
     "appId": "dev.zero.mugiwara",
     "productName": "Mugiwara",
+    "directories": {
+      "buildResources": "buildResources"
+    },
     "files": [
       "dist/**/*",
       "package.json"
     ],
     "extraResources": [
+      {
+        "from": "buildResources/icon.png",
+        "to": "icon.png"
+      },
       {
         "from": "../server/dist",
         "to": "server"

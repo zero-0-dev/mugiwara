@@ -12,6 +12,7 @@
     "typecheck": "turbo typecheck",
     "verify": "pnpm typecheck && pnpm lint && pnpm test && pnpm build",
     "screens": "node scripts/capture-ui-screens.mjs",
+    "brand:assets": "node scripts/generate-brand-assets.mjs",
     "clean": "turbo clean && rm -rf node_modules",
     "build:app:android": "node scripts/build.mjs app:android",
     "build:app:android:release": "node scripts/build.mjs app:android:release",

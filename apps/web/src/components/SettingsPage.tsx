@@ -17,6 +17,7 @@ import { SecuritySection } from "./settings/SecuritySection";
 import { useSettings, useSaveSetting } from "../api/hooks";
 import { useMobileLayout } from "../hooks/useMobileLayout";
 import pkg from "../../package.json";
+import brandMark from "../assets/mugiwara-mark.png";
 import { Select } from "./Select";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
@@ -338,9 +339,12 @@ export function SettingsPage({
                 description="A cross-platform manga reader with an extensible plugin architecture."
               />
               <div className="mt-4 flex items-center gap-3 rounded-xl border border-border/70 bg-background/40 p-4">
-                <span className="flex size-12 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-400 to-indigo-600 text-white shadow-sm">
-                  <BookOpen className="size-6" />
-                </span>
+                <img
+                  src={brandMark}
+                  alt=""
+                  aria-hidden="true"
+                  className="size-12 shrink-0 rounded-xl object-cover shadow-sm shadow-orange-950/40"
+                />
                 <div>
                   <p className="font-semibold">Mugiwara Manga Reader</p>
                   <p className="text-sm text-muted-foreground">

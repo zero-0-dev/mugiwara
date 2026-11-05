@@ -15,6 +15,7 @@ import { useSettings } from "./api/hooks";
 import { ApiClientProvider } from "./api/context";
 import { ToastProvider } from "./components/Toast";
 import { Button } from "./components/ui/button";
+import brandMark from "./assets/mugiwara-mark.png";
 import { cn } from "./lib/utils";
 import {
   clearStoredAuthToken,
@@ -73,15 +74,15 @@ type View =
 
 function BrandMark({ className }: { className?: string }) {
   return (
-    <span
+    <img
+      src={brandMark}
+      alt=""
+      aria-hidden="true"
       className={cn(
-        "flex size-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-400 to-indigo-600 text-white shadow-sm shadow-indigo-950/40",
+        "size-8 shrink-0 rounded-lg object-cover shadow-sm shadow-orange-950/40",
         className,
       )}
-      aria-hidden="true"
-    >
-      <BookOpen className="size-4" strokeWidth={2.4} />
-    </span>
+    />
   );
 }
 
