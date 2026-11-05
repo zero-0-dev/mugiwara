@@ -23,6 +23,7 @@ interface Settings {
   "reading.webtoonMode": string;
   "reader.haptics": string;
   "ui.theme": string;
+  "download.compressImages": string;
 }
 
 const defaultSettings: Settings = {
@@ -33,6 +34,7 @@ const defaultSettings: Settings = {
   "reading.webtoonMode": "vertical",
   "reader.haptics": "false",
   "ui.theme": "dark",
+  "download.compressImages": "true",
 };
 
 const readingModes = [
@@ -213,6 +215,41 @@ export function SettingsPage({
           </section>
         );
 
+      case "downloads":
+        return (
+          <section className="settings-section">
+            <h2>Downloads</h2>
+            <p className="section-description">
+              Control how chapter pages are stored when downloading.
+            </p>
+
+            <div className="setting-item">
+              <div className="setting-info">
+                <label>Compress downloaded chapters</label>
+                <p>
+                  Re-encode downloaded pages to WebP to save disk space. Page
+                  order and dimensions are preserved. Existing downloads are not
+                  changed.
+                </p>
+              </div>
+              <div className="setting-control">
+                <Select
+                  value={settings["download.compressImages"]}
+                  onChange={(v) => updateSetting("download.compressImages", v)}
+                  disabled={saveSetting.isPending}
+                  options={[
+                    { value: "true", label: "On" },
+                    { value: "false", label: "Off" },
+                  ]}
+                />
+                {saveSetting.isPending && (
+                  <span className="saving-indicator">Saving...</span>
+                )}
+              </div>
+            </div>
+          </section>
+        );
+
       case "storage":
         return <StorageSection />;
 
@@ -300,6 +337,13 @@ export function SettingsPage({
             Reading
           </button>
           <button
+            aria-current={activeTab === "downloads" ? "page" : undefined}
+            className={`nav-item ${activeTab === "downloads" ? "active" : ""}`}
+            onClick={() => setActiveTab("downloads")}
+          >
+            Downloads
+          </button>
+          <button
             aria-current={activeTab === "storage" ? "page" : undefined}
             className={`nav-item ${activeTab === "storage" ? "active" : ""}`}
             onClick={() => setActiveTab("storage")}
@@ -334,7 +378,11 @@ export function SettingsPage({
           >
             About
           </button>
-          {saveSuccess && <span className="save-indicator settings-mobile-save" role="status">{saveSuccess}</span>}
+          {saveSuccess && (
+            <span className="save-indicator settings-mobile-save" role="status">
+              {saveSuccess}
+            </span>
+          )}
         </nav>
 
         <div className="settings-content">{renderTabContent()}</div>

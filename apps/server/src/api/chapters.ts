@@ -12,6 +12,11 @@ import { chapters } from "../database/schema";
 import { db } from "../database";
 import { v4 as uuidv4 } from "uuid";
 import sharp from "sharp";
+import { getBooleanSetting } from "../services/settings";
+import {
+  detectImageContentType,
+  maybeCompressPageData,
+} from "../services/image-compression";
 
 const router: Router = Router({ mergeParams: true });
 
@@ -279,7 +284,12 @@ router.get(
         // Chapter is already imported, serve from storage
         const pagePromises = Array.from({ length: pageCount }, async (_, i) => {
           const pageNum = i + 1;
-          const page: { index: number; url: string; width?: number; height?: number } = {
+          const page: {
+            index: number;
+            url: string;
+            width?: number;
+            height?: number;
+          } = {
             index: i,
             url: storage.getPageUrl(mangaId, chapter.chapterId, pageNum),
           };
@@ -329,16 +339,31 @@ router.get(
       }
 
       // Download chapter pages using the source
-      const pages: Array<{ index: number; url: string; width?: number; height?: number }> = [];
+      const pages: Array<{
+        index: number;
+        url: string;
+        width?: number;
+        height?: number;
+      }> = [];
+
+      // Snapshot once per on-demand download, matching the queue processor.
+      const compressImages = await getBooleanSetting("download.compressImages");
 
       for await (const pageData of source.downloadChapter(
         sourceChapter.sourceChapterId,
       )) {
+        // Compress before the storage call so every backend benefits equally.
+        const page = await maybeCompressPageData(
+          pageData.data,
+          pageData.contentType,
+          compressImages,
+        );
+
         // Get image dimensions before storing
         let width: number | undefined;
         let height: number | undefined;
         try {
-          const meta = await sharp(pageData.data).metadata();
+          const meta = await sharp(page.data).metadata();
           width = meta.width;
           height = meta.height;
         } catch {
@@ -350,8 +375,8 @@ router.get(
           mangaId,
           chapter.chapterId,
           pageData.pageNumber,
-          pageData.data,
-          pageData.contentType,
+          page.data,
+          page.contentType,
         );
 
         pages.push({
@@ -532,7 +557,10 @@ router.get(
           return;
         }
 
-        res.setHeader("Content-Type", "image/jpeg");
+        res.setHeader(
+          "Content-Type",
+          detectImageContentType(imageBuffer) || "image/jpeg",
+        );
         res.setHeader("Cache-Control", "public, max-age=3600");
         res.send(imageBuffer);
       } else {
