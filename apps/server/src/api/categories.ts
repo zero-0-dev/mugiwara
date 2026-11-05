@@ -1,18 +1,65 @@
 import { Router, Request, Response } from "express";
 import { db, categories, mangaCategories } from "../database";
-import { eq, asc, desc, and } from "drizzle-orm";
+import { eq, asc, desc, and, ne, count, sql } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
 
 const router: Router = Router();
 
-// GET /api/categories - Get all categories
+function normalizeName(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+/**
+ * Category names are unique without regard to case so the UI can reject
+ * "Reading" when "reading" already exists. The database unique index remains
+ * the final guard.
+ */
+async function findCategoryByName(
+  name: string,
+  excludeId?: string,
+): Promise<{ id: string } | undefined> {
+  const [existing] = await db
+    .select({ id: categories.id })
+    .from(categories)
+    .where(
+      excludeId
+        ? and(
+            sql`lower(${categories.name}) = lower(${name})`,
+            ne(categories.id, excludeId),
+          )
+        : sql`lower(${categories.name}) = lower(${name})`,
+    )
+    .limit(1);
+
+  return existing;
+}
+
+// GET /api/categories - Get all categories with their manga counts
 router.get("/", async (_req: Request, res: Response): Promise<void> => {
   try {
-    const allCategories = await db.query.categories.findMany({
-      orderBy: asc(categories.sortOrder),
-    });
+    const [allCategories, countRows] = await Promise.all([
+      db.query.categories.findMany({
+        orderBy: asc(categories.sortOrder),
+      }),
+      db
+        .select({
+          categoryId: mangaCategories.categoryId,
+          mangaCount: count(),
+        })
+        .from(mangaCategories)
+        .groupBy(mangaCategories.categoryId),
+    ]);
 
-    res.json(allCategories);
+    const counts = new Map(
+      countRows.map((row) => [row.categoryId, row.mangaCount]),
+    );
+
+    res.json(
+      allCategories.map((category) => ({
+        ...category,
+        mangaCount: counts.get(category.id) ?? 0,
+      })),
+    );
   } catch (error) {
     console.error("Error fetching categories:", error);
     res.status(500).json({ error: "Failed to fetch categories" });
@@ -23,16 +70,15 @@ router.get("/", async (_req: Request, res: Response): Promise<void> => {
 router.post("/", async (req: Request, res: Response): Promise<void> => {
   try {
     const { name, color } = req.body;
+    const trimmedName = normalizeName(name);
 
-    if (!name || typeof name !== "string" || name.trim().length === 0) {
+    if (trimmedName.length === 0) {
       res.status(400).json({ error: "Category name is required" });
       return;
     }
 
     // Check for duplicate name
-    const existing = await db.query.categories.findFirst({
-      where: eq(categories.name, name.trim()),
-    });
+    const existing = await findCategoryByName(trimmedName);
 
     if (existing) {
       res.status(409).json({ error: "Category with this name already exists" });
@@ -49,7 +95,7 @@ router.post("/", async (req: Request, res: Response): Promise<void> => {
       .insert(categories)
       .values({
         id: uuidv4(),
-        name: name.trim(),
+        name: trimmedName,
         color: color || null,
         sortOrder,
       })
@@ -83,22 +129,37 @@ router.put("/:id", async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // If name is being updated, check for duplicates
-    if (name && name !== existing.name) {
-      const duplicate = await db.query.categories.findFirst({
-        where: eq(categories.name, name.trim()),
-      });
+    if (
+      sortOrder !== undefined &&
+      (!Number.isInteger(sortOrder) || sortOrder < 0)
+    ) {
+      res
+        .status(400)
+        .json({ error: "Sort order must be a non-negative integer" });
+      return;
+    }
 
+    const updates: Partial<typeof categories.$inferInsert> = {};
+
+    if (name !== undefined) {
+      const trimmedName = normalizeName(name);
+      if (trimmedName.length === 0) {
+        res.status(400).json({ error: "Category name is required" });
+        return;
+      }
+
+      // Check for duplicates, ignoring the category being renamed.
+      const duplicate = await findCategoryByName(trimmedName, id);
       if (duplicate) {
         res
           .status(409)
           .json({ error: "Category with this name already exists" });
         return;
       }
+
+      updates.name = trimmedName;
     }
 
-    const updates: Partial<typeof categories.$inferInsert> = {};
-    if (name !== undefined) updates.name = name.trim();
     if (color !== undefined) updates.color = color || null;
     if (sortOrder !== undefined) updates.sortOrder = sortOrder;
 

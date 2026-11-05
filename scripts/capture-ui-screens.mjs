@@ -97,6 +97,7 @@ async function capture(viewport, label, dark) {
     .waitFor();
   await save(page, `${label}-settings-reading-${suffix}`);
   for (const [tab, name] of [
+    ["Categories", "categories"],
     ["Downloads", "downloads"],
     ["Storage", "storage"],
     ["Plugins", "plugins"],

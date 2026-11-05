@@ -8,8 +8,10 @@ import {
   ListOrdered,
   Plug,
   ShieldCheck,
+  Tags,
 } from "lucide-react";
 import { useToast } from "./Toast";
+import { CategoriesSection } from "./settings/CategoriesSection";
 import { StorageSection } from "./settings/StorageSection";
 import { PluginsSection } from "./settings/PluginsSection";
 import { QueueSection } from "./settings/QueueSection";
@@ -94,6 +96,7 @@ const mediaTypes = [
 
 const TABS = [
   { value: "reading", label: "Reading", icon: BookOpen },
+  { value: "categories", label: "Categories", icon: Tags },
   { value: "downloads", label: "Downloads", icon: Download },
   { value: "storage", label: "Storage", icon: Database },
   { value: "plugins", label: "Plugins", icon: Plug },
@@ -290,6 +293,10 @@ export function SettingsPage({
                 })}
               </div>
             </section>
+          </TabsContent>
+
+          <TabsContent value="categories" className="mt-0">
+            <CategoriesSection />
           </TabsContent>
 
           <TabsContent value="downloads" className="mt-0">
