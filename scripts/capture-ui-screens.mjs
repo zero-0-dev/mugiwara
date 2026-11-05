@@ -144,8 +144,10 @@ async function capture(viewport, label, dark) {
         .getByRole("button", { name: "Back", exact: true })
         .first()
         .click();
+      // Back from /disk-space returns to /settings/storage, not the default
+      // Reading tab.
       await page
-        .getByRole("heading", { name: "Reading Preferences", exact: true })
+        .getByRole("heading", { name: "Storage Backends", exact: true })
         .waitFor();
     }
   }
