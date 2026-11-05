@@ -384,6 +384,23 @@ export const progressRepository = {
     await db.delete(readingProgress).where(eq(readingProgress.id, id));
   },
 
+  /**
+   * Deletes progress for the given chapters across every device. Used when the
+   * user explicitly resolves a tracker conflict in favour of a lower remote
+   * progress count.
+   */
+  async clearChapterProgress(mangaId: string, chapterIds: string[]) {
+    if (chapterIds.length === 0) return;
+    await db
+      .delete(readingProgress)
+      .where(
+        and(
+          eq(readingProgress.mangaId, mangaId),
+          inArray(readingProgress.chapterId, chapterIds),
+        ),
+      );
+  },
+
   async deleteByMangaId(mangaId: string) {
     await db
       .delete(readingProgress)

@@ -22,6 +22,17 @@ import {
 
 const router: Router = Router({ mergeParams: true });
 
+function notifyTrackerProgress(mangaId: string): void {
+  const service = global.trackerService;
+  if (!service) return;
+  void service.noteChapterProgress(mangaId).catch((error: unknown) => {
+    console.error(
+      "Tracker progress notification failed:",
+      error instanceof Error ? error.message : "unknown error",
+    );
+  });
+}
+
 // GET /api/manga/:mangaId/chapters - List chapters for manga
 router.get("/", async (req: Request, res: Response): Promise<void> => {
   try {
@@ -91,6 +102,10 @@ router.post(
         totalPages,
         deviceId,
       });
+
+      if (progress.isCompleted) {
+        notifyTrackerProgress(mangaId);
+      }
 
       res.json(progress);
     } catch (error) {
@@ -170,6 +185,8 @@ router.post(
         deviceId,
       );
 
+      notifyTrackerProgress(mangaId);
+
       res.json({
         success: true,
         message: `${chapterIdsToMark.length} chapter(s) marked as read`,
@@ -224,6 +241,8 @@ router.delete(
         false,
         deviceId,
       );
+
+      notifyTrackerProgress(mangaId);
 
       res.json({
         success: true,
