@@ -1,6 +1,8 @@
 import { EventEmitter } from "events";
 import { ImportTaskRepository } from "./repository";
 import { ImportTask, TaskStatus } from "./types";
+import { getBooleanSetting } from "../services/settings";
+import { maybeCompressPageData } from "../services/image-compression";
 
 interface ImportQueueProcessorOptions {
   repository: ImportTaskRepository;
@@ -170,6 +172,10 @@ export class ImportQueueProcessor extends EventEmitter {
       task.mangaId,
     );
 
+    // Snapshot the setting for this task so changing it mid-download cannot
+    // produce a half-compressed chapter.
+    const compressImages = await getBooleanSetting("download.compressImages");
+
     // Download chapter pages from source
     let pageCount = 0;
     for await (const pageData of source.downloadChapter(task.sourceChapterId)) {
@@ -182,13 +188,20 @@ export class ImportQueueProcessor extends EventEmitter {
 
       pageCount++;
 
+      // Compress before the storage call so every backend benefits equally.
+      const page = await maybeCompressPageData(
+        pageData.data,
+        pageData.contentType,
+        compressImages,
+      );
+
       // Store page in storage backend
       await storage.writeChapterPage(
         task.mangaId,
         task.chapterId,
         pageData.pageNumber,
-        pageData.data,
-        pageData.contentType,
+        page.data,
+        page.contentType,
       );
 
       // Update progress

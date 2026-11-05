@@ -1,29 +1,9 @@
 import { Router, Request, Response } from "express";
 import { db, settings, mangaRepository } from "../database";
 import { eq } from "drizzle-orm";
+import { defaultSettings } from "../services/settings-defaults";
 
 const router: Router = Router();
-
-// Default settings
-const defaultSettings: Record<string, string> = {
-  // Reading preferences
-  "reading.defaultMode": "rtl",
-  "reading.mangaMode": "rtl",
-  "reading.manhwaMode": "vertical",
-  "reading.manhuaMode": "vertical",
-  "reading.webtoonMode": "vertical",
-
-  // Reader preferences
-  "reader.haptics": "false",
-
-  // UI preferences
-  "ui.theme": "dark",
-  "ui.showNSFW": "false",
-
-  // Library preferences
-  "library.autoScan": "false",
-  "library.autoRefreshMetadata": "false",
-};
 
 // GET /api/settings - Get all settings
 router.get("/", async (_req: Request, res: Response): Promise<void> => {

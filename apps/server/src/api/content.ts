@@ -3,6 +3,7 @@ import { readFile } from "fs/promises";
 import { existsSync } from "fs";
 import * as yauzl from "yauzl";
 import { basename, join, resolve, sep } from "path";
+import { detectImageContentType } from "../services/image-compression";
 
 const router: Router = Router();
 const DATA_DIR = process.env.DATA_DIR || join(process.cwd(), "data");
@@ -54,7 +55,10 @@ router.get(
           return;
         }
 
-        res.setHeader("Content-Type", "image/jpeg");
+        res.setHeader(
+          "Content-Type",
+          detectImageContentType(imageBuffer) || "image/jpeg",
+        );
         res.setHeader("Cache-Control", "public, max-age=3600");
         res.send(imageBuffer);
       } else {

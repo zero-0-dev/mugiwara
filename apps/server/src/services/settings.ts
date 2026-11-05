@@ -1,26 +1,8 @@
 import { db, settings } from "../database";
 import { eq } from "drizzle-orm";
+import { defaultSettings } from "./settings-defaults";
 
-// Default settings
-const defaultSettings: Record<string, string> = {
-  // Reading preferences
-  "reading.defaultMode": "rtl",
-  "reading.mangaMode": "rtl",
-  "reading.manhwaMode": "vertical",
-  "reading.manhuaMode": "vertical",
-  "reading.webtoonMode": "vertical",
-
-  // Reader preferences
-  "reader.haptics": "false",
-
-  // UI preferences
-  "ui.theme": "dark",
-  "ui.showNSFW": "false",
-
-  // Library preferences
-  "library.autoScan": "false",
-  "library.autoRefreshMetadata": "false",
-};
+export { defaultSettings };
 
 export async function getSetting(key: string): Promise<string | null> {
   try {
