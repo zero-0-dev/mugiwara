@@ -98,7 +98,41 @@ class LocalStorage extends BaseStorage {
     const filename = `${String(pageNumber).padStart(3, "0")}${extension}`;
     const pagePath = path.join(chapterPath, filename);
 
-    await fs.writeFile(pagePath, data);
+    // Write to a hidden temp file and rename it into place so an interrupted
+    // write can never leave a partial page behind.
+    const tempPath = path.join(
+      chapterPath,
+      `.${filename}.${process.pid}.${Date.now()}.tmp`,
+    );
+
+    try {
+      await fs.writeFile(tempPath, data);
+      await fs.rename(tempPath, pagePath);
+    } catch (error) {
+      await fs.rm(tempPath, { force: true }).catch(() => undefined);
+      throw error;
+    }
+
+    // Compression can change a page's content type/extension on re-download.
+    // Remove stale copies of this page that used a different extension so the
+    // page count and served bytes stay consistent.
+    try {
+      const pagePrefix = `${String(pageNumber).padStart(3, "0")}.`;
+      const files = await fs.readdir(chapterPath);
+      await Promise.all(
+        files
+          .filter(
+            (file) =>
+              file !== filename &&
+              file.startsWith(pagePrefix) &&
+              !file.startsWith(".") &&
+              path.extname(file) !== ".tmp",
+          )
+          .map((file) => fs.rm(path.join(chapterPath, file), { force: true })),
+      );
+    } catch {
+      // Cleanup is best-effort; the new page was already written.
+    }
   }
 
   async readChapterPage(

@@ -3,6 +3,7 @@ import {
   ArrowLeft,
   BookOpen,
   Database,
+  Download,
   Info,
   ListOrdered,
   Plug,
@@ -38,6 +39,7 @@ interface Settings {
   "reading.webtoonMode": string;
   "reader.haptics": string;
   "ui.theme": string;
+  "download.compressImages": string;
 }
 
 const defaultSettings: Settings = {
@@ -48,6 +50,7 @@ const defaultSettings: Settings = {
   "reading.webtoonMode": "vertical",
   "reader.haptics": "false",
   "ui.theme": "dark",
+  "download.compressImages": "true",
 };
 
 const readingModes = [
@@ -89,6 +92,7 @@ const mediaTypes = [
 
 const TABS = [
   { value: "reading", label: "Reading", icon: BookOpen },
+  { value: "downloads", label: "Downloads", icon: Download },
   { value: "storage", label: "Storage", icon: Database },
   { value: "plugins", label: "Plugins", icon: Plug },
   { value: "queue", label: "Queue", icon: ListOrdered },
@@ -156,7 +160,7 @@ export function SettingsPage({
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
             <p className="text-sm text-muted-foreground">
-              Reading, storage, plugins and security.
+              Reading, downloads, storage, plugins and security.
             </p>
           </div>
         </div>
@@ -282,6 +286,34 @@ export function SettingsPage({
                   );
                 })}
               </div>
+            </section>
+          </TabsContent>
+
+          <TabsContent value="downloads" className="mt-0">
+            <section className="rounded-2xl border border-border/80 bg-card p-5 shadow-sm sm:p-6">
+              <SectionHeading
+                title="Downloads"
+                description="Control how chapter pages are stored when downloading."
+              />
+
+              <Separator className="my-1" />
+
+              <SettingRow
+                label="Compress downloaded chapters"
+                description="Re-encode downloaded pages to WebP to save disk space. Page order and dimensions are preserved. Existing downloads are not changed."
+              >
+                <Switch
+                  checked={settings["download.compressImages"] === "true"}
+                  onCheckedChange={(checked) =>
+                    updateSetting(
+                      "download.compressImages",
+                      checked ? "true" : "false",
+                    )
+                  }
+                  disabled={saveSetting.isPending}
+                  aria-label="Compress downloaded chapters"
+                />
+              </SettingRow>
             </section>
           </TabsContent>
 
