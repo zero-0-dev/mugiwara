@@ -36,12 +36,13 @@ Release builds provide the credentials as build-time environment variables:
 Example packaging command:
 
 ```sh
-MUGIWARA_ANILIST_CLIENT_ID=... \
-MUGIWARA_ANILIST_CLIENT_SECRET=... \
-MUGIWARA_MAL_CLIENT_ID=... \
-MUGIWARA_MAL_REDIRECT_URI=http://127.0.0.1:3001/api/trackers/myanimelist/auth/callback \
+cp .env.example .env   # fill in the build-time values once
 pnpm build:desktop:linux
 ```
+
+The build reads `.env` and `.env.local` from the repository root. Real
+environment variables take precedence over both files, and `.env.local`
+overrides `.env`. The same variables work in CI without a `.env` file.
 
 The server build writes `dist/trackers/builtin-trackers.json`, which is copied
 into the desktop/server artifact. It is build output, never committed. Runtime

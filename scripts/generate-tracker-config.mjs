@@ -10,14 +10,34 @@
  *
  * Usage: node scripts/generate-tracker-config.mjs [output-directory]
  */
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { parse as parseDotenv } from "dotenv";
 
 const ROOT = join(fileURLToPath(import.meta.url), "..", "..");
 const outputDir = process.argv[2]
   ? resolve(process.argv[2])
   : join(ROOT, "apps", "server", "dist", "trackers");
+
+/**
+ * Loads repo-root `.env` / `.env.local` for local packaging. Real environment
+ * variables win over both files, and `.env.local` wins over `.env`.
+ */
+function loadBuildEnvironment() {
+  const shellKeys = new Set(Object.keys(process.env));
+  for (const file of [".env", ".env.local"]) {
+    const path = join(ROOT, file);
+    if (!existsSync(path)) continue;
+    const parsed = parseDotenv(readFileSync(path, "utf8"));
+    for (const [key, value] of Object.entries(parsed)) {
+      if (shellKeys.has(key)) continue;
+      process.env[key] = value;
+    }
+  }
+}
+
+loadBuildEnvironment();
 
 function read(name) {
   const value = process.env[name]?.trim();
