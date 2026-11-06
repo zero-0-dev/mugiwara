@@ -4,6 +4,15 @@
   "pipeline": {
     "build": {
       "dependsOn": ["^build"],
+      "env": [
+        "MUGIWARA_ANILIST_CLIENT_ID",
+        "MUGIWARA_ANILIST_CLIENT_SECRET",
+        "MUGIWARA_ANILIST_REDIRECT_URI",
+        "MUGIWARA_MAL_CLIENT_ID",
+        "MUGIWARA_MAL_CLIENT_SECRET",
+        "MUGIWARA_MAL_REDIRECT_URI",
+        "MUGIWARA_MAL_USER_AGENT"
+      ],
       "outputs": [".next/**", "!.next/cache/**", "dist/**", "build/**"]
     },
     "dev": {

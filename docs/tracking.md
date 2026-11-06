@@ -18,24 +18,48 @@ Tracker sync is optional and never blocks reading or downloading.
 
 ## Configuring OAuth
 
-Register an OAuth application with each provider and set these server variables:
+Mugiwara is self-hosted, so official packages **bake the OAuth app credentials
+into the build**. The end user does not need to set environment variables or
+create OAuth apps.
 
-| Provider    | Variables                                                                             |
-| ----------- | ------------------------------------------------------------------------------------- |
-| AniList     | `MUGIWARA_ANILIST_CLIENT_ID`, optional `MUGIWARA_ANILIST_CLIENT_SECRET`               |
-| MyAnimeList | `MUGIWARA_MAL_CLIENT_ID`, optional `MUGIWARA_MAL_CLIENT_SECRET`, `MUGIWARA_MAL_USER_AGENT` |
-| Both        | `MUGIWARA_PUBLIC_URL`, or the `server.publicUrl` setting                              |
+Release builds provide the credentials as build-time environment variables:
 
-Redirect URIs:
+| Build variable | Purpose |
+| --- | --- |
+| `MUGIWARA_ANILIST_CLIENT_ID` | AniList OAuth app id |
+| `MUGIWARA_ANILIST_CLIENT_SECRET` | AniList app secret (AniList requires one for the authorization-code flow) |
+| `MUGIWARA_MAL_CLIENT_ID` | MyAnimeList public client id (sent as `X-MAL-CLIENT-ID`) |
+| `MUGIWARA_MAL_CLIENT_SECRET` | Optional; leave unset for a public MAL client |
+| `MUGIWARA_ANILIST_REDIRECT_URI` / `MUGIWARA_MAL_REDIRECT_URI` | Registered callback URLs |
+| `MUGIWARA_MAL_USER_AGENT` | Optional MAL User-Agent override |
+
+Example packaging command:
+
+```sh
+MUGIWARA_ANILIST_CLIENT_ID=... \
+MUGIWARA_ANILIST_CLIENT_SECRET=... \
+MUGIWARA_MAL_CLIENT_ID=... \
+MUGIWARA_MAL_REDIRECT_URI=http://127.0.0.1:3001/api/trackers/myanimelist/auth/callback \
+pnpm build:desktop:linux
+```
+
+The server build writes `dist/trackers/builtin-trackers.json`, which is copied
+into the desktop/server artifact. It is build output, never committed. Runtime
+environment variables still take precedence so development and custom builds
+can override the baked values without repackaging.
+
+Register these callback URLs with each provider:
 
 - `{publicUrl}/api/trackers/anilist/auth/callback`
 - `{publicUrl}/api/trackers/myanimelist/auth/callback`
 
-For a LAN/self-hosted install, `MUGIWARA_PUBLIC_URL` (or `server.publicUrl`) must
-be the address phones can reach, for example `http://192.168.1.20:3001`. The
+Packaged desktop builds normally use a loopback callback such as
+`http://127.0.0.1:3001/...`; register that exact URL. If the packaged app must
+serve phones on the LAN, build with the LAN callback URL (for example
+`http://192.168.1.20:3001/...`) and/or use the code-paste fallback. The
 `GET /api/trackers/config` endpoint reports the redirect URI the server will
-use. `MUGIWARA_ANILIST_REDIRECT_URI` and `MUGIWARA_MAL_REDIRECT_URI` override the
-computed values when a proxy or custom domain is used.
+use. `MUGIWARA_PUBLIC_URL` or the `server.publicUrl` setting can still adjust the
+base URL at runtime when a proxy or custom domain is used.
 
 Both flows use authorization code + PKCE and a single-use `state` value. The
 callback is public because the provider redirects the browser to it; the state

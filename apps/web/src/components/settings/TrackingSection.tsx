@@ -27,9 +27,9 @@ import { cn } from "@/lib/utils";
 
 const CONFIG_HINTS: Record<TrackerProviderId, string> = {
   anilist:
-    "Set MUGIWARA_ANILIST_CLIENT_ID (and optionally MUGIWARA_ANILIST_CLIENT_SECRET) on the server, then restart it.",
+    "This build has no AniList OAuth app. Official packages bake one in at build time; custom builds can set MUGIWARA_ANILIST_CLIENT_ID and MUGIWARA_ANILIST_CLIENT_SECRET before packaging.",
   myanimelist:
-    "Set MUGIWARA_MAL_CLIENT_ID (and optionally MUGIWARA_MAL_CLIENT_SECRET) on the server, then restart it.",
+    "This build has no MyAnimeList OAuth client. Official packages bake one in at build time; custom builds can set MUGIWARA_MAL_CLIENT_ID before packaging.",
 };
 
 function formatDate(value: string | null): string {
@@ -203,7 +203,7 @@ export function TrackingSection() {
                     <p className="mt-1 text-sm text-muted-foreground">
                       {providerInfo.configured
                         ? "Connect an account to link manga and sync progress."
-                        : "This provider is not configured on the server."}
+                        : "This build has no OAuth credentials for this provider."}
                     </p>
                   )}
                   {!providerInfo.configured && (
