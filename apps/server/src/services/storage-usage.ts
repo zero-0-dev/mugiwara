@@ -104,7 +104,7 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-async function measureChapters(
+async function measureMangaChapters(
   backend: StorageBackend,
   mangaId: string,
   chapterIds: string[],
@@ -112,7 +112,11 @@ async function measureChapters(
   if (chapterIds.length === 0) return new Map();
 
   if (typeof backend.getMangaUsage === "function") {
-    const usage = await backend.getMangaUsage(mangaId, chapterIds);
+    // Ask for every chapter the backend stores instead of only the database's
+    // download candidates. On-demand reads used to write files without
+    // updating the chapter row, so a `pending` chapter can still own files
+    // that need to be counted and reclaimed.
+    const usage = await backend.getMangaUsage(mangaId);
     return new Map(
       (usage.chapters ?? []).map((chapter) => [
         chapter.chapterId,
@@ -208,9 +212,7 @@ export async function getStorageUsage(
 
   const rows = await Promise.all(
     mangaRows.map(async (manga): Promise<StorageUsageMangaRow> => {
-      const candidates = (chaptersByManga.get(manga.id) ?? []).filter(
-        isDownloadCandidate,
-      );
+      const mangaChapters = chaptersByManga.get(manga.id) ?? [];
       const base: StorageUsageMangaRow = {
         mangaId: manga.id,
         title: manga.title,
@@ -221,19 +223,22 @@ export async function getStorageUsage(
         lastReadAt: lastReadByManga.get(manga.id) ?? null,
       };
 
-      if (candidates.length === 0) return base;
+      if (mangaChapters.length === 0) return base;
 
       try {
         const backend = await deps.getBackendForManga(manga.id);
-        const sizes = await measureChapters(
+        const sizes = await measureMangaChapters(
           backend,
           manga.id,
-          candidates.map((chapter) => chapter.chapterId),
+          mangaChapters.map((chapter) => chapter.chapterId),
         );
 
+        // Files, not the chapter status, decide what is downloaded. That way
+        // chapters whose row is still `pending` (older on-demand reads) are
+        // still counted and can be reclaimed.
         let totalBytes = 0;
         let downloadedChapterCount = 0;
-        for (const chapter of candidates) {
+        for (const chapter of mangaChapters) {
           const bytes = sizes.get(chapter.chapterId) ?? 0;
           totalBytes += bytes;
           if (bytes > 0) downloadedChapterCount++;
@@ -309,22 +314,19 @@ export async function deleteMangaDownloads(
   deps: StorageUsageDeps,
   mangaId: string,
 ): Promise<DeleteMangaDownloadsResult> {
-  const chapterRows = await deps.db.query.chapters.findMany({
+  const chapterRows = (await deps.db.query.chapters.findMany({
     where: eq(chapters.mangaId, mangaId),
-  });
-
-  const targets = (chapterRows as ChapterRow[]).filter(isDownloadCandidate);
-  const results: ChapterDeleteResult[] = [];
+  })) as ChapterRow[];
 
   let sizes = new Map<string, number>();
   let resolvedBackend: StorageBackend | undefined;
-  if (targets.length > 0) {
+  if (chapterRows.length > 0) {
     try {
       resolvedBackend = await deps.getBackendForManga(mangaId);
-      sizes = await measureChapters(
+      sizes = await measureMangaChapters(
         resolvedBackend,
         mangaId,
-        targets.map((chapter) => chapter.chapterId),
+        chapterRows.map((chapter) => chapter.chapterId),
       );
     } catch {
       // A failed size measurement must not block deletion; bytes freed are
@@ -334,6 +336,14 @@ export async function deleteMangaDownloads(
       resolvedBackend = undefined;
     }
   }
+
+  // Include chapters whose row looks pending but that still have files on
+  // disk, so "delete all downloads" can reclaim legacy on-demand reads too.
+  const targets = chapterRows.filter(
+    (chapter) =>
+      isDownloadCandidate(chapter) || (sizes.get(chapter.chapterId) ?? 0) > 0,
+  );
+  const results: ChapterDeleteResult[] = [];
 
   // Delete one at a time so a slow or failing chapter cannot prevent the rest
   // from being processed.

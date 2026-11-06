@@ -19,6 +19,10 @@ import {
   detectImageContentType,
   maybeCompressPageData,
 } from "../services/image-compression";
+import {
+  completedChapterState,
+  failedChapterState,
+} from "../services/chapter-download-state";
 
 const router: Router = Router({ mergeParams: true });
 
@@ -301,7 +305,7 @@ router.get(
       // For CBZ files, storedPageCount will be 1 (the archive), but chapter.pagesCount has actual count
       const pageCount = Math.max(storedPageCount, chapter.pagesCount || 0);
 
-      if (pageCount > 0) {
+      if (pageCount > 0 && chapter.importStatus !== "error") {
         // Chapter is already imported, serve from storage
         const pagePromises = Array.from({ length: pageCount }, async (_, i) => {
           const pageNum = i + 1;
@@ -359,6 +363,13 @@ router.get(
         return;
       }
 
+      // A previous failed download can leave partial files behind. Remove
+      // them before retrying so the chapter cannot be served from an
+      // incomplete set (and so stale pages do not survive a shorter retry).
+      if (pageCount > 0) {
+        await storage.deleteChapter(mangaId, chapter.chapterId);
+      }
+
       // Download chapter pages using the source
       const pages: Array<{
         index: number;
@@ -366,50 +377,111 @@ router.get(
         width?: number;
         height?: number;
       }> = [];
+      let storedArchive = false;
 
       // Snapshot once per on-demand download, matching the queue processor.
       const compressImages = await getBooleanSetting("download.compressImages");
 
-      for await (const pageData of source.downloadChapter(
-        sourceChapter.sourceChapterId,
-      )) {
-        // Compress before the storage call so every backend benefits equally.
-        const page = await maybeCompressPageData(
-          pageData.data,
-          pageData.contentType,
-          compressImages,
-        );
+      // Mirror the queue processor so the detail screen shows an active
+      // download while the reader is fetching pages.
+      await chapterRepository.update(chapter.id, {
+        importStatus: "downloading",
+      });
 
-        // Get image dimensions before storing
-        let width: number | undefined;
-        let height: number | undefined;
-        try {
-          const meta = await sharp(page.data).metadata();
-          width = meta.width;
-          height = meta.height;
-        } catch {
-          // silently continue without dimensions
-        }
+      try {
+        for await (const pageData of source.downloadChapter(
+          sourceChapter.sourceChapterId,
+        )) {
+          // Compress before the storage call so every backend benefits equally.
+          const page = await maybeCompressPageData(
+            pageData.data,
+            pageData.contentType,
+            compressImages,
+          );
 
-        // Store page in storage backend
-        await storage.writeChapterPage(
-          mangaId,
-          chapter.chapterId,
-          pageData.pageNumber,
-          page.data,
-          page.contentType,
-        );
+          // Get image dimensions before storing
+          let width: number | undefined;
+          let height: number | undefined;
+          try {
+            const meta = await sharp(page.data).metadata();
+            width = meta.width;
+            height = meta.height;
+          } catch {
+            // silently continue without dimensions
+          }
 
-        pages.push({
-          index: pageData.pageNumber - 1,
-          url: storage.getPageUrl(
+          // Store page in storage backend
+          await storage.writeChapterPage(
             mangaId,
             chapter.chapterId,
             pageData.pageNumber,
-          ),
-          width,
-          height,
-        });
+            page.data,
+            page.contentType,
+          );
+
+          if (
+            page.contentType === "application/zip" ||
+            page.contentType === "application/x-rar-compressed"
+          ) {
+            storedArchive = true;
+          }
+
+          pages.push({
+            index: pageData.pageNumber - 1,
+            url: storage.getPageUrl(
+              mangaId,
+              chapter.chapterId,
+              pageData.pageNumber,
+            ),
+            width,
+            height,
+          });
+        }
+
+        // Persist the downloaded state, exactly like the queue processor. This
+        // is what makes the chapter (and its files) visible to the manga
+        // detail screen and the disk-space manager.
+        await chapterRepository.update(
+          chapter.id,
+          completedChapterState(chapter, {
+            pageCount: pages.length,
+            sourcePageCount: sourceChapter.pageCount,
+          }),
+        );
+
+        // An archive is stored as one file but holds every page. Return the
+        // full page list right away so the first read is not limited to the
+        // single archive page that was written.
+        if (storedArchive && sourceChapter.pageCount) {
+          for (
+            let index = pages.length;
+            index < sourceChapter.pageCount;
+            index++
+          ) {
+            pages.push({
+              index,
+              url: storage.getPageUrl(mangaId, chapter.chapterId, index + 1),
+            });
+          }
+        }
+      } catch (error) {
+        // Never leave an invisible mix of partial files and a pending row: the
+        // disk-space manager could not reclaim the files and the reader would
+        // show a truncated chapter.
+        await storage.deleteChapter(mangaId, chapter.chapterId).catch(
+          (cleanupError: unknown) => {
+            console.error(
+              "Failed to remove partially downloaded chapter:",
+              cleanupError,
+            );
+          },
+        );
+        await chapterRepository
+          .update(chapter.id, failedChapterState())
+          .catch((stateError: unknown) => {
+            console.error("Failed to mark chapter download as failed:", stateError);
+          });
+        throw error;
       }
 
       res.json(pages);

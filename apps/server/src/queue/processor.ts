@@ -3,6 +3,7 @@ import { ImportTaskRepository } from "./repository";
 import { ImportTask } from "./types";
 import { getBooleanSetting } from "../services/settings";
 import { maybeCompressPageData } from "../services/image-compression";
+import { completedChapterState } from "../services/chapter-download-state";
 
 interface ImportQueueProcessorOptions {
   repository: ImportTaskRepository;
@@ -242,11 +243,10 @@ export class ImportQueueProcessor extends EventEmitter {
     }
 
     // Update chapter with actual page count (only if not already set, e.g., for archives)
-    await chapterRepository.update(chapter.id, {
-      pagesCount: chapter.pagesCount > 0 ? chapter.pagesCount : pageCount,
-      importProgress: 100,
-      importStatus: "complete",
-    });
+    await chapterRepository.update(
+      chapter.id,
+      completedChapterState(chapter, { pageCount }),
+    );
 
     // Mark task as complete with final progress
     await this.repository.updateProgress(task.id, pageCount, pageCount);
