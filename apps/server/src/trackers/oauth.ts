@@ -5,11 +5,14 @@ export interface PkcePair {
   challenge: string;
 }
 
-export function createPkcePair(): PkcePair {
+export function createPkcePair(
+  method: "S256" | "plain" = "S256",
+): PkcePair {
   const verifier = randomBytes(48).toString("base64url");
-  const challenge = createHash("sha256")
-    .update(verifier, "utf8")
-    .digest("base64url");
+  const challenge =
+    method === "plain"
+      ? verifier
+      : createHash("sha256").update(verifier, "utf8").digest("base64url");
   return { verifier, challenge };
 }
 

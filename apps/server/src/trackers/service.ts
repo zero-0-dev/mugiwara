@@ -217,7 +217,7 @@ export class TrackerService {
     const redirectUri = resolveRedirectUri(provider, baseUrl);
     const impl = this.provider(provider, redirectUri);
     const state = createOAuthState();
-    const pkce = createPkcePair();
+    const pkce = createPkcePair(impl.pkceMethod);
     const expiresAt = new Date(this.now() + 10 * 60 * 1000).toISOString();
 
     await this.repository.pruneOAuthStates();

@@ -1,4 +1,8 @@
 import type { TrackerHttp } from "./http";
+import {
+  loadBakedTrackerConfig,
+  type BakedTrackerConfig,
+} from "./builtin-config";
 import { AniListProvider } from "./providers/anilist";
 import { MalProvider, DEFAULT_MAL_USER_AGENT } from "./providers/myanimelist";
 import type { TrackerProvider, TrackerProviderId } from "./types";
@@ -23,18 +27,61 @@ export interface TrackerEnvironment {
   malUserAgent?: string;
 }
 
+/**
+ * Runtime environment variables win so self-hosters can override a packaged
+ * build. Otherwise, credentials baked in at package time are used. A packaged
+ * app therefore needs no environment variables at all.
+ */
+export function buildTrackerEnvironment(
+  env: NodeJS.ProcessEnv,
+  baked: BakedTrackerConfig = {},
+): TrackerEnvironment {
+  const configValue = (
+    envKey: string,
+    bakedValue: string | undefined,
+  ): string | undefined => {
+    const fromEnvironment = env[envKey]?.trim();
+    if (fromEnvironment) return fromEnvironment;
+    const fromBuild = bakedValue?.trim();
+    return fromBuild ? fromBuild : undefined;
+  };
+
+  return {
+    anilistClientId: configValue(
+      "MUGIWARA_ANILIST_CLIENT_ID",
+      baked.anilistClientId,
+    ),
+    anilistClientSecret: configValue(
+      "MUGIWARA_ANILIST_CLIENT_SECRET",
+      baked.anilistClientSecret,
+    ),
+    anilistRedirectUri: configValue(
+      "MUGIWARA_ANILIST_REDIRECT_URI",
+      baked.anilistRedirectUri,
+    ),
+    malClientId: configValue(
+      "MUGIWARA_MAL_CLIENT_ID",
+      baked.malClientId,
+    ),
+    malClientSecret: configValue(
+      "MUGIWARA_MAL_CLIENT_SECRET",
+      baked.malClientSecret,
+    ),
+    malRedirectUri: configValue(
+      "MUGIWARA_MAL_REDIRECT_URI",
+      baked.malRedirectUri,
+    ),
+    malUserAgent: configValue(
+      "MUGIWARA_MAL_USER_AGENT",
+      baked.malUserAgent,
+    ),
+  };
+}
+
 export function trackerEnvironment(
   env: NodeJS.ProcessEnv = process.env,
 ): TrackerEnvironment {
-  return {
-    anilistClientId: env.MUGIWARA_ANILIST_CLIENT_ID,
-    anilistClientSecret: env.MUGIWARA_ANILIST_CLIENT_SECRET,
-    anilistRedirectUri: env.MUGIWARA_ANILIST_REDIRECT_URI,
-    malClientId: env.MUGIWARA_MAL_CLIENT_ID,
-    malClientSecret: env.MUGIWARA_MAL_CLIENT_SECRET,
-    malRedirectUri: env.MUGIWARA_MAL_REDIRECT_URI,
-    malUserAgent: env.MUGIWARA_MAL_USER_AGENT,
-  };
+  return buildTrackerEnvironment(env, loadBakedTrackerConfig());
 }
 
 export function normalizeBaseUrl(value: string): string {

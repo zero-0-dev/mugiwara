@@ -15,6 +15,7 @@ import {
   trackerOAuthStates,
   tracking as trackingTable,
 } from "../src/database";
+import { createTrackerProvider } from "../src/trackers/config";
 import { decryptSecret, encryptSecret } from "../src/trackers/crypto";
 import {
   fromAniListScore,
@@ -26,6 +27,7 @@ import {
   toMalScore,
   toMalStatus,
 } from "../src/trackers/mapping";
+import { createPkcePair } from "../src/trackers/oauth";
 import { TrackerSyncQueue } from "../src/trackers/queue";
 import { TrackerService } from "../src/trackers/service";
 import {
@@ -44,6 +46,7 @@ class FakeProvider implements TrackerProvider {
   readonly id = "anilist" as const;
   readonly label = "Fake AniList";
   readonly scoreMax = 100;
+  readonly pkceMethod = "S256" as const;
   entries = new Map<string, TrackerEntry>();
   updates: Array<{ id: string; update: TrackerEntryUpdate }> = [];
   refreshCalls = 0;
@@ -257,6 +260,49 @@ describe("tracker mappings", () => {
     expect(encrypted).not.toContain("super-secret-token");
     expect(encrypted.startsWith("v1.")).toBe(true);
     expect(decryptSecret(encrypted)).toBe("super-secret-token");
+  });
+});
+
+describe("pkce methods", () => {
+  it("uses the plain challenge method for MyAnimeList", () => {
+    const redirectUri =
+      "http://localhost/api/trackers/myanimelist/auth/callback";
+    const provider = createTrackerProvider("myanimelist", {
+      redirectUri,
+      env: { malClientId: "client-id" },
+    });
+    const pair = createPkcePair(provider.pkceMethod);
+    expect(pair.challenge).toBe(pair.verifier);
+
+    const url = new URL(
+      provider.authorizationUrl({
+        state: "state",
+        codeChallenge: pair.challenge,
+        redirectUri,
+      }),
+    );
+    expect(url.searchParams.get("code_challenge_method")).toBe("plain");
+    expect(url.searchParams.get("code_challenge")).toBe(pair.verifier);
+  });
+
+  it("uses an S256 challenge for AniList", () => {
+    const redirectUri = "http://localhost/api/trackers/anilist/auth/callback";
+    const provider = createTrackerProvider("anilist", {
+      redirectUri,
+      env: { anilistClientId: "client-id" },
+    });
+    const pair = createPkcePair(provider.pkceMethod);
+    expect(pair.challenge).not.toBe(pair.verifier);
+
+    const url = new URL(
+      provider.authorizationUrl({
+        state: "state",
+        codeChallenge: pair.challenge,
+        redirectUri,
+      }),
+    );
+    expect(url.searchParams.get("code_challenge_method")).toBe("S256");
+    expect(url.searchParams.get("code_challenge")).toBe(pair.challenge);
   });
 });
 

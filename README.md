@@ -168,13 +168,13 @@ loopback server.
 | `MUGIWARA_PLUGIN_INSTALL_ENABLED`                  | `true`                        | Master switch for plugin installation.                                                                                          |
 | `MUGIWARA_PUBLIC_URL`                              | empty                         | Public/LAN base URL used for OAuth redirects; overrides the request origin fallback.                                           |
 | `MUGIWARA_TRACKER_ENCRYPTION_KEY`                  | generated                     | Key material for AES-256-GCM tracker token encryption. When unset a key is generated in `DATA_DIR/tracker.key`.                |
-| `MUGIWARA_ANILIST_CLIENT_ID`                       | empty                         | Enables the AniList tracker connection.                                                                                        |
-| `MUGIWARA_ANILIST_CLIENT_SECRET`                   | empty                         | Optional AniList OAuth client secret.                                                                                          |
-| `MUGIWARA_ANILIST_REDIRECT_URI`                    | derived                       | Override the AniList OAuth callback URL.                                                                                       |
-| `MUGIWARA_MAL_CLIENT_ID`                           | empty                         | Enables the MyAnimeList tracker connection (sent as `X-MAL-CLIENT-ID`).                                                        |
-| `MUGIWARA_MAL_CLIENT_SECRET`                       | empty                         | Optional MyAnimeList OAuth client secret.                                                                                      |
-| `MUGIWARA_MAL_REDIRECT_URI`                        | derived                       | Override the MyAnimeList OAuth callback URL.                                                                                   |
-| `MUGIWARA_MAL_USER_AGENT`                          | Mugiwara default              | User-Agent sent to the MyAnimeList API.                                                                                        |
+| `MUGIWARA_ANILIST_CLIENT_ID`                       | empty                         | AniList OAuth app id. Baked into packaged builds at build time; runtime env overrides.                                         |
+| `MUGIWARA_ANILIST_CLIENT_SECRET`                   | empty                         | AniList OAuth app secret. Baked at build time only; not required at runtime for official packages.                             |
+| `MUGIWARA_ANILIST_REDIRECT_URI`                    | derived                       | Override the AniList OAuth callback URL (build-time or runtime).                                                               |
+| `MUGIWARA_MAL_CLIENT_ID`                           | empty                         | MyAnimeList public client id. Baked into packaged builds; sent as `X-MAL-CLIENT-ID`.                                           |
+| `MUGIWARA_MAL_CLIENT_SECRET`                       | empty                         | Optional MyAnimeList client secret. Omit for a public MAL client.                                                              |
+| `MUGIWARA_MAL_REDIRECT_URI`                        | derived                       | Override the MyAnimeList OAuth callback URL (build-time or runtime).                                                           |
+| `MUGIWARA_MAL_USER_AGENT`                          | Mugiwara default              | Optional User-Agent sent to the MyAnimeList API.                                                                               |
 
 ### CORS, CSRF and body limits
 
@@ -236,17 +236,19 @@ latest `lastReadAt` per key.
 
 ## Tracker sync
 
-Reading progress can be mirrored to AniList and MyAnimeList. Configure the
-provider client ids (see [Environment variables](#environment-variables)) and
-connect accounts in **Settings → Tracking**, then link a manga from its detail
-page. Tokens are encrypted at rest with AES-256-GCM and never returned by the
-API. A dedicated, rate-limited queue handles debounced completion pushes,
-manual sync, retries and the schedule; it is independent from the download
-queue, so tracker outages never block reading.
+Reading progress can be mirrored to AniList and MyAnimeList. Packaged builds
+bake the OAuth app credentials in at build time, so connecting an account in
+**Settings → Tracking** works without runtime environment variables. Connect an
+account, then link a manga from its detail page. Tokens are encrypted at rest
+with AES-256-GCM and never returned by the API. A dedicated, rate-limited queue
+handles debounced completion pushes, manual sync, retries and the schedule; it
+is independent from the download queue, so tracker outages never block reading.
 
-The conflict policy, redirect URI setup (including the MyAnimeList code-paste
-fallback for phones) and provider status/score mappings are documented in
-[`docs/tracking.md`](docs/tracking.md).
+The build-time variables, conflict policy, redirect URI setup (including the
+MyAnimeList code-paste fallback for phones) and provider status/score mappings
+are documented in [`docs/tracking.md`](docs/tracking.md). For local development and
+packaging, copy `.env.example` to `.env` once; the dev server and build scripts
+load it automatically, so commands do not need inline environment variables.
 
 ## Desktop
 
