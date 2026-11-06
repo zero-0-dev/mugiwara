@@ -157,17 +157,23 @@ export class ServerManager {
 
   private async waitForServer(port: number, timeoutMs: number): Promise<void> {
     const startTime = Date.now();
+    // The server binds HOST=0.0.0.0. Use IPv4 loopback explicitly: on some
+    // systems "localhost" resolves to ::1 first, while the listener is IPv4,
+    // which makes startup look like a timeout even though the server is up.
+    const healthUrl = `http://127.0.0.1:${port}/api/health`;
 
     while (Date.now() - startTime < timeoutMs) {
       try {
-        const response = await fetch(`http://localhost:${port}/api/health`);
+        const response = await fetch(healthUrl, {
+          signal: AbortSignal.timeout(2000),
+        });
         if (response.ok) {
           return;
         }
       } catch {
         // Server not ready yet, wait and retry
-        await new Promise((resolve) => setTimeout(resolve, 100));
       }
+      await new Promise((resolve) => setTimeout(resolve, 100));
     }
 
     throw new Error(`Server failed to start within ${timeoutMs}ms`);
