@@ -1,3 +1,4 @@
+import "./load-env";
 import { networkInterfaces } from "os";
 import { join } from "path";
 

@@ -246,9 +246,9 @@ is independent from the download queue, so tracker outages never block reading.
 
 The build-time variables, conflict policy, redirect URI setup (including the
 MyAnimeList code-paste fallback for phones) and provider status/score mappings
-are documented in [`docs/tracking.md`](docs/tracking.md). For local packaging,
-copy `.env.example` to `.env` once; the build scripts load it automatically, so
-packaging commands do not need inline environment variables.
+are documented in [`docs/tracking.md`](docs/tracking.md). For local development and
+packaging, copy `.env.example` to `.env` once; the dev server and build scripts
+load it automatically, so commands do not need inline environment variables.
 
 ## Desktop
 

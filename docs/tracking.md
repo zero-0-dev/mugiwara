@@ -44,7 +44,8 @@ The build reads `.env` and `.env.local` from the repository root. Real
 environment variables take precedence over both files, and `.env.local`
 overrides `.env`. The same variables work in CI without a `.env` file.
 `.env` is gitignored; commit only `.env.example`. These files are read by the
-build steps, not by the packaged server at runtime.
+build steps and the development server, but not by the packaged server at
+runtime.
 
 The server build writes `dist/trackers/builtin-trackers.json`, which is copied
 into the desktop/server artifact. It is build output, never committed. Runtime
