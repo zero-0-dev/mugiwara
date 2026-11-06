@@ -53,6 +53,11 @@ export interface TrackerProvider {
   readonly label: string;
   /** Highest valid provider-native score. */
   readonly scoreMax: number;
+  /**
+   * PKCE challenge method accepted by the provider. MyAnimeList only supports
+   * `plain`, so the challenge must equal the verifier for that provider.
+   */
+  readonly pkceMethod: "S256" | "plain";
 
   authorizationUrl(input: {
     state: string;
