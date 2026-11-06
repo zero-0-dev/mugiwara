@@ -389,7 +389,7 @@ export function MangaTrackingPanel({
                       ? "Not linked"
                       : providerInfo.configured
                         ? "Connect this tracker in Settings → Tracking"
-                        : "Not configured on the server"}
+                        : "No OAuth credentials in this build"}
                   </p>
                 </div>
                 {account ? (
