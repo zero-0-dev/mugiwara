@@ -50,6 +50,7 @@ export class AniListProvider implements TrackerProvider {
   readonly id = "anilist" as const;
   readonly label = "AniList";
   readonly scoreMax = 100;
+  readonly pkceMethod = "S256" as const;
 
   private readonly http: TrackerHttp;
   private readonly now: () => number;
@@ -70,7 +71,7 @@ export class AniListProvider implements TrackerProvider {
       response_type: "code",
       state: input.state,
       code_challenge: input.codeChallenge,
-      code_challenge_method: "S256",
+      code_challenge_method: this.pkceMethod,
     });
     return `${OAUTH_AUTHORIZE_URL}?${params.toString()}`;
   }

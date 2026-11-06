@@ -32,6 +32,7 @@ class ApiFakeProvider implements TrackerProvider {
   readonly id = "anilist" as const;
   readonly label = "Fake";
   readonly scoreMax = 100;
+  readonly pkceMethod = "S256" as const;
   entries = new Map<string, TrackerEntry>();
 
   authorizationUrl(input: { state: string; redirectUri: string }): string {

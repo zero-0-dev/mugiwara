@@ -56,6 +56,8 @@ export class MalProvider implements TrackerProvider {
   readonly id = "myanimelist" as const;
   readonly label = "MyAnimeList";
   readonly scoreMax = 10;
+  // MAL documents only the `plain` PKCE method; S256 is rejected.
+  readonly pkceMethod = "plain" as const;
 
   private readonly http: TrackerHttp;
   private readonly now: () => number;
@@ -78,7 +80,7 @@ export class MalProvider implements TrackerProvider {
       redirect_uri: input.redirectUri,
       state: input.state,
       code_challenge: input.codeChallenge,
-      code_challenge_method: "S256",
+      code_challenge_method: this.pkceMethod,
     });
     return `${OAUTH_AUTHORIZE_URL}?${params.toString()}`;
   }
