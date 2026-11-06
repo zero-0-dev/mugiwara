@@ -43,11 +43,16 @@ pnpm build:desktop:linux
 The build reads `.env` and `.env.local` from the repository root. Real
 environment variables take precedence over both files, and `.env.local`
 overrides `.env`. The same variables work in CI without a `.env` file.
+`.env` is gitignored; commit only `.env.example`. These files are read by the
+build steps, not by the packaged server at runtime.
 
 The server build writes `dist/trackers/builtin-trackers.json`, which is copied
 into the desktop/server artifact. It is build output, never committed. Runtime
 environment variables still take precedence so development and custom builds
 can override the baked values without repackaging.
+`MUGIWARA_TRACKER_ENCRYPTION_KEY` does not need to be set for packaged builds;
+a per-install key is generated in `DATA_DIR/tracker.key` when no key is
+configured.
 
 Register these callback URLs with each provider:
 
