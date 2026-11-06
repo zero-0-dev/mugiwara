@@ -84,7 +84,12 @@ class FakeBackend implements StorageBackend {
     chapterIds?: string[],
   ): Promise<MangaStorageUsage> {
     this.bulkCalls++;
-    const ids = chapterIds ?? [];
+    const prefix = `${mangaId}:`;
+    const ids =
+      chapterIds ??
+      [...this.bytes.keys()]
+        .filter((key) => key.startsWith(prefix))
+        .map((key) => key.slice(prefix.length));
     const entries = ids.map((chapterId) => ({
       chapterId,
       bytes: this.bytes.get(this.key(mangaId, chapterId)) ?? 0,
@@ -267,9 +272,26 @@ describe("storage usage", () => {
       lastReadAt: null,
     });
 
-    // One bulk listing per manga with candidate chapters, and none for the
-    // manga that has nothing downloaded.
-    expect(backend.bulkCalls).toBe(2);
+    // One bulk listing per manga with chapters: every chapter is measured so
+    // files left behind by older on-demand reads are still found.
+    expect(backend.bulkCalls).toBe(3);
+  });
+
+  it("counts chapters that have files but a stale pending status", async () => {
+    // Older on-demand reads wrote files without updating the chapter row.
+    backend.setSize(MANGA_A, "2", 300);
+
+    const usage = await getStorageUsage(deps);
+    const alpha = usage.manga.find((row) => row.mangaId === MANGA_A);
+    expect(alpha).toMatchObject({
+      downloadedChapterCount: 2,
+      totalBytes: 1300,
+    });
+    expect(usage.summary).toEqual({
+      totalBytes: 5300,
+      mangaWithDownloads: 2,
+      downloadedChapters: 3,
+    });
   });
 
   it("sorts by size and last read in both directions", async () => {
@@ -397,6 +419,33 @@ describe("deleting downloads", () => {
     expect(bravoChapter).toMatchObject({
       importStatus: "complete",
       pagesCount: 2,
+    });
+  });
+
+  it("deletes chapters that have files but a stale pending status", async () => {
+    backend.setSize(MANGA_A, "2", 300);
+
+    const result = await deleteMangaDownloads(deps, MANGA_A);
+
+    expect(result).toMatchObject({
+      mangaId: MANGA_A,
+      deletedCount: 2,
+      failedCount: 0,
+      bytesFreed: 1300,
+    });
+    expect(result.results.map((entry) => entry.chapterId)).toEqual([
+      "1",
+      "2",
+    ]);
+    expect(backend.deleted).toEqual(["1", "2"]);
+
+    const pending = await db.query.chapters.findFirst({
+      where: eq(chapters.id, "a-2"),
+    });
+    expect(pending).toMatchObject({
+      importStatus: "pending",
+      importProgress: 0,
+      pagesCount: 0,
     });
   });
 
