@@ -3,6 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "description": "Cross-platform manga reader with extensible plugin architecture",
+  "license": "GPL-3.0-or-later",
   "scripts": {
     "build": "turbo build",
     "dev": "turbo dev --filter=!@mugiwara-manga/mobile",

@@ -13,7 +13,7 @@ coverage
 .agents
 
 # UI evidence is attached to pull request comments, never committed.
-screenshots/
+/screenshots/
 
 data
 apps/server/deploy

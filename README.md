@@ -4,89 +4,39 @@
   <img src="assets/branding/mugiwara-logo.png" alt="Mugiwara — manga reader" width="220" />
 </p>
 
-Self-hosted manga reader. One shared web client (`apps/web`) runs in a browser,
-inside the Electron desktop shell, and inside the Capacitor mobile shell. The
-Node server (`apps/server`) owns the library, files, plugins, queue, and SQLite
+<p align="center">
+  <img src="assets/screenshots/mugiwara-desktop.jpg" alt="Mugiwara desktop app showing a library of popular manga" width="100%" />
+</p>
+
+<p align="center">
+  <em>The same library, on your desktop, phone and browser.</em>
+</p>
+
+Mugiwara is a self-hosted manga reader. One shared web client runs in a browser,
+inside the Electron desktop shell, and inside the Capacitor mobile shell. A
+single Node server owns the library, files, plugins, download queue and SQLite
 database.
 
-## Architecture
+- **Self-hosted and local-first** — your library, progress and credentials stay
+  on your machine or LAN.
+- **One UI everywhere** — desktop, mobile and web use the same React app; there
+  is no per-platform fork.
+- **Bring your own sources** — built-in local-filesystem support plus a
+  plugin API for source and storage backends.
+- **Reads the way you want** — RTL, vertical, webtoon and paged modes, themes,
+  progress tracking, categories and filters.
+- **Tracker friendly** — optional two-way sync with AniList and MyAnimeList.
 
-```
-apps/server       Express API + SQLite + plugins + queue; also serves the web build
-apps/web          The single React UI (also used by desktop and mobile)
-apps/desktop      Thin Electron shell; loads the local or LAN server URL
-apps/mobile       Thin Capacitor iOS/Android shell; bundles the same web build
-packages/*        Shared types, plugin API, storage/source plugins
-```
-
-Platform-specific code lives in the shells and `apps/web/src/platform/server.ts`.
-Feature components should not branch on `process.platform`, `Platform.OS`, or
-`navigator.platform`.
-
-## Branding
-
-The logo master lives in `assets/branding/mugiwara-logo.png`. All favicons, PWA
-icons, desktop icons and Android/iOS launcher icons and splashes are generated
-from it:
-
-```sh
-pnpm brand:assets
-```
-
-See `assets/branding/README.md`. Do not hand-edit generated icons.
-
-## UI system
-
-`apps/web` uses **Tailwind CSS v4** with **shadcn/ui** primitives built on
-Radix (`src/components/ui`). The original `--bg-primary`, `--text-primary` and
-brand accent tokens are bridged to the shadcn semantic variables in
-`src/index.css`, so every theme keeps the same look and feel.
-
-- Themes live in `src/lib/theme.ts`: each family (Mugiwara, Classic,
-  Catppuccin, Tokyo Night, Dracula, Synthwave, …) ships a light and a dark
-  variant, and `applyTheme` writes its tokens to `<html>`. The default is the
-  logo-inspired **Mugiwara** palette; the previous indigo palette is still
-  available as **Classic**. Themes are selected in Settings → Appearance.
-
-- Layout and components use Tailwind utilities; `src/index.css` is limited to
-  tokens, base styles and the performance-sensitive reader page layout.
-- Dialogs, selects, dropdown menus, tabs, switches and toasts are accessible
-  primitives with focus trapping, keyboard navigation and ARIA semantics.
-- Mobile-first layouts use a bottom navigation bar, safe-area padding and
-  bottom-sheet dialogs. Modals restore focus and close on Escape.
-- Navigation is URL-driven with **React Router v7** (data router). Screens are
-  `/`, `/manga/:mangaId`, `/read/:mangaId/:chapterId`, `/discover`,
-  `/discover/:anilistId`, `/settings/:tab?` and `/disk-space`; unknown URLs
-  render a not-found screen. Library search, filters and sort live in query
-  parameters (`q`, `status`, `type`, `genre`, `category`, `reading`, `sort`,
-  `order`) so reloads, back/forward and shared links restore the list.
-  `App.tsx` resolves the server before routing, which keeps mobile deep links
-  working. Do not reintroduce in-memory view state; navigate with the router.
-  The Electron shell registers the `mugiwara://` scheme and loads the matching
-  route; Capacitor handles `appUrlOpen`/launch URLs after server resolution.
-- The web build uses an absolute Vite `base` so deep links load `/assets/*`
-  correctly from the server root. The server already provides the SPA fallback.
-- Use the helpers in `src/lib/utils.ts` (`cn`) and the primitives in
-  `src/components/ui` before adding bespoke styles.
-
-## Quick start (development)
+## Quick start
 
 ```sh
 pnpm install
 pnpm dev
 ```
 
-This starts the server on `:3001`, the web client on `:5173`, and Electron.
-The desktop window loads `http://localhost:5173`; the Vite dev server proxies
-`/api` to `:3001`.
-
-To test on a phone during development, open `http://<your-lan-ip>:5173` from the
-phone. Both servers bind to the LAN.
-
-## Run for the LAN (recommended)
-
-Build the web client and server once, then run the server on the machine that
-holds the library (a PC, NAS, or Raspberry Pi):
+This starts the API on `:3001`, the web client on `:5173` and the Electron
+window. To run Mugiwara for the whole LAN, build the client and server, then run
+the server on the machine that holds the library:
 
 ```sh
 pnpm --filter @mugiwara-manga/web build
@@ -94,327 +44,35 @@ pnpm --filter @mugiwara-manga/server build
 PORT=3001 DATA_DIR=/path/to/mugiwara-data node apps/server/dist/index.js
 ```
 
-The server prints its LAN addresses at startup:
-
-```
-🎉 Mugiwara server running on http://localhost:3001
-
-📱 LAN access:
-   - http://192.168.1.20:3001
-```
-
-Open that URL from any device on the same network. The web client and the API
-are served from the same origin, so there is no CORS or port configuration in
-the browser.
-
-Notes:
-
-- The server listens on `0.0.0.0` by default. Set `HOST=127.0.0.1` to restrict
-  it to the local machine.
-- Open the port in the host firewall (default `3001`).
-- Every `/api` route except `/api/health` requires a paired device token. The
-  server is safe to run on a trusted LAN, but still put it behind HTTPS and a
-  reverse proxy if it is reachable from the internet.
-
-## Authentication and pairing
-
-The server uses a single-user bearer-token model. The raw token is shown once;
-the database stores only its SHA-256 hash plus the device label, creation time,
-last-used time and revocation state.
-
-On first start, the server prints a short-lived pairing code:
-
-```
-🔑 First-run pairing code: ABCD2345
-   Valid for 10 minutes. Enter it in the Mugiwara app to pair this device.
-```
-
-In the app, enter the server address and that code (or paste an access token)
-on the Connect screen. Codes are single use and expire after 10 minutes. Once
-paired, open **Settings → Security** to:
-
-- see paired devices,
-- revoke one device,
-- create a pairing code for another device,
-- rotate the current token (API: `POST /api/auth/rotate`),
-- log out all devices (`POST /api/auth/logout-all`).
-
-The web client stores the token per server origin in `localStorage` and sends
-`Authorization: Bearer …` from the single API client. The server also sets an
-`HttpOnly`, `SameSite=Lax` session cookie on pairing. That cookie lets
-same-origin browser and Electron `<img>` tags load covers and reader pages.
-Capacitor and other cross-origin clients request a short-lived (15 minute)
-content-scoped signed token from `POST /api/auth/content-token`; the client
-appends it as `?contentToken=…` to content URLs. It only works on
-`/api/content/*` and is invalidated when the device token is revoked.
-
-The packaged Electron app provisions a token automatically over loopback and
-passes it to the renderer through the preload bridge, so desktop setup stays
-zero-touch. Set `MUGIWARA_AUTH_TOKEN` to override that for a headless or shared
-server. In development Electron reads the same env var or pairs through the
-loopback server.
-
-### Environment variables
-
-| Variable                                           | Default                       | Purpose                                                                                                                         |
-| -------------------------------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `PORT`                                             | `3001`                        | HTTP port.                                                                                                                      |
-| `HOST`                                             | `0.0.0.0`                     | Bind address. Use `127.0.0.1` for local-only.                                                                                   |
-| `DATA_DIR`                                         | `./data`                      | SQLite database, covers and plugin installs.                                                                                    |
-| `WEB_DIR`                                          | auto-detect                   | Built web client directory.                                                                                                     |
-| `MUGIWARA_ALLOWED_ORIGINS`                         | empty                         | Comma-separated extra CORS origins. Wildcards are ignored; same-origin and known Electron/Capacitor origins are always allowed. |
-| `MUGIWARA_TRUST_PROXY`                             | `false`                       | Set to `true` when a reverse proxy terminates TLS (affects secure cookies and client IPs).                                      |
-| `MUGIWARA_COOKIE_SECURE`                           | auto                          | Force the `Secure` cookie flag.                                                                                                 |
-| `MUGIWARA_AUTH_TOKEN` / `MUGIWARA_BOOTSTRAP_TOKEN` | empty                         | Provision a fixed admin token (minimum 24 characters). The value is never logged.                                               |
-| `MUGIWARA_BOOTSTRAP_LABEL`                         | `Bootstrap token`             | Device label for the bootstrap token.                                                                                           |
-| `MUGIWARA_TOKEN_TTL_DAYS`                          | `0`                           | Optional bearer-token lifetime in days. `0` means tokens do not expire until revoked.                                           |
-| `MUGIWARA_PLUGIN_REGISTRY`                         | `https://registry.npmjs.org/` | Approved npm registry. Must be HTTPS (HTTP is allowed only for localhost).                                                      |
-| `MUGIWARA_PLUGIN_ALLOWLIST`                        | empty                         | Comma-separated exact package allowlist. Empty allows the `mugiwara-plugin-*` and `@mugiwara-manga/*` namespaces.               |
-| `MUGIWARA_ALLOW_REMOTE_PLUGIN_INSTALL`             | `false`                       | Permit plugin installs while bound to a non-loopback interface.                                                                 |
-| `MUGIWARA_PLUGIN_INSTALL_ENABLED`                  | `true`                        | Master switch for plugin installation.                                                                                          |
-| `MUGIWARA_PUBLIC_URL`                              | empty                         | Public/LAN base URL used for OAuth redirects; overrides the request origin fallback.                                           |
-| `MUGIWARA_TRACKER_ENCRYPTION_KEY`                  | generated                     | Key material for AES-256-GCM tracker token encryption. When unset a key is generated in `DATA_DIR/tracker.key`.                |
-| `MUGIWARA_ANILIST_CLIENT_ID`                       | empty                         | AniList OAuth app id. Baked into packaged builds at build time; runtime env overrides.                                         |
-| `MUGIWARA_ANILIST_CLIENT_SECRET`                   | empty                         | AniList OAuth app secret. Baked at build time only; not required at runtime for official packages.                             |
-| `MUGIWARA_ANILIST_REDIRECT_URI`                    | derived                       | Override the AniList OAuth callback URL (build-time or runtime).                                                               |
-| `MUGIWARA_MAL_CLIENT_ID`                           | empty                         | MyAnimeList public client id. Baked into packaged builds; sent as `X-MAL-CLIENT-ID`.                                           |
-| `MUGIWARA_MAL_CLIENT_SECRET`                       | empty                         | Optional MyAnimeList client secret. Omit for a public MAL client.                                                              |
-| `MUGIWARA_MAL_REDIRECT_URI`                        | derived                       | Override the MyAnimeList OAuth callback URL (build-time or runtime).                                                           |
-| `MUGIWARA_MAL_USER_AGENT`                          | Mugiwara default              | Optional User-Agent sent to the MyAnimeList API.                                                                               |
-
-### CORS, CSRF and body limits
-
-CORS never uses `*`: only configured origins, the request's own origin, and the
-known Electron/Vite (`http://localhost:5173`) and Capacitor
-(`http://localhost`, `https://localhost`, `capacitor://localhost`) origins are
-allowed, with `Access-Control-Allow-Credentials: true`. Disallowed preflights
-are rejected with `403`.
-
-State-changing requests that use cookie authentication must have a valid
-`Origin` (or be same-origin/non-browser). `application/x-www-form-urlencoded`
-writes are rejected with `415`; API writes use JSON. The global JSON body limit
-is 1 MB, with a 20 MB limit for `/api/library/import`.
-
-Auth and expensive routes (discovery, source search, metadata, storage scans,
-plugin install/update) are rate limited. Auth failures, plugin
-install/uninstall/update and destructive operations are written to the
-`audit_logs` table; audit rows never contain tokens, pairing codes or request
-bodies.
-
-### Plugin installation safety
-
-Plugin installation is admin-only and requires `confirm: true` in the request
-body (the UI asks for confirmation). npm runs with `--ignore-scripts`, no audit
-or funding checks, and the configured registry. Packages must match the approved
-namespace or explicit allowlist and the `mugiwara-plugin-*` / `@mugiwara-manga/*`
-name pattern. When the server is bound to a non-loopback interface, installs
-and updates are disabled unless `MUGIWARA_ALLOW_REMOTE_PLUGIN_INSTALL=true`.
-Built-in source and storage plugins keep working and cannot be uninstalled.
-
-## Library data, progress and reading status
-
-The library is served by `GET /api/library/filter` (the legacy `GET /api/manga`
-returns the same aggregates). For each manga:
-
-- **Chapter count** is the number of distinct chapters, independent of how many
-  progress rows exist.
-- **Progress** is the most recent progress row across all devices, enriched with
-  `percentComplete` and `isCompleted` (`isCompleted` is true at the last page or
-  at >= 95% of the chapter). Raw database rows are not exposed to clients.
-- **Reading status** is manga-level:
-  - `reading`: the manga has progress rows, but not every chapter is completed.
-  - `completed`: the manga has at least one chapter and every chapter has a
-    completed latest progress row across devices.
-  - `not-started`: the manga has no progress rows at all.
-
-`GET /api/library/filters/options` counts distinct manga for each reading
-status. `notStarted` is counted directly (not by subtracting other buckets), so
-it cannot go negative.
-
-Progress is stored per device as one row per
-`(mangaId, chapterId, deviceId)`. The shared web client creates a random UUID
-once, persists it in `localStorage` under `mugiwara.deviceId`, and sends it with
-every progress write. Library cards and filters use the newest row across
-devices. Older clients that omit a device id are stored under the `default`
-device. A unique index plus `ON CONFLICT` upsert makes duplicate/double-submit
-writes idempotent; the migration also deduplicates existing rows, keeping the
-latest `lastReadAt` per key.
-
-## Tracker sync
-
-Reading progress can be mirrored to AniList and MyAnimeList. Packaged builds
-bake the OAuth app credentials in at build time, so connecting an account in
-**Settings → Tracking** works without runtime environment variables. Connect an
-account, then link a manga from its detail page. Tokens are encrypted at rest
-with AES-256-GCM and never returned by the API. A dedicated, rate-limited queue
-handles debounced completion pushes, manual sync, retries and the schedule; it
-is independent from the download queue, so tracker outages never block reading.
-
-The build-time variables, conflict policy, redirect URI setup (including the
-MyAnimeList code-paste fallback for phones) and provider status/score mappings
-are documented in [`docs/tracking.md`](docs/tracking.md). For local development and
-packaging, copy `.env.example` to `.env` once; the dev server and build scripts
-load it automatically, so commands do not need inline environment variables.
-
-## Desktop
-
-Development:
-
-```sh
-pnpm dev
-```
-
-Build installers:
-
-```sh
-pnpm build:desktop:mac
-pnpm build:desktop:win
-pnpm build:desktop:linux
-```
-
-By default the packaged desktop app starts its own server and provisions a
-loopback auth token automatically for the renderer. To use a server that is
-already running on the LAN instead:
-
-```sh
-MUGIWARA_SERVER_URL=http://192.168.1.20:3001 pnpm --filter @mugiwara-manga/desktop dev
-# packaged binary:
-MUGIWARA_SERVER_URL=http://192.168.1.20:3001 ./Mugiwara
-```
-
-The packaged desktop shell currently expects `node` on `PATH` to run the
-embedded server. If you only use the LAN server, set `MUGIWARA_SERVER_URL` and
-no embedded server is started. (Porting the `dev/osx-build` Electron-as-Node
-packaging improvements is still on the list.)
-
-## Mobile (Capacitor)
-
-The mobile app in `apps/mobile` bundles the same web client and asks for the LAN
-server address on first launch.
-
-One-time setup:
-
-```sh
-pnpm install
-pnpm --filter @mugiwara-manga/mobile add:android
-pnpm --filter @mugiwara-manga/mobile add:ios
-```
-
-Every time the web UI changes:
-
-```sh
-pnpm cap:sync
-# or one platform:
-pnpm --filter @mugiwara-manga/mobile sync:android
-pnpm --filter @mugiwara-manga/mobile sync:ios
-```
-
-### Build an installable Android APK
-
-The easiest path is a debug APK. It is signed with the Android debug key and can
-be installed directly on a phone:
-
-```sh
-pnpm build:app:android
-```
-
-Output:
-
-```
-dist/app/android/mugiwara-<version>-debug.apk
-```
-
-Install it over USB:
-
-```sh
-adb install -r dist/app/android/mugiwara-<version>-debug.apk
-```
-
-If a previous Mugiwara build signed with a different key is already installed
-(for example the old React Native debug app), uninstall it first:
-
-```sh
-adb uninstall dev.zero.mugiwara
-```
-
-Or copy the APK to the phone and open it (enable "Install unknown apps" for the
-file manager/browser you use).
-
-For a release APK:
-
-```sh
-pnpm build:app:android:release
-```
-
-Unless you configure a keystore, the release APK is unsigned and cannot be
-installed. Sign it with `apksigner` or use Android Studio's **Build → Generate
-Signed Bundle/APK**:
-
-```sh
-$ANDROID_HOME/build-tools/36.0.0/apksigner sign \
-  --ks mugiwara.keystore \
-  --out dist/app/android/mugiwara-signed.apk \
-  apps/mobile/android/app/build/outputs/apk/release/app-release-unsigned.apk
-```
-
-### Build/install on an iPhone
-
-iOS builds require macOS + Xcode. From the repo:
-
-```sh
-pnpm --filter @mugiwara-manga/mobile sync:ios
-pnpm --filter @mugiwara-manga/mobile open:ios
-```
-
-In Xcode:
-
-1. Select the `App` target → **Signing & Capabilities**.
-2. Choose your Apple ID/team. A free Apple ID works for direct-to-device
-   sideloading (the app expires after 7 days). A paid developer account is
-   needed for TestFlight/App Store distribution.
-3. Connect the iPhone, select it as the run destination, and press **Run**.
-4. For TestFlight/App Store: **Product → Archive → Distribute App**.
-
-You can also use `pnpm --filter @mugiwara-manga/mobile run:ios` to let Capacitor
-pick a connected device/emulator.
-
-On first launch, enter the server address printed by the server, for example
-`http://192.168.1.20:3001`, then the one-time pairing code printed by the
-server. The app verifies the address with `/api/health` before saving the
-token for that server origin.
-
-Cleartext HTTP is already configured for the LAN use case:
-
-- Android: `allowMixedContent` in `capacitor.config.ts`, `cleartext: true`, and
-  `android:usesCleartextTraffic="true"` in `AndroidManifest.xml`.
-- iOS: `NSAllowsArbitraryLoads` + `NSAllowsLocalNetworking` and a local-network
-  usage description in `Info.plist`.
-
-See `apps/mobile/README.md` for details. If you later put the server behind
-HTTPS, remove the cleartext exceptions.
-
-## Tests
-
-The server has focused security tests (auth, CORS/CSRF, content tokens and
-plugin install hardening) using Vitest and Supertest:
-
-```sh
-pnpm --filter @mugiwara-manga/server test
-```
-
-The tests use a temporary `DATA_DIR` and an exported app factory, so they never
-bind a port or touch your real library.
-
-## Why no per-platform UI
-
-- Desktop ships its own Chromium (Electron), so macOS/Windows/Linux render the
-  same UI.
-- Mobile uses the platform WebView (WKWebView on iOS, Chromium on Android). The
-  shared UI is written with standard CSS and touch/pointer events; there is no
-  separate mobile component tree.
-- Window chrome, file dialogs, and server URLs are shell capabilities, exposed
-  through one small adapter (`apps/web/src/platform/server.ts` and the Electron
-  preload bridge).
-
-The detailed investigation and migration plan are in
-`tasks/platform-portability-strategy.md`.
+Open the printed LAN URL from any device and pair it with the one-time code in
+the server log. See [Getting started](docs/getting-started.md) for prerequisites,
+development workflows and LAN setup.
+
+## Documentation
+
+| Guide                                                 | What it covers                                                    |
+| ----------------------------------------------------- | ----------------------------------------------------------------- |
+| [Getting started](docs/getting-started.md)            | Prerequisites, development commands, LAN deployment               |
+| [Architecture](docs/architecture.md)                  | Repository layout, server/web/desktop/mobile boundaries           |
+| [Authentication and security](docs/authentication.md) | Pairing, tokens, environment variables, CORS/CSRF and rate limits |
+| [Library and progress](docs/library.md)               | Reading status, progress sync and filter semantics                |
+| [Plugins](docs/plugins.md)                            | Source/storage plugins and install hardening                      |
+| [UI system](docs/ui.md)                               | Themes, routing, shadcn/Tailwind conventions                      |
+| [Desktop](docs/desktop.md)                            | Electron development, packaging and LAN-server mode               |
+| [Mobile](docs/mobile.md)                              | Capacitor setup, Android APKs and iOS builds                      |
+| [Tracker sync](docs/tracking.md)                      | AniList/MyAnimeList configuration and conflict handling           |
+| [Branding](docs/branding.md)                          | Logo master and generated platform assets                         |
+| [Development](docs/development.md)                    | Tests, gating checks, build and release commands                  |
+| [Documentation index](docs/README.md)                 | All guides in one place                                           |
+
+## Contributing
+
+Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening
+a pull request, and run `pnpm verify` before you push.
+
+## License
+
+Mugiwara is free software licensed under the
+[GNU General Public License v3.0 or later](LICENSE) (`GPL-3.0-or-later`).
+You may redistribute it and/or modify it under the terms of the GPL. There is
+no warranty, to the extent permitted by law.
