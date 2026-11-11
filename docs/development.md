@@ -184,8 +184,14 @@ tokens, pairing codes, cookies, API keys and absolute personal paths.
   `pnpm exec playwright install chromium`.
 - **Android build fails**: ensure `ANDROID_HOME`/`ANDROID_SDK_ROOT` is set and
   the SDK/build-tools are installed; run `cap:sync` before Gradle.
-- **Desktop packaging fails**: run the web and server builds first, and verify
-  the electron-builder inputs (`apps/server/dist`, `apps/server/deploy`,
-  `apps/web/dist`) exist.
+- **Desktop packaging fails**: build on the target OS (a macOS package needs a
+  macOS host) and run the web and server builds first. Verify the
+  electron-builder inputs (`apps/server/dist`, `apps/server/deploy`,
+  `apps/web/dist`) exist. If `better-sqlite3` reports a missing Electron
+  prebuild, upgrade it or use an Electron version that has one.
+- **Packaged app shows "Mugiwara failed to start"**: open
+  `<userData>/data/server.log` (for example
+  `~/Library/Application Support/Mugiwara/data/server.log` on macOS) for the
+  embedded server's output.
 - **Database looks wrong**: use a fresh temporary `DATA_DIR` instead of deleting
   a real library. Migrations run on server start.

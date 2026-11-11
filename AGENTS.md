@@ -38,11 +38,14 @@ Generated or local-only paths that must not be edited by hand or committed:
 
 ## Prerequisites
 
-- Node.js >= 20.19 (required by ESLint 10; the repo is developed on current Node releases)
+- Node.js >= 22.12 (required by ESLint 10 and Electron 42; the repo is developed on current Node releases)
 - pnpm >= 11 (the lockfile is `pnpm-lock.yaml`; do not use npm/yarn)
 - For Android builds: Android SDK and `ANDROID_HOME`
 - For iOS builds: macOS + Xcode
 - For desktop installers: the platform toolchain required by electron-builder
+  (Xcode Command Line Tools on macOS, Build Tools for Visual Studio on Windows,
+  `build-essential` on Linux). Build each desktop package on its target OS;
+  cross-compiling embeds native server modules for the wrong platform.
 
 ## Setup and everyday commands
 

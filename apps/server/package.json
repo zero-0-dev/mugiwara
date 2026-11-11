@@ -23,7 +23,7 @@
     "@mugiwara-manga/storage-local": "workspace:*",
     "@mugiwara-manga/types": "workspace:*",
     "axios": "^1.14.0",
-    "better-sqlite3": "^12.8.0",
+    "better-sqlite3": "^12.11.1",
     "chokidar": "^3.5.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",

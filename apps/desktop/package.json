@@ -13,10 +13,9 @@
     "clean": "rm -rf dist release",
     "lint": "eslint src",
     "typecheck": "tsc --noEmit",
-    "package:linux": "pnpm --filter @mugiwara-manga/web build && npm run build && electron-builder --linux",
-    "package:mac": "pnpm --filter @mugiwara-manga/web build && npm run build && electron-builder --mac",
-    "package:win": "pnpm --filter @mugiwara-manga/web build && npm run build && electron-builder --win",
-    "package:all": "pnpm --filter @mugiwara-manga/web build && npm run build && electron-builder --linux --win --mac"
+    "package:linux": "node ../../scripts/build.mjs desktop:linux",
+    "package:mac": "node ../../scripts/build.mjs desktop:mac",
+    "package:win": "node ../../scripts/build.mjs desktop:win"
   },
   "build": {
     "appId": "dev.zero.mugiwara",
@@ -58,7 +57,8 @@
     ],
     "linux": {
       "target": ["AppImage"],
-      "category": "Utility"
+      "category": "Utility",
+      "executableName": "mugiwara"
     },
     "mac": {
       "target": ["zip"],
@@ -77,8 +77,8 @@
     "@mugiwara-manga/web": "workspace:*",
     "@types/node": "^20.10.5",
     "concurrently": "^8.2.2",
-    "electron": "^28.0.0",
-    "electron-builder": "^26.8.1",
+    "electron": "^42.11.18",
+    "electron-builder": "^26.18.0",
     "typescript": "^5.3.3"
   }
 }

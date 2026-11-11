@@ -304,6 +304,16 @@ async function initialize() {
     await createWindow(serverPort);
   } catch (error) {
     console.error("[Main] Failed to initialize:", error);
+    const message = error instanceof Error ? error.message : String(error);
+    const logHint = serverManager
+      ? `\n\nServer log: ${serverManager.getLogFile()}`
+      : "";
+    // Packaged apps have no visible console; surface the failure instead of
+    // quitting silently.
+    dialog.showErrorBox(
+      "Mugiwara failed to start",
+      `The embedded server could not be started.\n\n${message}${logHint}`,
+    );
     app.quit();
   }
 }

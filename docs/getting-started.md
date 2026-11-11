@@ -2,12 +2,14 @@
 
 ## Prerequisites
 
-- Node.js >= 20.19 (required by ESLint 10; the repo is developed on current
-  Node releases).
+- Node.js >= 22.12 (required by ESLint 10 and Electron 42; the repo is
+  developed on current Node releases).
 - pnpm >= 11. The lockfile is `pnpm-lock.yaml`; do not use npm or yarn.
 - For Android builds: the Android SDK and `ANDROID_HOME`.
 - For iOS builds: macOS and Xcode.
-- For desktop installers: the platform toolchain required by electron-builder.
+- For desktop installers: build each package on its target OS (macOS packages
+  on macOS, Windows packages on Windows, Linux packages on Linux). The embedded
+  server ships native modules for the host platform.
 
 ## Install and run in development
 

@@ -23,7 +23,7 @@
     "cap:sync": "pnpm --filter @mugiwara-manga/mobile sync",
     "cap:android": "pnpm --filter @mugiwara-manga/mobile sync:android && pnpm --filter @mugiwara-manga/mobile open:android",
     "cap:ios": "pnpm --filter @mugiwara-manga/mobile sync:ios && pnpm --filter @mugiwara-manga/mobile open:ios",
-    "build:server:deploy": "turbo build --filter=@mugiwara-manga/server --filter=@mugiwara-manga/web && rm -rf apps/server/deploy && pnpm --filter=@mugiwara-manga/server deploy --legacy apps/server/deploy && cp -R apps/web/dist apps/server/deploy/web"
+    "build:server:deploy": "turbo build --filter=@mugiwara-manga/server --filter=@mugiwara-manga/web && rm -rf apps/server/deploy && pnpm --filter=@mugiwara-manga/server deploy --prod --legacy apps/server/deploy && cp -R apps/web/dist apps/server/deploy/web"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -38,6 +38,6 @@
     "typescript-eslint": "^8.72.1"
   },
   "engines": {
-    "node": ">=20.19.0"
+    "node": ">=22.12.0"
   }
 }

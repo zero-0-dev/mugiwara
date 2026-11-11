@@ -20,8 +20,25 @@ pnpm build:desktop:win
 pnpm build:desktop:linux
 ```
 
+Each desktop package must be built on its target operating system. The embedded
+server ships native modules (`better-sqlite3`, `sharp`) compiled for the host,
+so a Linux host cannot produce a working macOS or Windows package.
+
+The build uses the architecture of the Node.js runtime that runs it: a native
+arm64 Node on an Apple Silicon Mac produces an `arm64` package, and an Intel
+Mac produces an `x64` package. On Apple Silicon, make sure the Node.js running
+the build is a native arm64 build; a Node under Rosetta reports `x64` and
+produces an Intel package.
+
+The build also fetches the `better-sqlite3` prebuild that matches the bundled
+Electron ABI. That download normally needs no compiler; if upstream stops
+publishing a matching prebuild, the build fails with an explicit error and you
+must upgrade `better-sqlite3` or choose an Electron version that has one.
+
 By default the packaged desktop app starts its own server and provisions a
-loopback auth token automatically for the renderer.
+loopback auth token automatically for the renderer. It runs that server on
+Electron's own Node runtime (`ELECTRON_RUN_AS_NODE`), so a system `node`
+installation is not required.
 
 ## Use an existing LAN server
 
@@ -33,10 +50,11 @@ MUGIWARA_SERVER_URL=http://192.168.1.20:3001 pnpm --filter @mugiwara-manga/deskt
 MUGIWARA_SERVER_URL=http://192.168.1.20:3001 ./Mugiwara
 ```
 
-The packaged desktop shell currently expects `node` on `PATH` to run the
-embedded server. If you only use the LAN server, set `MUGIWARA_SERVER_URL` and
-no embedded server is started. Porting the `dev/osx-build` Electron-as-Node
-packaging improvements is still on the list.
+The packaged desktop shell runs the embedded server on Electron's bundled Node
+runtime, so it does not need `node` on `PATH`. If you only use a LAN server, set
+`MUGIWARA_SERVER_URL` and no embedded server is started. Server output and
+errors are written to `<userData>/data/server.log` (for example
+`~/Library/Application Support/Mugiwara/data/server.log` on macOS).
 
 ## How it works
 
