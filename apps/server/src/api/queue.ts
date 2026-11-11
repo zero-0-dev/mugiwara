@@ -1,6 +1,7 @@
 import { Router, Response } from "express";
 import { ImportTaskRepository } from "../queue/repository";
 import { ImportQueueProcessor } from "../queue/processor";
+import type { TaskStatus } from "../queue/types";
 import { recordAudit } from "../services/audit";
 
 const router: Router = Router();
@@ -18,8 +19,18 @@ router.get("/tasks", async (req: any, res: Response) => {
     const repository: ImportTaskRepository = req.taskRepository;
     const { status, mangaId, limit, offset } = req.query;
 
+    // `status` accepts a comma-separated list so a client can ask for the
+    // active queue states (pending,running) in a single request.
+    const statuses =
+      typeof status === "string" && status.trim().length > 0
+        ? (status
+            .split(",")
+            .map((entry) => entry.trim())
+            .filter(Boolean) as TaskStatus[])
+        : undefined;
+
     const tasks = await repository.list({
-      status,
+      statuses,
       mangaId,
       limit: limit ? parseInt(limit) : undefined,
       offset: offset ? parseInt(offset) : undefined,

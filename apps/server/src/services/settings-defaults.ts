@@ -14,7 +14,7 @@ export const defaultSettings: Record<string, string> = {
   "reader.haptics": "false",
 
   // UI preferences
-  "ui.theme": "dark",
+  "ui.theme": "mugiwara-dark",
   "ui.showNSFW": "false",
 
   // Library preferences

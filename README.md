@@ -40,7 +40,13 @@ See `assets/branding/README.md`. Do not hand-edit generated icons.
 `apps/web` uses **Tailwind CSS v4** with **shadcn/ui** primitives built on
 Radix (`src/components/ui`). The original `--bg-primary`, `--text-primary` and
 brand accent tokens are bridged to the shadcn semantic variables in
-`src/index.css`, so dark and light themes keep the same look and feel.
+`src/index.css`, so every theme keeps the same look and feel.
+
+- Themes live in `src/lib/theme.ts`: each family (Mugiwara, Classic,
+  Catppuccin, Tokyo Night, Dracula, Synthwave, …) ships a light and a dark
+  variant, and `applyTheme` writes its tokens to `<html>`. The default is the
+  logo-inspired **Mugiwara** palette; the previous indigo palette is still
+  available as **Classic**. Themes are selected in Settings → Appearance.
 
 - Layout and components use Tailwind utilities; `src/index.css` is limited to
   tokens, base styles and the performance-sensitive reader page layout.

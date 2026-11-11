@@ -49,7 +49,7 @@ export function SearchResultCard({
             loading="lazy"
           />
         ) : (
-          <div className="flex size-full items-center justify-center bg-gradient-to-br from-indigo-500/25 to-secondary text-3xl font-bold text-muted-foreground">
+          <div className="flex size-full items-center justify-center bg-gradient-to-br from-primary/25 to-secondary text-3xl font-bold text-muted-foreground">
             {firstLetter}
           </div>
         )}

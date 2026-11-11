@@ -7,6 +7,7 @@ import {
   isDoubleTap,
   pageIndexForDisplayIndex,
   resolveEdgeSwipe,
+  resolveScrollEdgeSwipe,
   resolveTapZone,
   slideCountForLayout,
   toDisplaySlides,
@@ -166,6 +167,69 @@ describe("vertical edge swipes", () => {
   it("does nothing in the middle of the chapter", () => {
     expect(
       resolveEdgeSwipe({ ...base, atTop: false, atBottom: false, dx: 120, dy: 4 }),
+    ).toBeNull();
+  });
+});
+
+describe("vertical edge continuation swipes", () => {
+  it("advances after the bottom is reached", () => {
+    expect(
+      resolveScrollEdgeSwipe({
+        dx: 6,
+        dy: -90,
+        atTop: false,
+        atBottom: true,
+      }),
+    ).toBe("next");
+    expect(
+      resolveScrollEdgeSwipe({
+        dx: 6,
+        dy: -40,
+        atTop: false,
+        atBottom: true,
+      }),
+    ).toBeNull();
+  });
+
+  it("goes back after the top is reached", () => {
+    expect(
+      resolveScrollEdgeSwipe({ dx: 6, dy: 90, atTop: true, atBottom: false }),
+    ).toBe("prev");
+  });
+
+  it("does not steal normal scrolling in the middle of the chapter", () => {
+    expect(
+      resolveScrollEdgeSwipe({
+        dx: 6,
+        dy: -120,
+        atTop: false,
+        atBottom: false,
+      }),
+    ).toBeNull();
+    expect(
+      resolveScrollEdgeSwipe({ dx: 6, dy: 70, atTop: true, atBottom: false }),
+    ).toBeNull();
+  });
+
+  it("ignores mostly horizontal gestures", () => {
+    expect(
+      resolveScrollEdgeSwipe({
+        dx: -90,
+        dy: 40,
+        atTop: false,
+        atBottom: true,
+      }),
+    ).toBeNull();
+  });
+
+  it("uses the swiped edge's direction", () => {
+    // Swiping down at the bottom would scroll back up, so it is not "next".
+    expect(
+      resolveScrollEdgeSwipe({ dx: 6, dy: 90, atTop: false, atBottom: true }),
+    ).toBeNull();
+    // Swiping up at the top would scroll back down.
+    expect(
+      resolveScrollEdgeSwipe({ dx: 6, dy: -90, atTop: true, atBottom: false }),
     ).toBeNull();
   });
 });

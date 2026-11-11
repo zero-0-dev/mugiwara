@@ -18,20 +18,18 @@ const ToastContext = createContext<ToastContextValue | null>(null);
 function useDocumentTheme(): "dark" | "light" {
   const [theme, setTheme] = useState<"dark" | "light">(() => {
     if (typeof document === "undefined") return "dark";
-    return document.documentElement.dataset.theme === "light"
-      ? "light"
-      : "dark";
+    return document.documentElement.dataset.mode === "light" ? "light" : "dark";
   });
 
   useEffect(() => {
     const root = document.documentElement;
     const update = () =>
-      setTheme(root.dataset.theme === "light" ? "light" : "dark");
+      setTheme(root.dataset.mode === "light" ? "light" : "dark");
     update();
     const observer = new MutationObserver(update);
     observer.observe(root, {
       attributes: true,
-      attributeFilter: ["data-theme"],
+      attributeFilter: ["data-mode"],
     });
     return () => observer.disconnect();
   }, []);

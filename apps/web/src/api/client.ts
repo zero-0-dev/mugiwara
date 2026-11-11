@@ -122,6 +122,7 @@ export interface ImportTask {
   mangaId: string;
   mangaTitle: string;
   sourceId: string;
+  chapterId?: string;
   status: string;
   progress: number;
   error?: string;
@@ -576,7 +577,9 @@ export class ApiClient {
     mangaId: string,
     chapterId: string,
   ): Promise<import("@mugiwara-manga/types").PageInfo[]> {
-    return this.request(`/api/manga/${mangaId}/chapters/${chapterId}/pages`);
+    return this.request(
+      `/api/manga/${mangaId}/chapters/${encodeURIComponent(chapterId)}/pages`,
+    );
   }
 
   getAllChapterProgress(mangaId: string): Promise<ReadingProgress[]> {
@@ -587,7 +590,9 @@ export class ApiClient {
     mangaId: string,
     chapterId: string,
   ): Promise<ReadingProgress> {
-    return this.request(`/api/manga/${mangaId}/chapters/${chapterId}/progress`);
+    return this.request(
+      `/api/manga/${mangaId}/chapters/${encodeURIComponent(chapterId)}/progress`,
+    );
   }
 
   updateChapterProgress(
@@ -596,7 +601,7 @@ export class ApiClient {
     body: { pageNumber: number; totalPages: number; isCompleted: boolean },
   ): Promise<void> {
     return this.request(
-      `/api/manga/${mangaId}/chapters/${chapterId}/progress`,
+      `/api/manga/${mangaId}/chapters/${encodeURIComponent(chapterId)}/progress`,
       {
         method: "POST",
         body: JSON.stringify({ ...body, deviceId: getDeviceId() }),
@@ -610,7 +615,7 @@ export class ApiClient {
     body?: { markPrevious?: boolean },
   ): Promise<void> {
     return this.request(
-      `/api/manga/${mangaId}/chapters/${chapterId}/complete`,
+      `/api/manga/${mangaId}/chapters/${encodeURIComponent(chapterId)}/complete`,
       {
         method: "POST",
         body: JSON.stringify({ ...(body || {}), deviceId: getDeviceId() }),
@@ -624,7 +629,7 @@ export class ApiClient {
     body?: { markFollowing?: boolean },
   ): Promise<void> {
     return this.request(
-      `/api/manga/${mangaId}/chapters/${chapterId}/complete`,
+      `/api/manga/${mangaId}/chapters/${encodeURIComponent(chapterId)}/complete`,
       {
         method: "DELETE",
         body: JSON.stringify({ ...(body || {}), deviceId: getDeviceId() }),
@@ -634,7 +639,7 @@ export class ApiClient {
 
   downloadChapter(mangaId: string, chapterId: string): Promise<void> {
     return this.request(
-      `/api/manga/${mangaId}/chapters/${chapterId}/download`,
+      `/api/manga/${mangaId}/chapters/${encodeURIComponent(chapterId)}/download`,
       { method: "POST" },
     );
   }
@@ -811,9 +816,14 @@ export class ApiClient {
   }
 
   // Queue
-  getQueueTasks(limit = 50, mangaId?: string): Promise<ImportTask[]> {
+  getQueueTasks(
+    limit = 50,
+    mangaId?: string,
+    statuses?: string[],
+  ): Promise<ImportTask[]> {
     const params = new URLSearchParams({ limit: String(limit) });
     if (mangaId) params.set("mangaId", mangaId);
+    if (statuses?.length) params.set("status", statuses.join(","));
     return this.request(`/api/queue/tasks?${params.toString()}`);
   }
 

@@ -450,7 +450,7 @@ export function StorageSection({
                     isDefault: e.target.checked,
                   })
                 }
-                className="size-4 accent-indigo-500"
+                className="size-4 accent-primary"
               />
               <span>
                 Set as default backend
@@ -525,7 +525,7 @@ export function StorageSection({
                   type="checkbox"
                   checked={editIsDefault}
                   onChange={(e) => setEditIsDefault(e.target.checked)}
-                  className="size-4 accent-indigo-500"
+                  className="size-4 accent-primary"
                 />
                 Set as default backend
               </label>

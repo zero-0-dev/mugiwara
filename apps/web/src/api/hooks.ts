@@ -250,8 +250,10 @@ export function useQueueTasks(limit = 50) {
 
 export function useMangaQueueTasks(mangaId: string) {
   const api = useApiClient();
-  return useTaskQueue(["queueTasks", "manga", mangaId], () =>
-    api.getQueueTasks(50, mangaId),
+  // Only active tasks matter for a manga's chapter rows: finished tasks stay in
+  // the queue table and would otherwise crowd out pending downloads.
+  return useTaskQueue(["queueTasks", "manga", mangaId, "active"], () =>
+    api.getQueueTasks(500, mangaId, ["pending", "running", "paused"]),
   );
 }
 

@@ -517,7 +517,7 @@ export function Library({ onMangaSelect }: LibraryProps) {
                       className="size-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
                     />
                   ) : (
-                    <div className="flex size-full items-center justify-center bg-gradient-to-br from-indigo-500/25 to-secondary text-3xl font-bold text-muted-foreground">
+                    <div className="flex size-full items-center justify-center bg-gradient-to-br from-primary/25 to-secondary text-3xl font-bold text-muted-foreground">
                       {m.title.charAt(0)}
                     </div>
                   )}
@@ -548,7 +548,7 @@ export function Library({ onMangaSelect }: LibraryProps) {
                       <Progress
                         value={m.progress.percentComplete}
                         className="h-1 bg-white/20"
-                        indicatorClassName="bg-indigo-400"
+                        indicatorClassName="bg-primary"
                       />
                     </div>
                   )}

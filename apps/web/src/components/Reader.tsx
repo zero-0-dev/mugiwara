@@ -36,6 +36,7 @@ import {
   isDoubleTap,
   pageIndexForDisplayIndex,
   resolveEdgeSwipe,
+  resolveScrollEdgeSwipe,
   resolveTapZone,
   SettleDebouncer,
   toDisplaySlides,
@@ -620,8 +621,9 @@ export function Reader({
     };
   }, [paged, pages.length]);
 
-  // Vertical: horizontal edge swipes change chapter, but only at the very
-  // top/bottom and only when the gesture is clearly horizontal.
+  // Vertical: at the very top/bottom a horizontal edge swipe changes chapter,
+  // and an extra swipe past the end of the scroll continues to the neighbouring
+  // chapter.
   useEffect(() => {
     if (paged) return;
     const scroller = verticalRef.current;
@@ -657,13 +659,20 @@ export function Reader({
       start = null;
       if (!touch) return;
 
-      const action = resolveEdgeSwipe({
-        dx: touch.clientX - gesture.x,
-        dy: touch.clientY - gesture.y,
-        atTop: gesture.atTop,
-        atBottom: gesture.atBottom,
-        direction,
-      });
+      const action =
+        resolveEdgeSwipe({
+          dx: touch.clientX - gesture.x,
+          dy: touch.clientY - gesture.y,
+          atTop: gesture.atTop,
+          atBottom: gesture.atBottom,
+          direction,
+        }) ??
+        resolveScrollEdgeSwipe({
+          dx: touch.clientX - gesture.x,
+          dy: touch.clientY - gesture.y,
+          atTop: gesture.atTop,
+          atBottom: gesture.atBottom,
+        });
 
       if (action === "prev") onPrevChapter?.();
       else if (action === "next") onNextChapter?.();
@@ -781,6 +790,36 @@ export function Reader({
       onPrevChapter?.();
     }
   }, [currentPage, onPrevChapter, readingMode, scrollToPage]);
+
+  // In vertical mode the footer buttons jump between chapters; page scrolling
+  // stays on the swipe and keyboard paths.
+  const handlePrevButton = useCallback(() => {
+    if (readingMode === "vertical") {
+      onPrevChapter?.();
+      return;
+    }
+    goToPrevPage();
+  }, [goToPrevPage, onPrevChapter, readingMode]);
+
+  const handleNextButton = useCallback(() => {
+    if (readingMode === "vertical") {
+      onNextChapter?.();
+      return;
+    }
+    goToNextPage();
+  }, [goToNextPage, onNextChapter, readingMode]);
+
+  const prevDisabled =
+    readingMode === "vertical"
+      ? !onPrevChapter
+      : currentPage === 0 && !onPrevChapter;
+  const nextDisabled =
+    readingMode === "vertical"
+      ? !onNextChapter
+      : currentPage === pages.length - 1 && !onNextChapter;
+  const prevLabel =
+    readingMode === "vertical" ? "Previous chapter" : "Previous page";
+  const nextLabel = readingMode === "vertical" ? "Next chapter" : "Next page";
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -1124,7 +1163,7 @@ export function Reader({
             onChange={(event) =>
               handleModeChange(event.target.value as ReaderMode)
             }
-            className="h-8 shrink-0 rounded-md border border-white/15 bg-white/10 px-2 text-xs text-white outline-none focus:ring-2 focus:ring-indigo-400"
+            className="h-8 shrink-0 rounded-md border border-white/15 bg-white/10 px-2 text-xs text-white outline-none focus:ring-2 focus:ring-primary"
           >
             <option value="rtl" className="bg-zinc-900">
               RTL
@@ -1253,18 +1292,18 @@ export function Reader({
           <Button
             variant="ghost"
             size="icon-sm"
-            onClick={() => goToPrevPage()}
-            disabled={currentPage === 0 && !onPrevChapter}
+            onClick={handlePrevButton}
+            disabled={prevDisabled}
             className="text-white hover:bg-white/10 hover:text-white disabled:opacity-30"
-            aria-label="Previous page"
-            title="Previous page"
+            aria-label={prevLabel}
+            title={prevLabel}
           >
             <ChevronLeft className="size-5" />
           </Button>
           <div className="flex min-w-0 flex-1 items-center gap-2 px-1">
             <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/15">
               <div
-                className="h-full rounded-full bg-indigo-400 transition-[width] duration-200"
+                className="h-full rounded-full bg-primary transition-[width] duration-200"
                 style={{
                   width: `${((currentPage + 1) / pages.length) * 100}%`,
                 }}
@@ -1277,11 +1316,11 @@ export function Reader({
           <Button
             variant="ghost"
             size="icon-sm"
-            onClick={() => goToNextPage()}
-            disabled={currentPage === pages.length - 1 && !onNextChapter}
+            onClick={handleNextButton}
+            disabled={nextDisabled}
             className="text-white hover:bg-white/10 hover:text-white disabled:opacity-30"
-            aria-label="Next page"
-            title="Next page"
+            aria-label={nextLabel}
+            title={nextLabel}
           >
             <ChevronRight className="size-5" />
           </Button>

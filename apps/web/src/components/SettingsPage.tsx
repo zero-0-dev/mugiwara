@@ -7,6 +7,7 @@ import {
   Info,
   Link2,
   ListOrdered,
+  Palette,
   Plug,
   ShieldCheck,
   Tags,
@@ -17,6 +18,7 @@ import { StorageSection } from "./settings/StorageSection";
 import { PluginsSection } from "./settings/PluginsSection";
 import { QueueSection } from "./settings/QueueSection";
 import { SecuritySection } from "./settings/SecuritySection";
+import { ThemeSection } from "./settings/ThemeSection";
 import { TrackingSection } from "./settings/TrackingSection";
 import { useSettings, useSaveSetting } from "../api/hooks";
 import { useMobileLayout } from "../hooks/useMobileLayout";
@@ -57,7 +59,7 @@ const defaultSettings: Settings = {
   "reading.manhuaMode": "vertical",
   "reading.webtoonMode": "vertical",
   "reader.haptics": "false",
-  "ui.theme": "dark",
+  "ui.theme": "mugiwara-dark",
   "download.compressImages": "true",
 };
 
@@ -100,6 +102,7 @@ const mediaTypes = [
 
 const TABS = [
   { value: "reading", label: "Reading", icon: BookOpen },
+  { value: "appearance", label: "Appearance", icon: Palette },
   { value: "categories", label: "Categories", icon: Tags },
   { value: "downloads", label: "Downloads", icon: Download },
   { value: "tracking", label: "Tracking", icon: Link2 },
@@ -179,7 +182,7 @@ export function SettingsPage({
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
             <p className="text-sm text-muted-foreground">
-              Reading, downloads, storage, plugins and security.
+              Appearance, reading, downloads, storage, plugins and security.
             </p>
           </div>
         </div>
@@ -217,27 +220,8 @@ export function SettingsPage({
             <section className="rounded-2xl border border-border/80 bg-card p-5 shadow-sm sm:p-6">
               <SectionHeading
                 title="Reading Preferences"
-                description="Choose how Mugiwara looks and how chapters turn."
+                description="Choose how chapters turn."
               />
-
-              <SettingRow
-                label="Theme"
-                description="Choose between dark and light appearance"
-              >
-                <Select
-                  value={settings["ui.theme"]}
-                  onChange={(v) => updateSetting("ui.theme", v)}
-                  disabled={saveSetting.isPending}
-                  aria-label="Theme"
-                  className="w-36"
-                  options={[
-                    { value: "dark", label: "Dark" },
-                    { value: "light", label: "Light" },
-                  ]}
-                />
-              </SettingRow>
-
-              <Separator />
 
               <SettingRow
                 label="Page-turn haptics"
@@ -306,6 +290,10 @@ export function SettingsPage({
                 })}
               </div>
             </section>
+          </TabsContent>
+
+          <TabsContent value="appearance" className="mt-0">
+            <ThemeSection />
           </TabsContent>
 
           <TabsContent value="categories" className="mt-0">

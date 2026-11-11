@@ -157,6 +157,7 @@ export class ImportTaskRepository {
 
   async list(options?: {
     status?: TaskStatus;
+    statuses?: TaskStatus[];
     mangaId?: string;
     limit?: number;
     offset?: number;
@@ -165,6 +166,10 @@ export class ImportTaskRepository {
 
     if (options?.status) {
       query = query.where(eq(schema.importTasks.status, options.status));
+    }
+
+    if (options?.statuses?.length) {
+      query = query.where(inArray(schema.importTasks.status, options.statuses));
     }
 
     if (options?.mangaId) {

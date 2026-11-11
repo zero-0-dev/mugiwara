@@ -241,7 +241,7 @@ const manifest = {
   scope: "./",
   display: "standalone",
   background_color: BACKGROUND,
-  theme_color: "#171717",
+  theme_color: "#17120e",
   icons: [
     { src: "./icons/icon-192.png", sizes: "192x192", type: "image/png" },
     { src: "./icons/icon-512.png", sizes: "512x512", type: "image/png" },

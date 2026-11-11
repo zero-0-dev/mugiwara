@@ -192,6 +192,41 @@ export function resolveEdgeSwipe(input: {
   return null;
 }
 
+/**
+ * Resolves a vertical swipe that continues past the top/bottom of the vertical
+ * reader into a chapter action. It only fires when the scroller is already at
+ * that edge, so a normal webtoon scroll is never stolen: once the chapter runs
+ * out, an extra swipe in the same direction advances to the neighbouring
+ * chapter. A finger moving up continues the downward scroll into the next
+ * chapter; a finger moving down continues the upward scroll into the previous
+ * one.
+ */
+export function resolveScrollEdgeSwipe(input: {
+  dx: number;
+  dy: number;
+  atTop: boolean;
+  atBottom: boolean;
+  threshold?: number;
+}): ChapterAction | null {
+  const {
+    dx,
+    dy,
+    atTop,
+    atBottom,
+    threshold = CHAPTER_SWIPE_THRESHOLD_PX,
+  } = input;
+
+  if (!atTop && !atBottom) return null;
+  if (Math.abs(dy) < threshold) return null;
+  // Reject gestures that are mostly horizontal: they belong to the horizontal
+  // chapter edge swipes.
+  if (Math.abs(dy) <= Math.abs(dx) * 1.2) return null;
+
+  if (atBottom && dy < 0) return "next";
+  if (atTop && dy > 0) return "prev";
+  return null;
+}
+
 export interface TapPoint {
   x: number;
   y: number;

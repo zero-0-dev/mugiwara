@@ -33,7 +33,7 @@ export function ChapterItem({
     >
       <input
         type="checkbox"
-        className="size-4 shrink-0 accent-indigo-500"
+        className="size-4 shrink-0 accent-primary"
         checked={isSelected}
         onChange={() => onToggle(chapter.chapterId)}
         tabIndex={-1}

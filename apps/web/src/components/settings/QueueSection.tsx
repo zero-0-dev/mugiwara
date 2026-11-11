@@ -67,7 +67,7 @@ export function QueueSection() {
       label: "Running",
       value: queueStats.running ?? 0,
       icon: ListOrdered,
-      tone: "text-brand-text bg-indigo-500/10",
+      tone: "text-brand-text bg-primary/10",
     },
     {
       key: "complete",

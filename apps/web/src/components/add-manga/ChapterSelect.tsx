@@ -152,7 +152,7 @@ export function ChapterSelect({
             type="checkbox"
             checked={allVisibleSelected && visibleChapters.length > 0}
             onChange={handleSelectAllChange}
-            className="size-4 accent-indigo-500"
+            className="size-4 accent-primary"
           />
           Select All
         </label>

@@ -49,7 +49,7 @@ async function open(viewport, dark, authed = true) {
   await page.route("**/api/settings", async (route) => {
     const response = await route.fetch();
     const json = await response.json();
-    json["ui.theme"] = dark ? "dark" : "light";
+    json["ui.theme"] = dark ? "mugiwara-dark" : "mugiwara-light";
     await route.fulfill({ response, json });
   });
   return { context, page };

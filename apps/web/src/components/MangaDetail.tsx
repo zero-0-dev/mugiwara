@@ -35,6 +35,7 @@ import {
   useCheckMangaUpdates,
   useDownloadAllChapters,
   useDownloadQueueSync,
+  useMangaQueueTasks,
   useSources,
 } from "../api/hooks";
 import { CategoryPicker } from "./CategoryPicker";
@@ -53,6 +54,11 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import {
+  getChapterDownloadStatus,
+  isChapterDownloadable,
+  type ChapterTaskStatus,
+} from "@/lib/chapter-download-status";
 
 interface MangaDetailProps {
   mangaId: string;
@@ -114,6 +120,24 @@ export function MangaDetail({
   const downloadAll = useDownloadAllChapters(mangaId);
 
   useDownloadQueueSync(mangaId);
+
+  // Queue tasks are the real signal for a chapter that is waiting to download.
+  // `importStatus: "pending"` also covers chapters that were never queued.
+  const { data: queueTasks = [] } = useMangaQueueTasks(mangaId);
+  const activeChapterTasks = useMemo(() => {
+    const tasks = new Map<string, ChapterTaskStatus>();
+    for (const task of queueTasks) {
+      if (!task.chapterId) continue;
+      const status = task.status as ChapterTaskStatus;
+      if (status !== "pending" && status !== "running" && status !== "paused") {
+        continue;
+      }
+      if (tasks.get(task.chapterId) !== "running") {
+        tasks.set(task.chapterId, status);
+      }
+    }
+    return tasks;
+  }, [queueTasks]);
 
   const handleCheckUpdates = () => {
     checkUpdates.mutate(undefined, {
@@ -286,9 +310,14 @@ export function MangaDetail({
     );
   };
 
-  const handleDownloadChapter = (chapterId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    downloadChapter.mutate(chapterId, {
+  const handleDownloadChapter = (
+    chapter: ChapterWithProgress,
+    e?: React.MouseEvent,
+  ) => {
+    e?.stopPropagation();
+    downloadChapter.mutate(chapter.chapterId, {
+      onSuccess: () =>
+        toast.success(`Queued ${chapterLabel(chapter)} for download.`),
       onError: (err) => toast.error(err.message),
     });
   };
@@ -331,13 +360,11 @@ export function MangaDetail({
     );
   }
 
-  const getChapterDownloadStatus = (chapter: ChapterWithProgress) => {
-    if (chapter.importStatus === "complete") return "complete";
-    if (chapter.importStatus === "error") return "error";
-    if (chapter.importStatus === "pending") return "pending";
-    if (chapter.importStatus === "downloading") return "downloading";
-    return "idle";
-  };
+  const chapterDownloadStatus = (chapter: ChapterWithProgress) =>
+    getChapterDownloadStatus(
+      chapter,
+      activeChapterTasks.get(chapter.chapterId),
+    );
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-4 sm:px-6 sm:py-7">
@@ -386,7 +413,7 @@ export function MangaDetail({
                 className="size-full object-cover"
               />
             ) : (
-              <div className="flex size-full items-center justify-center bg-gradient-to-br from-indigo-500/30 to-secondary text-5xl font-bold text-muted-foreground">
+              <div className="flex size-full items-center justify-center bg-gradient-to-br from-primary/30 to-secondary text-5xl font-bold text-muted-foreground">
                 {manga.title.charAt(0)}
               </div>
             )}
@@ -622,7 +649,7 @@ export function MangaDetail({
       </div>
 
       {enrichedChapters.length > 0 && (
-        <div className="mt-4 overflow-hidden rounded-2xl border border-border/80 bg-gradient-to-r from-indigo-500/12 via-card to-card p-4 shadow-sm sm:p-5">
+        <div className="mt-4 overflow-hidden rounded-2xl border border-border/80 bg-gradient-to-r from-primary/12 via-card to-card p-4 shadow-sm sm:p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <Button
               variant="brand"
@@ -652,7 +679,7 @@ export function MangaDetail({
       ) : (
         <div className="mt-4 overflow-hidden rounded-2xl border border-border/80 bg-card shadow-sm">
           {enrichedChapters.map((chapter, index) => {
-            const downloadStatus = getChapterDownloadStatus(chapter);
+            const downloadStatus = chapterDownloadStatus(chapter);
             const isDownloaded =
               downloadStatus === "complete" || chapter.pagesCount > 0;
             return (
@@ -661,7 +688,7 @@ export function MangaDetail({
                 className={cn(
                   "group flex cursor-pointer items-center gap-3 px-3 py-3 outline-none transition-colors hover:bg-accent/60 focus-visible:bg-accent sm:px-4",
                   index > 0 && "border-t border-border/60",
-                  chapter.isCurrent && "bg-indigo-500/5",
+                  chapter.isCurrent && "bg-primary/5",
                 )}
                 onClick={() => onReadChapter(chapter.id)}
                 role="button"
@@ -742,7 +769,7 @@ export function MangaDetail({
                   <Button
                     variant="ghost"
                     size="icon-sm"
-                    onClick={(e) => handleDownloadChapter(chapter.chapterId, e)}
+                    onClick={(e) => handleDownloadChapter(chapter, e)}
                     disabled={
                       downloadStatus === "downloading" ||
                       downloadStatus === "pending"
@@ -825,6 +852,19 @@ export function MangaDetail({
                         >
                           <Circle /> Mark All Following as Unread
                         </DropdownMenuItem>
+                      )}
+                      {isChapterDownloadable(downloadStatus) && (
+                        <>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={() => handleDownloadChapter(chapter)}
+                          >
+                            <Download />
+                            {downloadStatus === "error"
+                              ? "Retry download"
+                              : "Download chapter"}
+                          </DropdownMenuItem>
+                        </>
                       )}
                       {isDownloaded && (
                         <>

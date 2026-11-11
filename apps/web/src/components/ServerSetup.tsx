@@ -158,8 +158,8 @@ export function ServerSetup({
         className="pointer-events-none absolute inset-0 opacity-70"
         aria-hidden="true"
       >
-        <div className="absolute left-1/2 top-[-10rem] size-[28rem] -translate-x-1/2 rounded-full bg-indigo-600/20 blur-3xl" />
-        <div className="absolute bottom-[-12rem] right-[-6rem] size-[26rem] rounded-full bg-indigo-500/10 blur-3xl" />
+        <div className="absolute left-1/2 top-[-10rem] size-[28rem] -translate-x-1/2 rounded-full bg-primary/20 blur-3xl" />
+        <div className="absolute bottom-[-12rem] right-[-6rem] size-[26rem] rounded-full bg-primary/10 blur-3xl" />
       </div>
 
       <div className="relative w-full max-w-md">
@@ -176,7 +176,7 @@ export function ServerSetup({
           )}
 
           <div className="flex flex-col items-center text-center">
-            <span className="flex size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-400 to-indigo-600 text-white shadow-lg shadow-indigo-950/30">
+            <span className="flex size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-brand to-[var(--brand-hover)] text-primary-foreground shadow-lg shadow-black/30">
               <Server className="size-7" />
             </span>
             <h1 className="mt-4 text-2xl font-semibold tracking-tight">

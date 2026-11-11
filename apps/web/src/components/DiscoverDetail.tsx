@@ -115,7 +115,7 @@ export function DiscoverDetail({
                 className="size-full object-cover"
               />
             ) : (
-              <div className="flex size-full items-center justify-center bg-gradient-to-br from-indigo-500/30 to-secondary text-5xl font-bold text-muted-foreground">
+              <div className="flex size-full items-center justify-center bg-gradient-to-br from-primary/30 to-secondary text-5xl font-bold text-muted-foreground">
                 {title.charAt(0).toUpperCase()}
               </div>
             )}

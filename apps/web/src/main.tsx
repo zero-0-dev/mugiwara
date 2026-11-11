@@ -1,22 +1,16 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import App, { THEME_STORAGE_KEY } from "./App";
+import App from "./App";
+import { applyTheme, THEME_STORAGE_KEY } from "./lib/theme";
 import "./index.css";
 
 // Apply the last known theme before the first paint so a light-theme user does
-// not get a dark flash while /api/settings loads.
+// not get a dark flash while /api/settings loads. Legacy "dark"/"light" values
+// resolve to the current default palette in the same mode.
 try {
   const cachedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
-  if (cachedTheme) {
-    document.documentElement.dataset.theme = cachedTheme;
-    document
-      .querySelector('meta[name="theme-color"]')
-      ?.setAttribute(
-        "content",
-        cachedTheme === "light" ? "#f4f1ed" : "#171717",
-      );
-  }
+  if (cachedTheme) applyTheme(cachedTheme);
 } catch {
   // localStorage can be unavailable; the server theme still applies later.
 }

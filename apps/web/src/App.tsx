@@ -10,6 +10,7 @@ import { AppChromeProvider } from "./routing/appChrome";
 import { createAppRouter } from "./routing/routes";
 import brandMark from "./assets/mugiwara-mark.png";
 import { cn } from "./lib/utils";
+import { applyTheme, THEME_STORAGE_KEY } from "./lib/theme";
 import {
   clearStoredAuthToken,
   getStoredServerUrl,
@@ -19,21 +20,12 @@ import {
   saveStoredServerUrl,
 } from "./platform/server";
 
-export const THEME_STORAGE_KEY = "mugiwara.theme";
+export { THEME_STORAGE_KEY };
 
-/** Keeps the browser theme-color and the native system bars in sync. */
+/** Applies the palette and keeps the native system bars in sync. */
 function applyThemeChrome(theme: string) {
-  const isDark = theme !== "light";
-  document.documentElement.dataset.theme = theme;
-
-  const themeColor = document.querySelector('meta[name="theme-color"]');
-  themeColor?.setAttribute("content", isDark ? "#171717" : "#f4f1ed");
-
-  try {
-    window.localStorage.setItem(THEME_STORAGE_KEY, theme);
-  } catch {
-    // Storage can be unavailable (private mode); the UI still works.
-  }
+  const variant = applyTheme(theme);
+  const isDark = variant.mode === "dark";
 
   if (isCapacitor()) {
     void SystemBars.setStyle({

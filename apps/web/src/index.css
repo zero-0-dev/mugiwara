@@ -4,42 +4,43 @@
 /*
  * Design tokens
  * -------------
- * The app keeps its original dark/light palette and indigo brand accent. The
- * shadcn semantic names are bridged on top so components never hard-code a
- * color. `--brand` stays the single source for the accent.
+ * The fallback palette below is the default Mugiwara theme. Theme switching
+ * happens at runtime: `src/lib/theme.ts` writes every theme's tokens to
+ * `<html>`, so components never hard-code a color. `--brand` stays the single
+ * source for the accent.
  */
 :root {
   color-scheme: dark;
 
-  --background: #171717;
-  --foreground: #f7f7f8;
-  --card: #222224;
-  --card-foreground: #f7f7f8;
-  --popover: #242427;
-  --popover-foreground: #f7f7f8;
-  --primary: #6366f1;
-  --primary-foreground: #ffffff;
-  --secondary: #303034;
-  --secondary-foreground: #f7f7f8;
-  --muted: #29292c;
-  --muted-foreground: #a1a1aa;
-  --accent: #303034;
-  --accent-foreground: #f7f7f8;
+  --background: #17120e;
+  --foreground: #f8efe2;
+  --card: #221a14;
+  --card-foreground: #f8efe2;
+  --popover: #281f18;
+  --popover-foreground: #f8efe2;
+  --primary: #f39413;
+  --primary-foreground: #201204;
+  --secondary: #33261b;
+  --secondary-foreground: #f8efe2;
+  --muted: #2c2119;
+  --muted-foreground: #b9a58f;
+  --accent: #3a2a1d;
+  --accent-foreground: #f8efe2;
   --destructive: #ef4444;
   --destructive-foreground: #ffffff;
-  --success: #22c55e;
-  --warning: #f59e0b;
-  --border: #34343a;
-  --input: #3b3b42;
-  --ring: #6366f1;
+  --success: #6fae4f;
+  --warning: #d2ab56;
+  --border: #3b2c1f;
+  --input: #463424;
+  --ring: #f39413;
 
-  --brand: #6366f1;
-  --brand-hover: #4f46e5;
-  --brand-soft: rgba(99, 102, 241, 0.16);
-  --brand-text: #a5b4fc;
-  --success-text: #6ee7b7;
-  --warning-text: #fcd34d;
-  --destructive-text: #fca5a5;
+  --brand: #f39413;
+  --brand-hover: #f4a12f;
+  --brand-soft: rgba(243, 148, 19, 0.18);
+  --brand-text: #f7b966;
+  --success-text: #9ac684;
+  --warning-text: #dfc385;
+  --destructive-text: #f47c7c;
 
   --radius: 0.75rem;
 
@@ -60,40 +61,6 @@
   );
   --safe-left: var(--safe-area-inset-left, env(safe-area-inset-left, 0px));
   --titlebar-inset-left: 0px;
-}
-
-[data-theme="light"] {
-  color-scheme: light;
-
-  --background: #f4f1ed;
-  --foreground: #26231f;
-  --card: #fbfaf8;
-  --card-foreground: #26231f;
-  --popover: #ffffff;
-  --popover-foreground: #26231f;
-  --primary: #4f46e5;
-  --primary-foreground: #ffffff;
-  --secondary: #eae4dd;
-  --secondary-foreground: #332f2b;
-  --muted: #eee9e3;
-  --muted-foreground: #736c64;
-  --accent: #e7e1d9;
-  --accent-foreground: #26231f;
-  --destructive: #dc2626;
-  --destructive-foreground: #ffffff;
-  --success: #16a34a;
-  --warning: #d97706;
-  --border: #e0d8cf;
-  --input: #d9d0c6;
-  --ring: #4f46e5;
-
-  --brand: #4f46e5;
-  --brand-hover: #4338ca;
-  --brand-soft: rgba(79, 70, 229, 0.12);
-  --brand-text: #4338ca;
-  --success-text: #15803d;
-  --warning-text: #b45309;
-  --destructive-text: #b91c1c;
 }
 
 @theme inline {
@@ -370,7 +337,7 @@
   background:
     radial-gradient(
       circle at 50% 40%,
-      rgba(99, 102, 241, 0.16),
+      color-mix(in srgb, var(--brand) 16%, transparent),
       transparent 45%
     ),
     #0b0b0c;
@@ -381,7 +348,7 @@
 .chapter-sentinel-arrow {
   font-size: 4rem;
   line-height: 1;
-  color: #818cf8;
+  color: color-mix(in srgb, var(--brand) 65%, white);
 }
 
 .chapter-sentinel-title {
