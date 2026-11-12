@@ -185,6 +185,22 @@ export class PluginManager {
     return [...this.sources.values(), ...this.storage.values()];
   }
 
+  /**
+   * Reloads an installed plugin after its package contents changed on disk.
+   * Node caches required modules, so the plugins directory must be evicted
+   * before the new version can be picked up.
+   */
+  async reloadPlugin(packageName: string): Promise<void> {
+    const record = await this.db.query.installedPlugins.findFirst({
+      where: eq(schema.installedPlugins.id, packageName),
+    });
+    if (!record) return;
+
+    await this.disablePlugin(packageName);
+    clearPluginRequireCache(this.pluginsDir);
+    await this.enablePlugin(packageName);
+  }
+
   // Only for optional plugins from DB
   async enablePlugin(packageName: string): Promise<void> {
     await this.db
@@ -303,4 +319,15 @@ async function loadPluginFromDB(
   }
 
   console.log(`✅ Loaded plugin: ${instance.metadata.name} (${record.id})`);
+}
+
+function clearPluginRequireCache(pluginsDir: string): void {
+  const pluginRequire = createRequire(pluginsDir + "/package.json");
+  const nodeModulesPrefix =
+    pluginsDir.replace(/[\\/]+$/, "") + "/node_modules/";
+  for (const key of Object.keys(pluginRequire.cache)) {
+    if (key.startsWith(nodeModulesPrefix)) {
+      delete pluginRequire.cache[key];
+    }
+  }
 }

@@ -938,6 +938,19 @@ export function useInstallPlugin() {
   });
 }
 
+export function useInstallPluginFromTarball() {
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (file: File) => api.installPluginFromTarball(file),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["pluginsInstalled"] });
+      queryClient.invalidateQueries({ queryKey: ["pluginsAvailable"] });
+      queryClient.invalidateQueries({ queryKey: ["sources"] });
+    },
+  });
+}
+
 export function useUninstallPlugin() {
   const api = useApiClient();
   const queryClient = useQueryClient();

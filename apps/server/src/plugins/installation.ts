@@ -2,8 +2,16 @@ import { spawn } from "child_process";
 import * as fs from "fs/promises";
 import * as path from "path";
 import { InstalledPluginRecord, PluginPackageInfo } from "./types";
+import { PluginInstallError } from "./errors";
+import {
+  extractTarball,
+  readPackageJsonFromTarball,
+  type TarballPackageJson,
+} from "./tarball";
 import { eq } from "drizzle-orm";
 import * as schema from "../database/schema";
+
+export { PluginInstallError };
 
 export interface PluginInstallPolicy {
   installEnabled: boolean;
@@ -30,20 +38,10 @@ export type NpmRunner = (
   options: { cwd: string; env: NodeJS.ProcessEnv },
 ) => Promise<void>;
 
-export class PluginInstallError extends Error {
-  readonly statusCode: number;
-  readonly code: string;
-
-  constructor(
-    message: string,
-    statusCode = 400,
-    code = "plugin_install_error",
-  ) {
-    super(message);
-    this.name = "PluginInstallError";
-    this.statusCode = statusCode;
-    this.code = code;
-  }
+export interface TarballInstallResult {
+  record: InstalledPluginRecord;
+  replaced: boolean;
+  wasEnabled: boolean;
 }
 
 const DEFAULT_REGISTRY = "https://registry.npmjs.org/";
@@ -280,6 +278,247 @@ export class PluginInstallationService {
     return record;
   }
 
+  /**
+   * Installs a plugin from a local .tar/.tar.gz uploaded by an admin. The
+   * archive is validated, extracted into DATA_DIR/plugins/node_modules, and
+   * recorded exactly like an npm-installed plugin. Re-uploading the same
+   * package name replaces the previous version and removes the old tarball.
+   */
+  async installFromTarball(tarball: Buffer): Promise<TarballInstallResult> {
+    this.assertInstallAllowed();
+
+    const { packageJson, directory } = readPackageJsonFromTarball(tarball);
+    const name = this.validatePackageName(packageJson.name);
+    const version = this.validateTarballVersion(packageJson.version);
+    const type = this.validateTarballType(packageJson, name);
+
+    if (this.BUILT_IN_PLUGINS.includes(name)) {
+      throw new PluginInstallError(
+        `${name} is a built-in plugin and cannot be installed separately`,
+      );
+    }
+
+    await fs.mkdir(this.pluginsDir, { recursive: true });
+    const staging = await fs.mkdtemp(
+      path.join(this.pluginsDir, ".tmp-plugin-"),
+    );
+
+    let storedTarballPath: string | null = null;
+    let destinationCreated = false;
+
+    try {
+      await extractTarball(tarball, staging);
+      const sourceDir = directory
+        ? path.join(staging, ...directory.split("/"))
+        : staging;
+
+      await fs.access(path.join(sourceDir, "package.json"));
+
+      const dependencies = packageJson.dependencies ?? {};
+      if (typeof dependencies !== "object" || Array.isArray(dependencies)) {
+        throw new PluginInstallError(
+          `Package ${name} has an invalid "dependencies" field in package.json.`,
+        );
+      }
+      const dependencyCount = Object.keys(dependencies).length;
+      const hasVendoredModules = await pathExists(
+        path.join(sourceDir, "node_modules"),
+      );
+      if (dependencyCount > 0 && !hasVendoredModules) {
+        console.log(
+          `📦 Installing dependencies for ${name}@${version} (scripts disabled)`,
+        );
+        await this.runNpm(this.buildNpmInstallPackageArgs(), {
+          cwd: sourceDir,
+        });
+      }
+
+      storedTarballPath = await this.storeTarball(name, version, tarball);
+
+      const destination = path.join(
+        this.pluginsDir,
+        "node_modules",
+        ...name.split("/"),
+      );
+      await fs.mkdir(path.dirname(destination), { recursive: true });
+      await fs.rm(destination, { recursive: true, force: true });
+      await fs.rename(sourceDir, destination);
+      destinationCreated = true;
+
+      await this.setPackageJsonDependency(
+        name,
+        `file:${this.tarballStoredPath(name, version)}`,
+      );
+
+      const existing = await this.db.query.installedPlugins.findFirst({
+        where: eq(schema.installedPlugins.id, name),
+      });
+      const now = new Date().toISOString();
+
+      if (existing) {
+        await this.db
+          .update(schema.installedPlugins)
+          .set({ type, version, updatedAt: now })
+          .where(eq(schema.installedPlugins.id, name));
+
+        await this.removeStoredTarballs(name, path.basename(storedTarballPath));
+
+        console.log(
+          `✅ Replaced plugin: ${name} v${existing.version} → v${version} (tarball)`,
+        );
+
+        return {
+          record: {
+            ...existing,
+            type,
+            version,
+            updatedAt: now,
+          },
+          replaced: true,
+          wasEnabled: existing.isEnabled,
+        };
+      }
+
+      const record: InstalledPluginRecord = {
+        id: name,
+        type,
+        version,
+        isBuiltin: false,
+        isEnabled: true,
+        config: {},
+        installedAt: now,
+        updatedAt: now,
+      };
+
+      await this.db.insert(schema.installedPlugins).values(record);
+      await this.removeStoredTarballs(name, path.basename(storedTarballPath));
+      console.log(`✅ Installed plugin from tarball: ${name} v${version}`);
+
+      return { record, replaced: false, wasEnabled: true };
+    } catch (error) {
+      try {
+        if (destinationCreated) {
+          await this.removePackage(name);
+        } else if (storedTarballPath) {
+          await fs.rm(storedTarballPath, { force: true });
+        }
+      } catch (cleanupError) {
+        console.error(
+          `Failed to clean up tarball install for ${name}:`,
+          cleanupError instanceof Error ? cleanupError.message : cleanupError,
+        );
+      }
+      throw error;
+    } finally {
+      await fs.rm(staging, { recursive: true, force: true });
+    }
+  }
+
+  buildNpmInstallPackageArgs(): string[] {
+    return [
+      "install",
+      "--omit=dev",
+      "--no-package-lock",
+      "--ignore-scripts",
+      "--no-audit",
+      "--no-fund",
+      `--registry=${this.options.registryUrl}`,
+    ];
+  }
+
+  private validateTarballVersion(version: unknown): string {
+    if (typeof version !== "string" || !VERSION_PATTERN.test(version.trim())) {
+      throw new PluginInstallError(
+        "Plugin tarball package.json must declare a valid version.",
+      );
+    }
+    return version.trim();
+  }
+
+  private validateTarballType(
+    packageJson: TarballPackageJson,
+    name: string,
+  ): InstalledPluginRecord["type"] {
+    const type = packageJson.mugiwara?.type;
+    if (type !== "source" && type !== "storage") {
+      throw new PluginInstallError(
+        `Package ${name} is not a valid Mugiwara plugin (expected "mugiwara.type" to be "source" or "storage").`,
+      );
+    }
+    return type;
+  }
+
+  private tarballFileName(name: string, version: string): string {
+    return `${this.tarballDirectoryName(name)}-${version}.tgz`;
+  }
+
+  private tarballDirectoryName(name: string): string {
+    return name.replace(/^@/, "").replace(/\//g, "-");
+  }
+
+  private tarballStoredPath(name: string, version: string): string {
+    return path.posix.join(
+      "tarballs",
+      this.tarballDirectoryName(name),
+      this.tarballFileName(name, version),
+    );
+  }
+
+  private async storeTarball(
+    name: string,
+    version: string,
+    tarball: Buffer,
+  ): Promise<string> {
+    const tarballsDir = path.join(
+      this.pluginsDir,
+      "tarballs",
+      this.tarballDirectoryName(name),
+    );
+    await fs.mkdir(tarballsDir, { recursive: true });
+    const filePath = path.join(
+      tarballsDir,
+      this.tarballFileName(name, version),
+    );
+    await fs.writeFile(filePath, tarball, { mode: 0o600 });
+    return filePath;
+  }
+
+  private async removeStoredTarballs(
+    name: string,
+    keep?: string,
+  ): Promise<void> {
+    const tarballsDir = path.join(
+      this.pluginsDir,
+      "tarballs",
+      this.tarballDirectoryName(name),
+    );
+    let files: string[];
+    try {
+      files = await fs.readdir(tarballsDir);
+    } catch {
+      return;
+    }
+    await Promise.all(
+      files
+        .filter((file) => file.endsWith(".tgz") && file !== keep)
+        .map((file) =>
+          fs.rm(path.join(tarballsDir, file), { force: true }).catch(() => {}),
+        ),
+    );
+  }
+
+  private async setPackageJsonDependency(
+    packageName: string,
+    spec: string,
+  ): Promise<void> {
+    const packageJsonPath = path.join(this.pluginsDir, "package.json");
+    const content = await fs.readFile(packageJsonPath, "utf-8");
+    const pkg = JSON.parse(content);
+    pkg.dependencies = pkg.dependencies ?? {};
+    pkg.dependencies[packageName] = spec;
+    await fs.writeFile(packageJsonPath, `${JSON.stringify(pkg, null, 2)}\n`);
+  }
+
   async uninstall(packageName: string): Promise<void> {
     if (this.BUILT_IN_PLUGINS.includes(packageName)) {
       throw new PluginInstallError(
@@ -387,6 +626,7 @@ export class PluginInstallationService {
     );
 
     await fs.rm(packagePath, { recursive: true, force: true });
+    await this.removeStoredTarballs(packageName);
 
     const packageJsonPath = path.join(this.pluginsDir, "package.json");
     const content = await fs.readFile(packageJsonPath, "utf-8");
@@ -494,4 +734,13 @@ function defaultNpmRunner(
 function truncate(value: string, max = 500): string {
   const trimmed = value.trim();
   return trimmed.length > max ? `${trimmed.slice(0, max)}…` : trimmed;
+}
+
+async function pathExists(target: string): Promise<boolean> {
+  try {
+    await fs.access(target);
+    return true;
+  } catch {
+    return false;
+  }
 }

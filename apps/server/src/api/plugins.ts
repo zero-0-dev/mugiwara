@@ -1,4 +1,5 @@
 import { Router, Request, Response } from "express";
+import multer from "multer";
 import { PluginManager } from "../plugins/manager";
 import {
   PluginInstallationService,
@@ -9,6 +10,44 @@ import { requireAdmin } from "../auth/middleware";
 import { recordAudit } from "../services/audit";
 
 const router: Router = Router();
+
+const MAX_TARBALL_BYTES = 32 * 1024 * 1024;
+
+const tarballUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_TARBALL_BYTES, files: 1, fields: 4 },
+});
+
+function handleTarballUpload(
+  req: Request,
+  res: Response,
+  next: (error?: unknown) => void,
+): void {
+  tarballUpload.single("tarball")(req, res, (error: unknown) => {
+    if (!error) {
+      next();
+      return;
+    }
+    if (error instanceof multer.MulterError) {
+      if (error.code === "LIMIT_FILE_SIZE") {
+        res.status(413).json({
+          error: `Plugin tarball must be ${MAX_TARBALL_BYTES / (1024 * 1024)} MB or smaller.`,
+          code: "plugin_tarball_too_large",
+        });
+        return;
+      }
+      res.status(400).json({
+        error: `Invalid plugin upload: ${error.message}`,
+        code: "plugin_tarball_upload_error",
+      });
+      return;
+    }
+    res.status(400).json({
+      error: "Invalid plugin upload",
+      code: "plugin_tarball_upload_error",
+    });
+  });
+}
 
 // Middleware to inject services
 router.use((req: any, _res, next) => {
@@ -169,6 +208,98 @@ router.post("/install", requireAdmin, async (req: any, res: Response) => {
     sendPluginError(res, error, "Failed to install plugin");
   }
 });
+
+// POST /api/plugins/install-tarball - Install/replace a plugin from a local .tar.gz (admin + confirmation)
+router.post(
+  "/install-tarball",
+  requireAdmin,
+  handleTarballUpload,
+  async (req: any, res: Response) => {
+    try {
+      const installer: PluginInstallationService = req.pluginInstaller;
+      const manager: PluginManager = req.pluginManager;
+      const confirm = req.body?.confirm;
+
+      if (confirm !== true && confirm !== "true") {
+        res.status(400).json({
+          error:
+            'Explicit confirmation is required. Send the multipart field "confirm" with value "true".',
+        });
+        return;
+      }
+
+      if (!req.file?.buffer) {
+        res.status(400).json({
+          error:
+            'A plugin tarball is required in the multipart field "tarball".',
+          code: "plugin_tarball_missing",
+        });
+        return;
+      }
+
+      if (!installer) {
+        res.status(503).json({ error: "Plugin installer not initialized" });
+        return;
+      }
+
+      const policy = installer.getPolicy();
+      if (!policy.installEnabled) {
+        recordAudit({
+          event: "plugin.install_tarball.blocked",
+          actor: auditActor(req),
+          ip: req.ip ?? req.socket.remoteAddress ?? null,
+          details: { reason: policy.reason },
+        });
+        res.status(403).json({
+          error: policy.reason ?? "Plugin installation is disabled",
+          code: "plugin_install_disabled",
+        });
+        return;
+      }
+
+      const result = await installer.installFromTarball(req.file.buffer);
+
+      if (result.replaced) {
+        if (result.wasEnabled) {
+          await manager.reloadPlugin(result.record.id);
+        }
+      } else {
+        await manager.enablePlugin(result.record.id);
+      }
+
+      recordAudit({
+        event: result.replaced
+          ? "plugin.install_tarball.replace"
+          : "plugin.install_tarball",
+        actor: auditActor(req),
+        ip: req.ip ?? req.socket.remoteAddress ?? null,
+        details: {
+          packageName: result.record.id,
+          version: result.record.version,
+        },
+      });
+
+      res.status(201).json({
+        message: result.replaced
+          ? "Plugin replaced and activated."
+          : "Plugin installed and activated.",
+        plugin: result.record,
+        replaced: result.replaced,
+      });
+    } catch (error) {
+      recordAudit({
+        event: "plugin.install_tarball.failed",
+        actor: auditActor(req),
+        ip: req.ip ?? req.socket.remoteAddress ?? null,
+        details: {
+          fileName: req.file?.originalname ?? null,
+          reason: error instanceof Error ? error.message : "unknown",
+        },
+      });
+      sendPluginError(res, error, "Failed to install plugin from tarball");
+    }
+  },
+);
 
 // POST /api/plugins/:id/uninstall - Uninstall a plugin (admin + confirmation)
 router.post("/:id/uninstall", requireAdmin, async (req: any, res: Response) => {

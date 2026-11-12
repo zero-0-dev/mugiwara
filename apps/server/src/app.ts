@@ -113,6 +113,14 @@ export function createApp(options: CreateAppOptions = {}): express.Express {
     rateLimit({ windowMs: 10 * 60 * 1000, max: 5, name: "plugin-install" }),
   );
   app.use(
+    "/api/plugins/install-tarball",
+    rateLimit({
+      windowMs: 10 * 60 * 1000,
+      max: 10,
+      name: "plugin-install-tarball",
+    }),
+  );
+  app.use(
     /^\/api\/plugins\/[^/]+\/update/,
     rateLimit({ windowMs: 10 * 60 * 1000, max: 5, name: "plugin-update" }),
   );

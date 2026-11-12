@@ -34,6 +34,55 @@ Relevant environment variables:
 | `MUGIWARA_ALLOW_REMOTE_PLUGIN_INSTALL` | `false`                       | Permit plugin installs while bound to a non-loopback interface.                                                   |
 | `MUGIWARA_PLUGIN_INSTALL_ENABLED`      | `true`                        | Master switch for plugin installation.                                                                            |
 
+## Installing from a local tarball
+
+Admins can install a plugin straight from a `.tgz` / `.tar.gz` package without
+publishing it to a registry. This is the intended workflow while developing a
+plugin.
+
+Archive format: a normal npm package tarball, for example the output of
+`npm pack`. It must contain `package.json` (at `package/package.json` or at the
+archive root) with the usual Mugiwara fields:
+
+```json
+{
+  "name": "mugiwara-plugin-source-example",
+  "version": "1.2.3",
+  "main": "dist/index.js",
+  "mugiwara": { "type": "source", "id": "example", "compatibleCore": "^1.0.0" }
+}
+```
+
+Install it from **Settings → Plugins → Install from tarball**, or with the API:
+
+```sh
+curl -X POST http://localhost:3001/api/plugins/install-tarball \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "confirm=true" \
+  -F "tarball=@mugiwara-plugin-source-example-1.2.3.tgz"
+```
+
+Behavior:
+
+- The package name and version are read from the `package.json` inside the
+  archive, not from the file name.
+- The package is extracted to `DATA_DIR/plugins/node_modules/<name>` and a row
+  is written to `installed_plugins` exactly like an npm install. The archive is
+  kept in `DATA_DIR/plugins/tarballs/<package>/` and recorded as a `file:`
+  dependency in `DATA_DIR/plugins/package.json` so later npm operations keep it
+  installed.
+- Uploading the same package name again replaces the previous version: the old
+  `node_modules` directory and tarball are removed, the DB row is updated to the
+  new version, and the existing plugin config and install date are preserved.
+  Only the most recently uploaded tarball is retained.
+- If the archive vendors `node_modules`, it is used as-is. Otherwise declared
+  runtime dependencies are installed with npm (`--omit=dev --ignore-scripts`)
+  from the configured registry.
+- Installs are admin-only, require `confirm=true`, are rate-limited, are capped
+  at 32 MB (256 MB decompressed), and written to `audit_logs`. Archive paths
+  are validated and symlinks, hard links and device files are rejected.
+- Replacing a plugin reloads it in the running server, so no restart is needed.
+
 ## Where plugins run
 
 The server loads built-in and installed plugins through

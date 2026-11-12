@@ -1,9 +1,19 @@
-import React, { useState } from "react";
-import { Download, Package, Search, ShieldOff, Trash2 } from "lucide-react";
+import React, { useRef, useState } from "react";
+import {
+  CheckCircle2,
+  Download,
+  FileArchive,
+  Package,
+  Search,
+  ShieldOff,
+  Trash2,
+  Upload,
+} from "lucide-react";
 import {
   useInstalledPlugins,
   useAvailablePlugins,
   useInstallPlugin,
+  useInstallPluginFromTarball,
   useUninstallPlugin,
   useTogglePlugin,
   usePluginPolicy,
@@ -19,12 +29,16 @@ export function PluginsSection() {
   const { data: installed = [], isLoading } = useInstalledPlugins();
   const { data: available = [] } = useAvailablePlugins();
   const installPlugin = useInstallPlugin();
+  const installTarball = useInstallPluginFromTarball();
   const uninstallPlugin = useUninstallPlugin();
   const togglePlugin = useTogglePlugin();
   const { data: policy } = usePluginPolicy();
 
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [tarball, setTarball] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const filteredAvailable = (Array.isArray(available) ? available : []).filter(
     (p) =>
@@ -46,8 +60,8 @@ export function PluginsSection() {
       <div>
         <h2 className="text-xl font-semibold tracking-tight">Plugins</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Manage manga sources and storage backends. Install new plugins from
-          NPM.
+          Manage manga sources and storage backends. Install plugins from npm or
+          from a local .tgz / .tar.gz package.
         </p>
       </div>
 
@@ -65,6 +79,79 @@ export function PluginsSection() {
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
+
+      {notice && (
+        <Alert variant="success" className="mt-4">
+          <CheckCircle2 />
+          <AlertDescription>{notice}</AlertDescription>
+        </Alert>
+      )}
+
+      <div className="mt-6 rounded-xl border border-border/70 bg-background/40 p-4">
+        <h3 className="flex items-center gap-2 text-base font-semibold">
+          <FileArchive className="size-4 text-brand-text" />
+          Install from tarball
+        </h3>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Upload a package built with <code>npm pack</code> (a <code>.tgz</code>{" "}
+          or <code>.tar.gz</code> containing <code>package/package.json</code>).
+          The package name and version are read from the archive; uploading the
+          same package again replaces the previous version.
+        </p>
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <Input
+            ref={fileInputRef}
+            type="file"
+            accept=".tgz,.tar.gz,application/gzip,application/x-gzip,application/x-tar"
+            onChange={(event) => {
+              setTarball(event.target.files?.[0] ?? null);
+              setError(null);
+              setNotice(null);
+            }}
+            aria-label="Plugin tarball"
+            className="max-w-sm"
+          />
+          <Button
+            size="sm"
+            onClick={() => {
+              if (!tarball) return;
+              if (
+                !window.confirm(
+                  `Install ${tarball.name}?\n\nMugiwara reads the package name and version from the archive, replaces any existing version of that package and installs it with lifecycle scripts disabled.`,
+                )
+              ) {
+                return;
+              }
+              installTarball.mutate(tarball, {
+                onSuccess: (result) => {
+                  setError(null);
+                  setNotice(
+                    result.replaced
+                      ? "Plugin replaced. The new version is now active."
+                      : "Plugin installed and activated.",
+                  );
+                  setTarball(null);
+                  if (fileInputRef.current) {
+                    fileInputRef.current.value = "";
+                  }
+                },
+                onError: (err) => {
+                  setNotice(null);
+                  setError(err.message);
+                },
+              });
+            }}
+            disabled={
+              !tarball ||
+              installTarball.isPending ||
+              policy?.installEnabled === false
+            }
+          >
+            <Upload className="size-3.5" />
+            {installTarball.isPending ? "Installing..." : "Install tarball"}
+          </Button>
+        </div>
+      </div>
 
       <div className="mt-6">
         <h3 className="flex items-center gap-2 text-base font-semibold">
