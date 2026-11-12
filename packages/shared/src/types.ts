@@ -55,7 +55,11 @@ export interface Chapter {
   // Examples: "1", "2", "24-Bis", "25-Special", "bonus", "extra"
   chapterId: ChapterId;
   title?: string;
+  // Pages actually stored for this chapter (0 until the download completes).
   pagesCount: number;
+  // Page count reported by the source, which can differ for archives that are
+  // stored as a single file.
+  sourcePagesCount?: number;
   // Sort order for displaying chapters in correct sequence
   sortOrder: number;
   // Import status for tracking background downloads

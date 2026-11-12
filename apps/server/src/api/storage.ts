@@ -219,6 +219,7 @@ router.post("/scan", async (req: any, res: Response) => {
                     chapterId: chapter.chapterId,
                     title: chapter.title,
                     pagesCount: chapter.pageCount || 0,
+                    sourcePagesCount: chapter.pageCount || 0,
                     sortOrder: chapter.sortOrder,
                     importStatus: "complete",
                   });
@@ -250,6 +251,7 @@ router.post("/scan", async (req: any, res: Response) => {
                   chapterId: chapter.chapterId,
                   title: chapter.title,
                   pagesCount: chapter.pageCount || 0,
+                  sourcePagesCount: chapter.pageCount || 0,
                   sortOrder: chapter.sortOrder,
                   importStatus: "complete",
                 });

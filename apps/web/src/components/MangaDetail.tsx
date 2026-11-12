@@ -680,8 +680,7 @@ export function MangaDetail({
         <div className="mt-4 overflow-hidden rounded-2xl border border-border/80 bg-card shadow-sm">
           {enrichedChapters.map((chapter, index) => {
             const downloadStatus = chapterDownloadStatus(chapter);
-            const isDownloaded =
-              downloadStatus === "complete" || chapter.pagesCount > 0;
+            const isDownloaded = downloadStatus === "complete";
             return (
               <div
                 key={chapter.id}

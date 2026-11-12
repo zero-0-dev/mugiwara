@@ -281,7 +281,8 @@ router.post("/import", async (req: Request, res: Response) => {
           mangaId,
           chapterId: chapter.chapterId,
           title: chapter.title,
-          pagesCount: chapter.pageCount || 0,
+          pagesCount: 0,
+          sourcePagesCount: chapter.pageCount || 0,
           sortOrder: chapter.sortOrder,
           importStatus: "pending",
         });
@@ -369,7 +370,23 @@ router.get(
         return;
       }
       const { chapterRepository } = await import("../database");
-      const chapters = await chapterRepository.findByMangaId(mangaId);
+      const allChapters = await chapterRepository.findByMangaId(mangaId);
+
+      // An import only covers the chapters the user selected. The rest of the
+      // source is created so it can be downloaded later, and stays pending
+      // with no queue task. Counting those would never let the import finish,
+      // so only chapters that are part of this import are reported.
+      const tasks = await global.taskRepository.getByManga(mangaId);
+      const taskChapterIds = new Set(
+        tasks
+          .map((task) => task.chapterId)
+          .filter((chapterId): chapterId is string => Boolean(chapterId)),
+      );
+      const chapters = (allChapters as any[]).filter(
+        (chapter: any) =>
+          chapter.importStatus !== "pending" ||
+          taskChapterIds.has(chapter.chapterId),
+      );
 
       const total = chapters.length;
       const completed = chapters.filter(
@@ -407,10 +424,16 @@ router.get(
           sortOrder: ch.sortOrder,
           status:
             ch.importStatus === "pending" ? "queued" : ch.importStatus,
-          totalPages: ch.pagesCount,
+          // Before a download finishes pagesCount is 0; the source count lets
+          // the progress view estimate the remaining pages.
+          totalPages: ch.pagesCount || ch.sourcePagesCount || 0,
           completedPages:
-            ch.pagesCount && ch.importProgress
-              ? Math.round((ch.pagesCount * ch.importProgress) / 100)
+            (ch.pagesCount || ch.sourcePagesCount) && ch.importProgress
+              ? Math.round(
+                  ((ch.pagesCount || ch.sourcePagesCount) *
+                    ch.importProgress) /
+                    100,
+                )
               : undefined,
           errorMessage:
             ch.importStatus === "error"
@@ -452,9 +475,22 @@ router.post(
       const { chapterRepository } = await import("../database");
       const chapters = await chapterRepository.findByMangaId(mangaId);
 
+      // Only chapters that were queued by this import belong to it. Created
+      // but unselected chapters stay pending so they can be downloaded later.
+      const tasks = await global.taskRepository.getByManga(mangaId);
+      const taskChapterIds = new Set(
+        tasks
+          .map((task) => task.chapterId)
+          .filter((chapterId): chapterId is string => Boolean(chapterId)),
+      );
+
       let cancelledChapters = 0;
       for (const ch of chapters as any[]) {
-        if (ch.importStatus === "pending" || ch.importStatus === "downloading") {
+        if (
+          (ch.importStatus === "pending" ||
+            ch.importStatus === "downloading") &&
+          taskChapterIds.has(ch.chapterId)
+        ) {
           await chapterRepository.update(ch.id, {
             importStatus: "cancelled",
           });
@@ -465,7 +501,6 @@ router.post(
       // Cancel all pending/running import tasks for this manga. For running
       // tasks the processor aborts its worker; the row is then removed so a
       // later retry starts from a clean queue.
-      const tasks = await global.taskRepository.getByManga(mangaId);
       let cancelledTasks = 0;
       for (const task of tasks) {
         if (task.status === "pending" || task.status === "running") {
@@ -589,7 +624,8 @@ router.post(
             mangaId: mangaId,
             chapterId: chapter.chapterId,
             title: chapter.title,
-            pagesCount: chapter.pageCount || 0,
+            pagesCount: 0,
+            sourcePagesCount: chapter.pageCount || 0,
             sortOrder: chapter.sortOrder,
             importStatus: "pending",
           });
@@ -804,7 +840,8 @@ async function checkSingleMangaForUpdates(manga: {
           mangaId: manga.id,
           chapterId: chapter.chapterId,
           title: chapter.title,
-          pagesCount: chapter.pageCount || 0,
+          pagesCount: 0,
+          sourcePagesCount: chapter.pageCount || 0,
           sortOrder: chapter.sortOrder,
           importStatus: "pending",
         });

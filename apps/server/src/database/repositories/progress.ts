@@ -344,9 +344,11 @@ export const progressRepository = {
           ),
         });
 
-        // Create a map of chapterId -> pagesCount
+        // Create a map of chapterId -> page count. Chapters that are not
+        // downloaded yet only know the source count; completion state can be
+        // toggled without downloading them, so use it as the fallback.
         const chapterPagesMap = new Map(
-          chapterData.map((c) => [c.id, c.pagesCount]),
+          chapterData.map((c) => [c.id, c.pagesCount || c.sourcePagesCount]),
         );
 
         // Create progress records with pageNumber = totalPages. Ignore

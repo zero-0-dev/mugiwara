@@ -242,10 +242,14 @@ export class ImportQueueProcessor extends EventEmitter {
       });
     }
 
-    // Update chapter with actual page count (only if not already set, e.g., for archives)
+    // Update chapter with actual page count. The source page count covers
+    // archives that are stored as a single file but contain many pages.
     await chapterRepository.update(
       chapter.id,
-      completedChapterState(chapter, { pageCount }),
+      completedChapterState(chapter, {
+        pageCount,
+        sourcePageCount: chapter.sourcePagesCount ?? undefined,
+      }),
     );
 
     // Mark task as complete with final progress

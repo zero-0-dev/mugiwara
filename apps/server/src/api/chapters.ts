@@ -445,7 +445,8 @@ router.get(
           chapter.id,
           completedChapterState(chapter, {
             pageCount: pages.length,
-            sourcePageCount: sourceChapter.pageCount,
+            sourcePageCount:
+              sourceChapter.pageCount ?? chapter.sourcePagesCount ?? undefined,
           }),
         );
 
@@ -570,9 +571,13 @@ router.post(
         priority: 10, // Higher priority for on-demand downloads
       });
 
-      // Update chapter status to pending
+      // Update chapter status to pending. Refresh the source page count so an
+      // existing row (created before it was tracked) still reports the right
+      // page total when the download completes.
       await chapterRepository.update(chapter.id, {
         importStatus: "pending",
+        sourcePagesCount:
+          sourceChapter.pageCount ?? chapter.sourcePagesCount ?? 0,
       });
 
       res.json({

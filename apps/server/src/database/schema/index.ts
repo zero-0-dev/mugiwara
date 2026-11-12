@@ -128,7 +128,13 @@ export const chapters = sqliteTable(
       .references(() => manga.id, { onDelete: "cascade" }),
     chapterId: text("chapter_id").notNull(), // String chapter identifier (e.g., "1", "24-Bis", "bonus")
     title: text("title"),
+    // Pages actually stored for this chapter. Stays 0 until the download
+    // completes, so it can be used as the "downloaded" signal.
     pagesCount: integer("pages_count").notNull().default(0),
+    // Page count reported by the source listing. Archives report the pages
+    // inside the archive while only one file is written, so this is kept
+    // separate from pagesCount and copied over on completion.
+    sourcePagesCount: integer("source_pages_count").notNull().default(0),
     sortOrder: integer("sort_order").notNull().default(0), // For ordering chapters
     importStatus: text("import_status").default("pending"), // 'pending', 'downloading', 'complete', 'error'
     importProgress: integer("import_progress").default(0), // percentage
