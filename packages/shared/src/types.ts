@@ -92,8 +92,13 @@ export type LibraryReadingStatus = "reading" | "completed" | "not-started";
 
 export interface LibraryManga extends Omit<Manga, "progress"> {
   chapterCount: number;
+  // Manga-level progress: completed chapters out of the total chapter count,
+  // rounded to a whole percentage. This is what library cards display, and it
+  // is independent of where the reader is inside the last opened chapter.
+  progressPercent: number;
   // Most recent progress row across every device, enriched with
-  // percentComplete/isCompleted. Raw database rows are never returned.
+  // percentComplete/isCompleted. Raw database rows are never returned. This is
+  // chapter-level progress for the last opened chapter, not manga progress.
   progress?: ReadingProgress;
   readingStatus: LibraryReadingStatus;
 }

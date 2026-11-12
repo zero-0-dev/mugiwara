@@ -131,6 +131,9 @@ describe("library aggregation", () => {
     expect(fixture).toBeDefined();
     expect(fixture?.chapterCount).toBe(8);
     expect(fixture?.readingStatus).toBe("reading");
+    // Manga progress is completed chapters / total chapters (1 of 8), not the
+    // 50% the reader happens to be through the last opened chapter.
+    expect(fixture?.progressPercent).toBe(13);
     expect(fixture?.progress).toMatchObject({
       chapterId: "a-chapter-2",
       pageNumber: 5,
@@ -143,11 +146,49 @@ describe("library aggregation", () => {
     expect(fixture?.progress).not.toHaveProperty("page_number");
   });
 
+  it("computes manga progress from completed chapters", async () => {
+    const library = await database.libraryRepository.findAll({
+      sortBy: "title",
+      sortOrder: "asc",
+    });
+
+    const byId = new Map(library.map((item) => [item.id, item]));
+    // One of eight chapters is completed.
+    expect(byId.get(MANGA_A)?.progressPercent).toBe(13);
+    // Every chapter is completed.
+    expect(byId.get(MANGA_B)?.progressPercent).toBe(100);
+    // No chapters at all.
+    expect(byId.get(MANGA_C)?.progressPercent).toBe(0);
+  });
+
+  it("sorts by manga progress rather than last-chapter progress", async () => {
+    const descending = await database.libraryRepository.findAll({
+      sortBy: "progress",
+      sortOrder: "desc",
+    });
+    expect(descending.map((item) => item.id)).toEqual([
+      MANGA_B,
+      MANGA_A,
+      MANGA_C,
+    ]);
+
+    const ascending = await database.libraryRepository.findAll({
+      sortBy: "progress",
+      sortOrder: "asc",
+    });
+    expect(ascending.map((item) => item.id)).toEqual([
+      MANGA_C,
+      MANGA_A,
+      MANGA_B,
+    ]);
+  });
+
   it("returns the same counts through the legacy getWithProgress path", async () => {
     const legacy = await database.mangaRepository.getWithProgress();
     const fixture = legacy.find((item) => item.id === MANGA_A);
 
     expect(fixture?.chapterCount).toBe(8);
+    expect(fixture?.progressPercent).toBe(13);
     expect(fixture?.progress?.percentComplete).toBe(50);
   });
 

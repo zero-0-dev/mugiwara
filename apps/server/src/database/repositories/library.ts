@@ -47,6 +47,8 @@ interface LibraryRow {
   createdAt: string;
   updatedAt: string;
   chapter_count: number;
+  completed_chapter_count: number;
+  progress_percent: number;
   reading_status: LibraryReadingStatus;
   progress_id: string | null;
   progress_chapter_id: string | null;
@@ -65,8 +67,10 @@ interface LibraryRow {
  * - `chapter_latest` picks the most recent progress row per chapter across all
  *   devices, so one device re-reading a chapter cannot double-count it.
  * - `progress_stats` marks a manga completed only when every chapter has a
- *   completed latest row (and the manga has at least one chapter).
- * - `latest_progress` picks the most recent row per manga for the card.
+ *   completed latest row (and the manga has at least one chapter). It also
+ *   feeds `progress_percent`, the manga-level progress the card displays.
+ * - `latest_progress` picks the most recent row per manga for continuing to
+ *   read; it is chapter-level progress, not manga progress.
  */
 const LIBRARY_CTES = sql`
   WITH chapter_counts AS (
@@ -145,6 +149,13 @@ const LIBRARY_CTES = sql`
       m.updated_at AS updatedAt,
       COALESCE(cc.chapter_count, 0) AS chapter_count,
       COALESCE(ps.completed_chapter_count, 0) AS completed_chapter_count,
+      CASE
+        WHEN COALESCE(cc.chapter_count, 0) > 0
+        THEN ROUND(
+          COALESCE(ps.completed_chapter_count, 0) * 100.0 / cc.chapter_count
+        )
+        ELSE 0
+      END AS progress_percent,
       lp.id AS progress_id,
       lp.chapter_id AS progress_chapter_id,
       lp.page_number AS progress_page_number,
@@ -211,6 +222,7 @@ function mapRow(row: LibraryRow): LibraryManga {
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     chapterCount: row.chapter_count,
+    progressPercent: Math.min(100, Math.max(0, row.progress_percent)),
     readingStatus: row.reading_status,
     progress: progress ?? undefined,
   };
@@ -259,11 +271,7 @@ function orderExpression(sortBy: LibrarySortBy | undefined) {
     case "dateAdded":
       return sql`createdAt`;
     case "progress":
-      return sql`CASE
-        WHEN progress_total_pages > 0
-        THEN (progress_page_number * 100.0 / progress_total_pages)
-        ELSE 0
-      END`;
+      return sql`progress_percent`;
     case "chapterCount":
       return sql`chapter_count`;
     case "lastRead":

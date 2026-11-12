@@ -543,10 +543,10 @@ export function Library({ onMangaSelect }: LibraryProps) {
                       {syncIssue.syncState === "conflict" ? "Conflict" : "Sync"}
                     </Badge>
                   )}
-                  {m.progress && m.progress.percentComplete > 0 && (
+                  {m.progressPercent > 0 && (
                     <div className="absolute inset-x-0 bottom-0 p-1.5">
                       <Progress
-                        value={m.progress.percentComplete}
+                        value={m.progressPercent}
                         className="h-1 bg-white/20"
                         indicatorClassName="bg-primary"
                       />
