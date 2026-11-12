@@ -352,11 +352,20 @@ export interface PluginPolicy {
   allowedPackages: string[];
 }
 
+const DEFAULT_CONTENT_TOKEN_TTL_SECONDS = 15 * 60;
+/**
+ * Content tokens are renewed before they expire. This margin absorbs clock
+ * drift and a slow server round-trip so a page request never races the
+ * expiry.
+ */
+const CONTENT_TOKEN_REFRESH_MARGIN_MS = 60 * 1000;
+
 export class ApiClient {
   private baseUrl: string;
   private authToken: string | null;
   private contentToken: string | null = null;
   private contentTokenExpiresAt = 0;
+  private contentTokenRefresh: Promise<string | null> | null = null;
 
   constructor(baseUrl: string, authToken: string | null = null) {
     this.baseUrl = baseUrl;
@@ -375,6 +384,8 @@ export class ApiClient {
     this.authToken = token;
     this.contentToken = null;
     this.contentTokenExpiresAt = 0;
+    // A refresh started with the previous identity must not be reused.
+    this.contentTokenRefresh = null;
   }
 
   hasAuthToken(): boolean {
@@ -382,10 +393,23 @@ export class ApiClient {
   }
 
   setContentToken(token: string | null, expiresInSeconds?: number) {
+    const ttl = expiresInSeconds ?? DEFAULT_CONTENT_TOKEN_TTL_SECONDS;
     this.contentToken = token;
     this.contentTokenExpiresAt = token
-      ? Date.now() + Math.max(30, (expiresInSeconds ?? 900) - 60) * 1000
+      ? Date.now() + Math.max(30, ttl) * 1000
       : 0;
+  }
+
+  /**
+   * Milliseconds until the content token should be renewed, or null when no
+   * renewal is possible (no bearer token). Zero means "renew now".
+   */
+  contentTokenRefreshDelayMs(): number | null {
+    if (!this.authToken) return null;
+    if (!this.contentToken) return 0;
+    return (
+      this.contentTokenExpiresAt - CONTENT_TOKEN_REFRESH_MARGIN_MS - Date.now()
+    );
   }
 
   getAssetUrl(path?: string, cacheBuster?: number): string | undefined {
@@ -415,26 +439,54 @@ export class ApiClient {
     return `${url}${url.includes("?") ? "&" : "?"}${params.join("&")}`;
   }
 
-  async refreshContentToken(): Promise<string | null> {
+  /**
+   * Fetches a fresh content token. Pass `force` to renew before the scheduled
+   * time (for example after an asset request fails with 401, or when the app
+   * becomes visible again after the server restarted).
+   *
+   * Concurrent callers share one request so a burst of failed images cannot
+   * flood the token endpoint.
+   */
+  async refreshContentToken(force = false): Promise<string | null> {
     if (!this.authToken) return null;
-    if (this.contentToken && Date.now() < this.contentTokenExpiresAt) {
+    const delay = this.contentTokenRefreshDelayMs();
+    if (!force && this.contentToken && delay !== null && delay > 0) {
       return this.contentToken;
     }
+    if (this.contentTokenRefresh) return this.contentTokenRefresh;
+
+    const authToken = this.authToken;
+    const refresh = (async (): Promise<string | null> => {
+      try {
+        const issued = await this.request<{ token: string; expiresIn: number }>(
+          "/api/auth/content-token",
+          { method: "POST" },
+        );
+        if (this.authToken !== authToken) return null;
+        this.setContentToken(issued.token, issued.expiresIn);
+        return issued.token;
+      } catch {
+        return null;
+      }
+    })();
+
+    this.contentTokenRefresh = refresh;
     try {
-      const issued = await this.request<{ token: string; expiresIn: number }>(
-        "/api/auth/content-token",
-        { method: "POST" },
-      );
-      this.setContentToken(issued.token, issued.expiresIn);
-      return issued.token;
-    } catch {
-      return null;
+      return await refresh;
+    } finally {
+      if (this.contentTokenRefresh === refresh) {
+        this.contentTokenRefresh = null;
+      }
     }
   }
 
   private async request<T>(path: string, options?: RequestInit): Promise<T> {
     const headers = new Headers(options?.headers);
-    if (options?.body !== undefined && !headers.has("Content-Type")) {
+    if (
+      options?.body !== undefined &&
+      !(options.body instanceof FormData) &&
+      !headers.has("Content-Type")
+    ) {
       headers.set("Content-Type", "application/json");
     }
     if (this.authToken) {
@@ -921,6 +973,18 @@ export class ApiClient {
     return this.request("/api/plugins/install", {
       method: "POST",
       body: JSON.stringify(body),
+    });
+  }
+
+  installPluginFromTarball(
+    file: File,
+  ): Promise<{ message: string; replaced: boolean }> {
+    const formData = new FormData();
+    formData.append("tarball", file, file.name);
+    formData.append("confirm", "true");
+    return this.request("/api/plugins/install-tarball", {
+      method: "POST",
+      body: formData,
     });
   }
 

@@ -88,6 +88,7 @@ function ReaderPage({
   className = "",
   width,
   height,
+  onError,
 }: {
   src?: string;
   pageNumber: number;
@@ -97,14 +98,41 @@ function ReaderPage({
   className?: string;
   width?: number;
   height?: number;
+  /** Called once per page when the image fails, to renew auth and retry. */
+  onError?: () => Promise<boolean> | boolean;
 }) {
   const [status, setStatus] = useState<"loading" | "loaded" | "error">(
     "loading",
   );
+  const retriedRef = useRef(false);
+  const identityRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
+    // A retry changes only the query string (fresh token/cache buster) and must
+    // keep the retry budget; a different page must get a fresh one.
+    const identity = src ? src.split("?")[0] : undefined;
+    if (identityRef.current !== identity) {
+      identityRef.current = identity;
+      retriedRef.current = false;
+    }
     setStatus("loading");
   }, [src]);
+
+  const handleError = () => {
+    if (!onError || retriedRef.current) {
+      setStatus("error");
+      return;
+    }
+    retriedRef.current = true;
+    const result = onError();
+    if (typeof result === "boolean") {
+      if (!result) setStatus("error");
+      return;
+    }
+    void result.then((recovered) => {
+      if (!recovered) setStatus("error");
+    });
+  };
 
   const zoomed = active && zoom.scale > 1;
   const imageStyle: React.CSSProperties = {};
@@ -135,7 +163,7 @@ function ReaderPage({
           draggable={false}
           style={imageStyle}
           onLoad={() => setStatus("loaded")}
-          onError={() => setStatus("error")}
+          onError={handleError}
         />
       ) : null}
       {status === "loading" && active ? (
@@ -210,6 +238,7 @@ export function Reader({
   const [savedPageIndex, setSavedPageIndex] = useState<number | null>(null);
   const [zoom, setZoom] = useState<ZoomState>(DEFAULT_ZOOM);
   const [modeEpoch, setModeEpoch] = useState(0);
+  const [assetEpoch, setAssetEpoch] = useState(0);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const pagedRef = useRef<HTMLDivElement>(null);
@@ -270,6 +299,19 @@ export function Reader({
   const paged = readingMode !== "vertical";
 
   useWakeLock(true);
+
+  // A page usually fails because its content token expired (the app was
+  // backgrounded/suspended) or because a server restart rotated the signing
+  // secret. Renew the token once and change the URL so React retries the
+  // image instead of leaving a permanent "failed to load" frame.
+  const retryPageAsset = useCallback(async (): Promise<boolean> => {
+    if (api.hasAuthToken()) {
+      const token = await api.refreshContentToken(true);
+      if (!token) return false;
+    }
+    setAssetEpoch((value) => value + 1);
+    return true;
+  }, [api]);
 
   useEffect(() => {
     initialPageRef.current = initialPage;
@@ -704,7 +746,7 @@ export function Reader({
     for (let offset = -PRELOAD_RADIUS; offset <= PRELOAD_RADIUS; offset += 1) {
       const page = pages[currentPage + offset];
       if (!page) continue;
-      const url = api.getAssetUrl(page.url);
+      const url = api.getAssetUrl(page.url, assetEpoch || undefined);
       if (!url) continue;
       const image = new Image();
       image.decoding = "async";
@@ -712,7 +754,7 @@ export function Reader({
       images.push(image);
     }
     preloadedImagesRef.current = images;
-  }, [api, pages, currentPage]);
+  }, [api, pages, currentPage, assetEpoch]);
 
   // Progress is saved only after the settled page changes.
   useEffect(() => {
@@ -1236,7 +1278,10 @@ export function Reader({
             <div className="page-slide" key={slide.key}>
               {slide.kind === "page" ? (
                 <ReaderPage
-                  src={api.getAssetUrl(pages[slide.pageIndex!]?.url)}
+                  src={api.getAssetUrl(
+                    pages[slide.pageIndex!]?.url,
+                    assetEpoch || undefined,
+                  )}
                   pageNumber={slide.pageIndex! + 1}
                   eager={
                     Math.abs(slide.pageIndex! - currentPage) <= PRELOAD_RADIUS
@@ -1245,6 +1290,7 @@ export function Reader({
                   zoom={zoom}
                   width={pages[slide.pageIndex!]?.width}
                   height={pages[slide.pageIndex!]?.height}
+                  onError={retryPageAsset}
                 />
               ) : (
                 <ChapterSentinel kind={slide.kind} />
@@ -1265,7 +1311,7 @@ export function Reader({
                 data-page-index={index}
               >
                 <ReaderPage
-                  src={api.getAssetUrl(page.url)}
+                  src={api.getAssetUrl(page.url, assetEpoch || undefined)}
                   pageNumber={index + 1}
                   eager={Math.abs(index - currentPage) <= PRELOAD_RADIUS}
                   active={index === currentPage}
@@ -1273,6 +1319,7 @@ export function Reader({
                   className="vertical"
                   width={page.width}
                   height={page.height}
+                  onError={retryPageAsset}
                 />
               </div>
             ))}

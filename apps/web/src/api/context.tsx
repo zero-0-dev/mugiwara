@@ -3,6 +3,9 @@ import { ApiClient } from "./client";
 
 const ApiClientContext = createContext<ApiClient | null>(null);
 
+/** Retry a failed content-token renewal after this delay. */
+const CONTENT_TOKEN_RETRY_MS = 30 * 1000;
+
 export function ApiClientProvider({
   baseUrl,
   authToken,
@@ -31,15 +34,56 @@ export function ApiClientProvider({
   }, [authToken, contentToken]);
   React.useEffect(() => {
     if (!authToken) return undefined;
-    // Content tokens are short-lived. Refresh well before expiry so covers and
-    // reader pages keep loading in Capacitor (which cannot use the cookie).
-    const timer = window.setInterval(
-      () => {
-        void clientRef.current?.refreshContentToken();
-      },
-      10 * 60 * 1000,
-    );
-    return () => window.clearInterval(timer);
+    const client = clientRef.current;
+    if (!client) return undefined;
+
+    let timer: number | null = null;
+    let cancelled = false;
+
+    const clearTimer = () => {
+      if (timer !== null) {
+        window.clearTimeout(timer);
+        timer = null;
+      }
+    };
+
+    const renew = async () => {
+      if (cancelled) return;
+      const token = await client.refreshContentToken(true);
+      if (cancelled) return;
+      if (!token) {
+        clearTimer();
+        timer = window.setTimeout(() => void renew(), CONTENT_TOKEN_RETRY_MS);
+        return;
+      }
+      schedule();
+    };
+
+    const schedule = () => {
+      if (cancelled) return;
+      clearTimer();
+      const delay = client.contentTokenRefreshDelayMs();
+      if (delay === null) return;
+      timer = window.setTimeout(() => void renew(), Math.max(0, delay));
+    };
+
+    // Timers are throttled while the window is hidden (and paused across
+    // suspend), so renew immediately when the app becomes visible again.
+    const handleVisibility = () => {
+      if (cancelled || document.visibilityState !== "visible") return;
+      const delay = client.contentTokenRefreshDelayMs();
+      if (delay === null) return;
+      if (delay <= 0) void renew();
+      else schedule();
+    };
+
+    schedule();
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      cancelled = true;
+      clearTimer();
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
   }, [authToken]);
   return (
     <ApiClientContext.Provider value={clientRef.current}>
