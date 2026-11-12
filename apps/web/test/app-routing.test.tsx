@@ -234,7 +234,7 @@ describe("app routes", () => {
     await waitFor(() =>
       expect(router.state.location.pathname).toBe("/settings/downloads"),
     );
-    expect(screen.getByText("Settings downloads")).toBeTruthy();
+    expect(await screen.findByText("Settings downloads")).toBeTruthy();
   });
 
   it("switches screens from the mobile tab bar", async () => {
@@ -254,7 +254,7 @@ describe("app routes", () => {
     await waitFor(() =>
       expect(router.state.location.pathname).toBe("/discover"),
     );
-    expect(screen.getByText("Discover screen")).toBeTruthy();
+    expect(await screen.findByText("Discover screen")).toBeTruthy();
 
     within(nav).getByRole("button", { name: "Downloads" }).click();
     await waitFor(() =>

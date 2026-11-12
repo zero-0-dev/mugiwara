@@ -8,8 +8,10 @@ import React, {
 } from "react";
 import {
   ArrowLeft,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   Maximize,
   Minimize,
   RotateCcw,
@@ -78,6 +80,8 @@ const PRELOAD_RADIUS = 2;
 const SCROLL_SETTLE_MS = 140;
 const FAST_SCROLL_MS = 90;
 const CONTROLS_HIDE_MS = 3000;
+/** Distance from the top/bottom edge that reveals the chrome on hover. */
+const CONTROLS_EDGE_PX = 48;
 
 function ReaderPage({
   src,
@@ -104,10 +108,18 @@ function ReaderPage({
   const [status, setStatus] = useState<"loading" | "loaded" | "error">(
     "loading",
   );
+  const [trackedSrc, setTrackedSrc] = useState(src);
   const retriedRef = useRef(false);
-  const identityRef = useRef<string | undefined>(undefined);
+  const identityRef = useRef<string | undefined>(
+    src ? src.split("?")[0] : undefined,
+  );
 
-  useEffect(() => {
+  // Reset during render instead of in an effect. A cached image can fire
+  // `load` before passive effects run, and resetting the status afterwards
+  // would put the spinner back up with no further `load` event to clear it.
+  if (trackedSrc !== src) {
+    setTrackedSrc(src);
+    setStatus("loading");
     // A retry changes only the query string (fresh token/cache buster) and must
     // keep the retry budget; a different page must get a fresh one.
     const identity = src ? src.split("?")[0] : undefined;
@@ -115,8 +127,7 @@ function ReaderPage({
       identityRef.current = identity;
       retriedRef.current = false;
     }
-    setStatus("loading");
-  }, [src]);
+  }
 
   const handleError = () => {
     if (!onError || retriedRef.current) {
@@ -192,6 +203,38 @@ function ChapterSentinel({ kind }: { kind: "prev" | "next" }) {
         {kind === "prev" ? "Previous chapter" : "Next chapter"}
       </div>
       <p>Swipe to continue</p>
+    </div>
+  );
+}
+
+function VerticalChapterLink({
+  kind,
+  onClick,
+}: {
+  kind: "prev" | "next";
+  onClick: () => void;
+}) {
+  const Icon = kind === "prev" ? ChevronUp : ChevronDown;
+  return (
+    <div
+      className={cn(
+        "vertical-chapter-nav",
+        kind === "prev"
+          ? "vertical-chapter-nav-prev"
+          : "vertical-chapter-nav-next",
+      )}
+    >
+      <Button
+        variant="secondary"
+        className="gap-2"
+        onClick={onClick}
+        aria-label={
+          kind === "prev" ? "Go to previous chapter" : "Go to next chapter"
+        }
+      >
+        <Icon className="size-4" aria-hidden="true" />
+        {kind === "prev" ? "Previous chapter" : "Next chapter"}
+      </Button>
     </div>
   );
 }
@@ -791,6 +834,14 @@ export function Reader({
     }, CONTROLS_HIDE_MS);
   }, []);
 
+  // Keep the chrome open while the pointer is on it so buttons stay clickable.
+  const holdControls = useCallback(() => {
+    if (controlsTimeoutRef.current !== null) {
+      clearTimeout(controlsTimeoutRef.current);
+      controlsTimeoutRef.current = null;
+    }
+  }, []);
+
   useEffect(() => {
     showControlsTemporarily();
     return () => {
@@ -911,11 +962,24 @@ export function Reader({
   }, [goToNextPage, goToPrevPage, onBack, readingMode]);
 
   const performTap = useCallback(
-    (clientX: number, clientY: number, target: EventTarget | null) => {
+    (
+      clientX: number,
+      clientY: number,
+      target: EventTarget | null,
+      source: "touch" | "mouse",
+    ) => {
       if ((target as HTMLElement | null)?.closest?.(".reader-controls")) return;
 
       if (readingMode === "vertical") {
         showControlsTemporarily();
+        return;
+      }
+
+      // On desktop a plain left click always advances and the right button
+      // (handled by the context-menu listener) always goes back. Positional
+      // tap zones only apply to touch/pen input.
+      if (source === "mouse") {
+        goToNextPage();
         return;
       }
 
@@ -959,6 +1023,19 @@ export function Reader({
   };
 
   const handlePointerMove = (event: React.PointerEvent) => {
+    // Reveal the chrome only when the pointer deliberately reaches the top or
+    // bottom edge. Moving around the page must not pop the bars up over the
+    // chapter buttons.
+    if (event.pointerType === "mouse") {
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (rect && rect.height > 0) {
+        const y = event.clientY - rect.top;
+        if (y <= CONTROLS_EDGE_PX || y >= rect.height - CONTROLS_EDGE_PX) {
+          showControlsTemporarily();
+        }
+      }
+    }
+
     const start = pointerStartRef.current;
     if (!start) return;
     if (
@@ -979,6 +1056,15 @@ export function Reader({
     }
     if ((event.target as HTMLElement).closest(".reader-controls")) return;
     if (event.pointerType === "mouse" && event.button !== 0) return;
+
+    // Mouse buttons act immediately: double-clicking must keep advancing pages
+    // instead of zooming. Touch/pen still wait to recognise a double tap.
+    if (event.pointerType === "mouse") {
+      cancelPendingTap();
+      lastTapRef.current = null;
+      performTap(event.clientX, event.clientY, event.target, "mouse");
+      return;
+    }
 
     const point: TapPoint = {
       x: event.clientX,
@@ -1016,7 +1102,7 @@ export function Reader({
     tapTimerRef.current = setTimeout(() => {
       tapTimerRef.current = null;
       lastTapRef.current = null;
-      performTap(clientX, clientY, target);
+      performTap(clientX, clientY, target, "touch");
     }, DOUBLE_TAP_MS);
   };
 
@@ -1089,6 +1175,46 @@ export function Reader({
     };
   }, [cancelPendingTap, pages.length]);
 
+  // Desktop wheel zoom. The paged reader has no vertical scroll to consume the
+  // wheel, so it zooms around the pointer. Vertical mode keeps native scrolling
+  // and only zooms with a modifier, which is the familiar trackpad gesture.
+  useEffect(() => {
+    const element = containerRef.current;
+    if (!element) return;
+
+    const handleWheel = (event: WheelEvent) => {
+      if (event.deltaY === 0) return;
+      if ((event.target as HTMLElement).closest(".reader-controls")) return;
+      if (!paged && !(event.ctrlKey || event.metaKey)) return;
+      event.preventDefault();
+
+      const rect = element.getBoundingClientRect();
+      const originX = clamp(
+        ((event.clientX - rect.left) / rect.width) * 100,
+        0,
+        100,
+      );
+      const originY = clamp(
+        ((event.clientY - rect.top) / rect.height) * 100,
+        0,
+        100,
+      );
+
+      setZoom((previous) => {
+        const nextScale = clamp(
+          previous.scale * Math.exp(-event.deltaY * 0.0025),
+          1,
+          MAX_ZOOM,
+        );
+        if (nextScale <= 1.01) return DEFAULT_ZOOM;
+        return { scale: nextScale, originX, originY };
+      });
+    };
+
+    element.addEventListener("wheel", handleWheel, { passive: false });
+    return () => element.removeEventListener("wheel", handleWheel);
+  }, [paged]);
+
   const resetZoom = () => setZoom(DEFAULT_ZOOM);
 
   const toggleImmersive = () => {
@@ -1108,10 +1234,14 @@ export function Reader({
 
   const handleContextMenu = (event: React.MouseEvent) => {
     if (readingMode === "vertical") return;
-    event.preventDefault();
     if (event.button !== 2) return;
     if (window.matchMedia?.("(hover: none)").matches) return;
     if ((event.target as HTMLElement).closest(".reader-controls")) return;
+    event.preventDefault();
+    // Drop a single left click still waiting out the double-tap window so it
+    // cannot advance again right after this reverse.
+    cancelPendingTap();
+    lastTapRef.current = null;
     goToPrevPage();
   };
 
@@ -1159,6 +1289,8 @@ export function Reader({
             ? "pointer-events-auto translate-y-0 opacity-100"
             : "pointer-events-none -translate-y-2 opacity-0",
         )}
+        onPointerEnter={holdControls}
+        onPointerLeave={showControlsTemporarily}
       >
         <div className="mx-auto flex max-w-4xl items-center gap-1.5 rounded-2xl border border-white/10 bg-black/65 p-1.5 text-white shadow-xl backdrop-blur-xl sm:gap-2 sm:p-2">
           <Button
@@ -1304,6 +1436,9 @@ export function Reader({
           ref={verticalRef}
         >
           <div className="vertical-pages">
+            {onPrevChapter ? (
+              <VerticalChapterLink kind="prev" onClick={onPrevChapter} />
+            ) : null}
             {pages.map((page, index) => (
               <div
                 className="vertical-page-frame"
@@ -1323,6 +1458,9 @@ export function Reader({
                 />
               </div>
             ))}
+            {onNextChapter ? (
+              <VerticalChapterLink kind="next" onClick={onNextChapter} />
+            ) : null}
           </div>
         </div>
       )}
@@ -1334,6 +1472,8 @@ export function Reader({
             ? "pointer-events-auto translate-y-0 opacity-100"
             : "pointer-events-none translate-y-2 opacity-0",
         )}
+        onPointerEnter={holdControls}
+        onPointerLeave={showControlsTemporarily}
       >
         <div className="mx-auto flex max-w-4xl items-center gap-2 rounded-2xl border border-white/10 bg-black/65 p-1.5 text-white shadow-xl backdrop-blur-xl sm:p-2">
           <Button

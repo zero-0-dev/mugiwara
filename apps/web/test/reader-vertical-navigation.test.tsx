@@ -73,6 +73,33 @@ describe("Reader vertical chapter navigation", () => {
     expect(onPrevChapter).toHaveBeenCalledTimes(1);
   });
 
+  it("places chapter buttons around the images", async () => {
+    const { onNextChapter, onPrevChapter } = renderReader();
+
+    const prev = await screen.findByRole("button", {
+      name: "Go to previous chapter",
+    });
+    const next = screen.getByRole("button", { name: "Go to next chapter" });
+
+    // The previous link sits before the first image and the next link after
+    // the last one, so both are reachable by scrolling the story itself.
+    const firstPage = screen.getByLabelText("Page 1");
+    const lastPage = screen.getByLabelText("Page 3");
+    expect(
+      prev.compareDocumentPosition(firstPage) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      lastPage.compareDocumentPosition(next) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+
+    fireEvent.click(next);
+    expect(onNextChapter).toHaveBeenCalledTimes(1);
+    fireEvent.click(prev);
+    expect(onPrevChapter).toHaveBeenCalledTimes(1);
+  });
+
   it("continues to the next chapter on an extra swipe past the bottom", async () => {
     const { onNextChapter } = renderReader();
 

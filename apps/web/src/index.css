@@ -312,6 +312,27 @@
   scroll-snap-align: start;
 }
 
+.vertical-chapter-nav {
+  display: flex;
+  justify-content: center;
+  padding: 1.5rem 1rem;
+}
+
+.vertical-chapter-nav button {
+  width: 100%;
+  max-width: 22rem;
+}
+
+/* Keep the chapter buttons clear of the auto-hiding top/bottom chrome and the
+ * hover zone that reveals it, so they stay clickable. */
+.vertical-chapter-nav-prev {
+  padding-top: 5rem;
+}
+
+.vertical-chapter-nav-next {
+  padding-bottom: 5rem;
+}
+
 .reader-vertical-scroller {
   height: 100%;
   overflow-y: auto;
