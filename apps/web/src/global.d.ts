@@ -4,6 +4,7 @@ declare global {
   interface ElectronAPI {
     getServerPort: () => Promise<number>;
     getApiUrl: (path: string) => Promise<string>;
+    getLanServerUrl?: () => Promise<string>;
     getAuthToken: () => Promise<string>;
     getAppVersion: () => Promise<string>;
     selectFolder: () => Promise<string | null>;

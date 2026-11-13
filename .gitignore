@@ -18,3 +18,4 @@ coverage
 data
 apps/server/deploy
 apps/desktop/release
+apps/desktop/buildResources/node

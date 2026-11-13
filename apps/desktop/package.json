@@ -39,6 +39,10 @@
         "to": "icon.png"
       },
       {
+        "from": "buildResources/node",
+        "to": "node"
+      },
+      {
         "from": "../server/dist",
         "to": "server"
       },

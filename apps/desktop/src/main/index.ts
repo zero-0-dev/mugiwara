@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, dialog, shell } from "electron";
 import path from "path";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
+import { networkInterfaces } from "os";
 import { ServerManager } from "./server-manager";
 
 // Keep a global reference to prevent garbage collection
@@ -61,6 +62,66 @@ function serverBaseUrl(serverPort: number): string {
   // In dev the web UI is served by Vite (:5173) and proxies /api to the server,
   // but pairing calls go straight to the loopback server.
   return `http://127.0.0.1:${port}`;
+}
+
+/**
+ * Pick the IPv4 address a phone on the same network would use. Loopback and
+ * link-local addresses are skipped; private ranges and physical interface
+ * names are preferred over virtual adapters (Docker, VPN, VMs).
+ */
+function findLanAddress(): string {
+  let best: { address: string; score: number } | null = null;
+
+  for (const [name, addresses] of Object.entries(networkInterfaces())) {
+    for (const address of addresses ?? []) {
+      if (address.family !== "IPv4" || address.internal) continue;
+      if (address.address.startsWith("169.254.")) continue;
+
+      let score = 5;
+      if (address.address.startsWith("192.168.")) score = 30;
+      else if (address.address.startsWith("10.")) score = 20;
+      else if (/^172\.(1[6-9]|2\d|3[01])\./.test(address.address)) score = 15;
+
+      const normalizedName = name.toLowerCase();
+      if (/^(en|eth|wl|wi-?fi|ethernet)/.test(normalizedName)) score += 5;
+      if (
+        /(docker|veth|br-|virbr|vmnet|vboxnet|utun|tun|tap|wg|tailscale|zerotier)/.test(
+          normalizedName,
+        )
+      ) {
+        score -= 20;
+      }
+
+      if (!best || score > best.score) {
+        best = { address: address.address, score };
+      }
+    }
+  }
+
+  return best?.address ?? "";
+}
+
+function resolveServerPort(): number {
+  if (EXTERNAL_SERVER_URL) {
+    try {
+      return Number(new URL(EXTERNAL_SERVER_URL).port) || 80;
+    } catch {
+      return 0;
+    }
+  }
+  if (isDev) return DEV_SERVER_PORT;
+  return serverManager?.getPort() || DEV_SERVER_PORT;
+}
+
+/**
+ * LAN URL shown in the shared UI so a phone can connect. The renderer keeps
+ * talking to loopback; this is display metadata only and empty for external
+ * servers (their configured host is already the right label).
+ */
+function lanServerUrl(): string {
+  if (EXTERNAL_SERVER_URL) return "";
+  const address = findLanAddress();
+  return address ? `http://${address}:${resolveServerPort()}` : "";
 }
 
 function isLoopbackUrl(value: string): boolean {
@@ -320,17 +381,11 @@ async function initialize() {
 
 // IPC handlers
 ipcMain.handle("get-server-port", () => {
-  if (EXTERNAL_SERVER_URL) {
-    try {
-      return Number(new URL(EXTERNAL_SERVER_URL).port) || 80;
-    } catch {
-      return 0;
-    }
-  }
-  if (isDev) {
-    return DEV_SERVER_PORT;
-  }
-  return serverManager?.getPort() || DEV_SERVER_PORT;
+  return resolveServerPort();
+});
+
+ipcMain.handle("get-lan-server-url", () => {
+  return lanServerUrl();
 });
 
 ipcMain.handle("get-api-url", (event, apiPath: string) => {

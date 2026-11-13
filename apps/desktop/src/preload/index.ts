@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   // Server info
   getServerPort: () => ipcRenderer.invoke("get-server-port"),
   getApiUrl: (path: string) => ipcRenderer.invoke("get-api-url", path),
+  getLanServerUrl: () => ipcRenderer.invoke("get-lan-server-url"),
   getAuthToken: () => ipcRenderer.invoke("get-auth-token"),
 
   // App info
@@ -27,6 +28,7 @@ declare global {
     electronAPI: {
       getServerPort: () => Promise<number>;
       getApiUrl: (path: string) => Promise<string>;
+      getLanServerUrl: () => Promise<string>;
       getAuthToken: () => Promise<string>;
       getAppVersion: () => Promise<string>;
       selectFolder: () => Promise<string | null>;

@@ -1,4 +1,5 @@
 import { spawn } from "child_process";
+import { existsSync } from "fs";
 import * as fs from "fs/promises";
 import * as path from "path";
 import { InstalledPluginRecord, PluginPackageInfo } from "./types";
@@ -683,15 +684,56 @@ function normalizeRegistry(value: string): string {
   return url.toString().replace(/\/+$/, "/");
 }
 
+/**
+ * Use the npm CLI that ships with the running Node.js runtime. The desktop app
+ * bundles its own Node.js (and npm) and may not have `node`/`npm` on PATH at
+ * all, especially when launched from Finder or Explorer.
+ */
+export function resolveNpmCli(
+  execPath: string = process.execPath,
+  platform: NodeJS.Platform = process.platform,
+): { command: string; args: string[]; shell: boolean } {
+  const runtimeDir = path.dirname(execPath);
+  const candidates = [
+    // Official Node.js archives on macOS/Linux.
+    path.resolve(
+      runtimeDir,
+      "..",
+      "lib",
+      "node_modules",
+      "npm",
+      "bin",
+      "npm-cli.js",
+    ),
+    // Official Node.js archives on Windows (and `node.exe` next to npm).
+    path.resolve(runtimeDir, "node_modules", "npm", "bin", "npm-cli.js"),
+  ];
+
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) {
+      return { command: execPath, args: [candidate], shell: false };
+    }
+  }
+
+  // Development or a non-standard Node.js install: fall back to PATH.
+  return {
+    command: platform === "win32" ? "npm.cmd" : "npm",
+    args: [],
+    shell: platform === "win32",
+  };
+}
+
 function defaultNpmRunner(
   args: string[],
   options: { cwd: string; env: NodeJS.ProcessEnv },
 ): Promise<void> {
   return new Promise((resolve, reject) => {
-    const proc = spawn("npm", args, {
+    const npm = resolveNpmCli();
+    const proc = spawn(npm.command, [...npm.args, ...args], {
       cwd: options.cwd,
       env: options.env,
       stdio: "pipe",
+      shell: npm.shell,
     });
 
     let stdout = "";

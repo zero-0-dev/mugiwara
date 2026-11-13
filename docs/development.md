@@ -187,8 +187,8 @@ tokens, pairing codes, cookies, API keys and absolute personal paths.
 - **Desktop packaging fails**: build on the target OS (a macOS package needs a
   macOS host) and run the web and server builds first. Verify the
   electron-builder inputs (`apps/server/dist`, `apps/server/deploy`,
-  `apps/web/dist`) exist. If `better-sqlite3` reports a missing Electron
-  prebuild, upgrade it or use an Electron version that has one.
+  `apps/web/dist`) exist. If `better-sqlite3` reports a missing Node.js
+  prebuild, upgrade it or use a Node.js version that has one.
 - **Packaged app shows "Mugiwara failed to start"**: open
   `<userData>/data/server.log` (for example
   `~/Library/Application Support/Mugiwara/data/server.log` on macOS) for the

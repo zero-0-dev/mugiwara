@@ -30,15 +30,19 @@ Mac produces an `x64` package. On Apple Silicon, make sure the Node.js running
 the build is a native arm64 build; a Node under Rosetta reports `x64` and
 produces an Intel package.
 
-The build also fetches the `better-sqlite3` prebuild that matches the bundled
-Electron ABI. That download normally needs no compiler; if upstream stops
-publishing a matching prebuild, the build fails with an explicit error and you
-must upgrade `better-sqlite3` or choose an Electron version that has one.
+The build downloads a pinned Node.js runtime (currently
+`v24.22.3`, override with `MUGIWARA_NODE_VERSION`) from nodejs.org, verifies
+its SHA-256 checksum and copies it into the app bundle. The embedded server and
+the `npm` used by the plugin system both run on that runtime, so the desktop app
+does not depend on `node` being installed on the user's machine.
+
+The same build fetches the `better-sqlite3` prebuild for the bundled Node
+version. That download normally needs no compiler; if upstream stops publishing
+a matching prebuild, the build fails with an explicit error and you must upgrade
+`better-sqlite3` or choose a Node.js version that has one.
 
 By default the packaged desktop app starts its own server and provisions a
-loopback auth token automatically for the renderer. It runs that server on
-Electron's own Node runtime (`ELECTRON_RUN_AS_NODE`), so a system `node`
-installation is not required.
+loopback auth token automatically for the renderer.
 
 ## Use an existing LAN server
 
@@ -50,8 +54,9 @@ MUGIWARA_SERVER_URL=http://192.168.1.20:3001 pnpm --filter @mugiwara-manga/deskt
 MUGIWARA_SERVER_URL=http://192.168.1.20:3001 ./Mugiwara
 ```
 
-The packaged desktop shell runs the embedded server on Electron's bundled Node
-runtime, so it does not need `node` on `PATH`. If you only use a LAN server, set
+The packaged desktop shell runs the embedded server on the Node.js runtime
+bundled in the app (`Resources/node`), so it does not need `node` on `PATH` and
+plugin installs can use the bundled `npm`. If you only use a LAN server, set
 `MUGIWARA_SERVER_URL` and no embedded server is started. Server output and
 errors are written to `<userData>/data/server.log` (for example
 `~/Library/Application Support/Mugiwara/data/server.log` on macOS).

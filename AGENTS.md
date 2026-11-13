@@ -132,8 +132,11 @@ pnpm build:desktop:mac
 ### Desktop (`apps/desktop`)
 
 - `src/main/*` is the Electron main process, including the embedded
-  `ServerManager`, loopback token provisioning and IPC. It registers the
-  `mugiwara://` protocol and forwards deep links to the shared router.
+  `ServerManager`, loopback token provisioning and IPC. It spawns the embedded
+  server on the Node.js runtime bundled in `Resources/node`; do not substitute
+  the system `node` or Electron-as-Node, because the plugin system needs `npm`.
+  It registers the `mugiwara://` protocol and forwards deep links to the shared
+  router.
 - `src/preload/*` exposes the narrow bridge consumed by the web UI.
 - The renderer is always the shared web build. Do not add a desktop-only UI.
 

@@ -202,6 +202,9 @@ export async function validateToken(
 export async function resolveServer(): Promise<ResolvedServer> {
   if (isElectron()) {
     const baseUrl = await window.electronAPI!.getApiUrl("");
+    // The desktop shell keeps API traffic on loopback. Show the LAN address
+    // instead so a phone on the same network can use the value in the header.
+    const lanUrl = (await window.electronAPI?.getLanServerUrl?.()) || "";
     // Prefer the token provisioned by the main process, but fall back to a
     // token saved by the in-app pairing screen (dev/external server flows).
     const authToken =
@@ -215,7 +218,7 @@ export async function resolveServer(): Promise<ResolvedServer> {
       : null;
     return {
       baseUrl,
-      label: getServerLabel(baseUrl),
+      label: getServerLabel(lanUrl || baseUrl),
       needsSetup: !authenticated,
       authToken: authToken || null,
       contentToken,

@@ -1,11 +1,19 @@
 #!/usr/bin/env node
 import { execSync } from 'node:child_process';
-import { existsSync, mkdirSync, copyFileSync, rmSync, readFileSync, readdirSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { createReadStream, createWriteStream, existsSync, mkdirSync, copyFileSync, renameSync, rmSync, readFileSync, readdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(fileURLToPath(import.meta.url), '..', '..');
+
+// Node.js runtime shipped inside the desktop app. It runs the embedded server
+// and the `npm` used to install plugins, so it must stay in sync with the
+// better-sqlite3 prebuild selected below.
+const NODE_RUNTIME_VERSION = process.env.MUGIWARA_NODE_VERSION || '24.22.3';
 
 function getVersion() {
   try {
@@ -30,33 +38,113 @@ function clean(dir) {
   mkdirSync(dir, { recursive: true });
 }
 
-// The packaged desktop app runs the embedded server on Electron's bundled Node
-// runtime (ELECTRON_RUN_AS_NODE). Native addons must therefore be compiled for
-// Electron's ABI instead of the build machine's system Node.
-function rebuildServerNativeModules(arch) {
+// The packaged desktop app runs the embedded server on a Node.js runtime that
+// is copied into the app bundle. Doing it this way (instead of reusing
+// Electron as Node) keeps `npm` available for the plugin system and decouples
+// the server's Node ABI from the Electron release.
+async function fetchNodeRuntime(platform, arch) {
+  const isWindows = platform === 'win32';
+  const name = `node-v${NODE_RUNTIME_VERSION}-${platform}-${arch}`;
+  const ext = isWindows ? 'zip' : 'tar.gz';
+  const baseUrl = `https://nodejs.org/dist/v${NODE_RUNTIME_VERSION}`;
+  const cacheDir = join(ROOT, 'dist', 'cache', 'node');
+  const archive = join(cacheDir, `${name}.${ext}`);
+
+  mkdirSync(cacheDir, { recursive: true });
+
+  if (!existsSync(archive)) {
+    console.log(
+      `\nDownloading Node.js ${NODE_RUNTIME_VERSION} (${platform}-${arch})...`,
+    );
+    const response = await fetch(`${baseUrl}/${name}.${ext}`);
+    if (!response.ok || !response.body) {
+      throw new Error(
+        `Failed to download Node.js: ${response.status} ${response.statusText}`,
+      );
+    }
+    await pipeline(
+      Readable.fromWeb(response.body),
+      createWriteStream(archive),
+    );
+  }
+
+  // Verify the official checksum even for cached downloads.
+  const sumsResponse = await fetch(`${baseUrl}/SHASUMS256.txt`);
+  if (!sumsResponse.ok) {
+    throw new Error(
+      `Failed to download Node.js checksums: ${sumsResponse.status}`,
+    );
+  }
+  const sums = await sumsResponse.text();
+  const checksumLine = sums
+    .split('\n')
+    .map((line) => line.trim())
+    .find((line) => line.endsWith(` ${name}.${ext}`));
+  if (!checksumLine) {
+    throw new Error(`No checksum found for ${name}.${ext}`);
+  }
+  const expected = checksumLine.split(/\s+/)[0];
+  const hash = createHash('sha256');
+  for await (const chunk of createReadStream(archive)) {
+    hash.update(chunk);
+  }
+  const actual = hash.digest('hex');
+  if (actual !== expected) {
+    rmSync(archive, { force: true });
+    throw new Error(
+      `Checksum mismatch for ${name}.${ext}: expected ${expected}, got ${actual}`,
+    );
+  }
+
+  const runtimeDir = join(
+    ROOT,
+    'apps',
+    'desktop',
+    'buildResources',
+    'node',
+  );
+  const buildResources = dirname(runtimeDir);
+  const extracted = join(buildResources, name);
+  rmSync(runtimeDir, { recursive: true, force: true });
+  rmSync(extracted, { recursive: true, force: true });
+
+  if (isWindows) {
+    run(`tar -xf "${archive}" -C "${buildResources}"`);
+  } else {
+    run(`tar -xzf "${archive}" -C "${buildResources}"`);
+  }
+  renameSync(extracted, runtimeDir);
+
+  // Headers and man pages are not needed to run the server or npm.
+  rmSync(join(runtimeDir, 'include'), { recursive: true, force: true });
+  rmSync(join(runtimeDir, 'share'), { recursive: true, force: true });
+
+  const nodeBin = join(
+    runtimeDir,
+    isWindows ? 'node.exe' : join('bin', 'node'),
+  );
+  if (!existsSync(nodeBin)) {
+    throw new Error(`Bundled Node.js runtime is incomplete: ${nodeBin}`);
+  }
+
+  return { dir: runtimeDir, bin: nodeBin, version: NODE_RUNTIME_VERSION };
+}
+
+// better-sqlite3 is the only native addon that depends on the Node ABI. Fetch
+// the prebuild for the *bundled* Node version so it matches the runtime shipped
+// in the app, not the machine running the build.
+function prepareServerNativeModules(nodeVersion, platform, arch) {
   const deployDir = join(ROOT, 'apps', 'server', 'deploy');
   const betterSqliteDir = join(
     deployDir,
     'node_modules',
     'better-sqlite3',
   );
-  const electronPkg = join(
-    ROOT,
-    'apps',
-    'desktop',
-    'node_modules',
-    'electron',
-    'package.json',
-  );
 
   if (!existsSync(betterSqliteDir)) {
     console.error(
       'Error: apps/server/deploy is missing better-sqlite3. Run `pnpm build:server:deploy` first.',
     );
-    process.exit(1);
-  }
-  if (!existsSync(electronPkg)) {
-    console.error('Error: Electron is not installed. Run `pnpm install` first.');
     process.exit(1);
   }
 
@@ -68,11 +156,8 @@ function rebuildServerNativeModules(arch) {
     force: true,
   });
 
-  const electronVersion = JSON.parse(readFileSync(electronPkg, 'utf8')).version;
   // Resolve prebuild-install from the deployed better-sqlite3 so the download
-  // only ever touches the package we are about to ship. Walking the workspace
-  // (for example with @electron/rebuild) can rewrite the developer's own
-  // node_modules copy for Electron's ABI and break local dev/tests.
+  // only ever touches the package we are about to ship.
   const requireFromBetterSqlite = createRequire(
     join(betterSqliteDir, 'package.json'),
   );
@@ -93,17 +178,17 @@ function rebuildServerNativeModules(arch) {
   rmSync(join(betterSqliteDir, 'build'), { recursive: true, force: true });
 
   console.log(
-    `\nFetching better-sqlite3 prebuild for Electron ${electronVersion} (${process.platform}-${arch})...`,
+    `\nFetching better-sqlite3 prebuild for Node ${nodeVersion} (${platform}-${arch})...`,
   );
   try {
     run(
-      `node "${prebuildInstall}" --runtime=electron --target=${electronVersion} --arch=${arch} --platform=${process.platform}`,
+      `node "${prebuildInstall}" --runtime=node --target=${nodeVersion} --arch=${arch} --platform=${platform}`,
       betterSqliteDir,
     );
   } catch {
     console.error(
-      `\nError: better-sqlite3 has no Electron ${electronVersion} (${process.platform}-${arch}) prebuild.\n` +
-        'Upgrade better-sqlite3 or pick an Electron version that has a matching prebuild.',
+      `\nError: better-sqlite3 has no Node ${nodeVersion} (${platform}-${arch}) prebuild.\n` +
+        'Upgrade better-sqlite3 or choose a Node.js version that has a matching prebuild.',
     );
     process.exit(1);
   }
@@ -172,7 +257,8 @@ switch (target) {
     clean(distDir);
 
     run('pnpm build:server:deploy');
-    rebuildServerNativeModules(arch);
+    const nodeRuntime = await fetchNodeRuntime(process.platform, arch);
+    prepareServerNativeModules(nodeRuntime.version, process.platform, arch);
     run('pnpm turbo build --filter=@mugiwara-manga/desktop');
 
     run(

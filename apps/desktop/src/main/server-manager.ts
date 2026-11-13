@@ -1,5 +1,5 @@
 import { spawn, ChildProcess } from "child_process";
-import { appendFileSync, mkdirSync, writeFileSync } from "fs";
+import { appendFileSync, existsSync, mkdirSync, writeFileSync } from "fs";
 import path from "path";
 import { app } from "electron";
 import net from "net";
@@ -7,6 +7,16 @@ import net from "net";
 interface ServerConfig {
   port: number;
   dataDir: string;
+}
+
+/** Put the bundled Node.js runtime first so `npm` resolves to the same version. */
+function prependToPath(env: NodeJS.ProcessEnv, dir: string): NodeJS.ProcessEnv {
+  const pathKey =
+    Object.keys(env).find((key) => key.toUpperCase() === "PATH") ?? "PATH";
+  return {
+    ...env,
+    [pathKey]: [dir, env[pathKey]].filter(Boolean).join(path.delimiter),
+  };
 }
 
 export class ServerManager {
@@ -61,33 +71,45 @@ export class ServerManager {
       return this.config.port; // In dev mode, server is started separately by turbo, so just return the port
     }
 
-    // Run the embedded server with Electron's own Node runtime instead of a
-    // system `node`. GUI apps launched from Finder/Explorer get a minimal
-    // PATH, so `spawn("node")` fails with ENOENT even when Node is installed.
-    // ELECTRON_RUN_AS_NODE turns the app binary itself into a Node-compatible
-    // runtime, which is always present and keeps the version predictable.
-    const serverCmd = process.execPath;
+    // Run the embedded server with the Node.js runtime bundled in the app.
+    // GUI apps launched from Finder/Explorer get a minimal PATH, so spawning a
+    // system `node` fails with ENOENT even when Node is installed. The bundle
+    // also ships npm, which the plugin system needs to install packages.
+    const nodeRuntimeDir = path.join(process.resourcesPath, "node");
+    const serverCmd =
+      process.platform === "win32"
+        ? path.join(nodeRuntimeDir, "node.exe")
+        : path.join(nodeRuntimeDir, "bin", "node");
+    if (!existsSync(serverCmd)) {
+      throw new Error(
+        `The bundled Node.js runtime is missing (${serverCmd}). Rebuild the desktop app.`,
+      );
+    }
     const serverArgs = [path.join(process.resourcesPath, "server/index.js")];
     // Never inherit the launching process' working directory: on macOS a
     // Finder-launched app starts in "/", which would make relative storage
     // paths unwritable.
     const serverCwd = app.getPath("userData");
+    const nodeBinDir = path.dirname(serverCmd);
 
-    // Set environment variables
-    const env = {
-      ...process.env,
-      ELECTRON_RUN_AS_NODE: "1",
-      PORT: this.config.port.toString(),
-      DATA_DIR: this.config.dataDir,
-      WEB_DIR: path.join(process.resourcesPath, "web"),
-      HOST: "0.0.0.0",
-      NODE_ENV: "production",
-      // The desktop shell deliberately allows plugin installation even though
-      // the embedded server binds the LAN interface. Plugin installs still
-      // require an admin token, explicit confirmation, an approved registry and
-      // npm lifecycle scripts are disabled.
-      MUGIWARA_ALLOW_REMOTE_PLUGIN_INSTALL: "true",
-    };
+    // Set environment variables. The bundled bin directory goes first so npm,
+    // npx and any plugin tooling run on the same Node.js version.
+    const env = prependToPath(
+      {
+        ...process.env,
+        PORT: this.config.port.toString(),
+        DATA_DIR: this.config.dataDir,
+        WEB_DIR: path.join(process.resourcesPath, "web"),
+        HOST: "0.0.0.0",
+        NODE_ENV: "production",
+        // The desktop shell deliberately allows plugin installation even though
+        // the embedded server binds the LAN interface. Plugin installs still
+        // require an admin token, explicit confirmation, an approved registry and
+        // npm lifecycle scripts are disabled.
+        MUGIWARA_ALLOW_REMOTE_PLUGIN_INSTALL: "true",
+      },
+      nodeBinDir,
+    );
 
     this.log("MANAGER", `Starting server on port ${this.config.port}`);
     this.log("MANAGER", `Command: ${serverCmd} ${serverArgs.join(" ")}`);
